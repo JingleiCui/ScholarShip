@@ -42,6 +42,8 @@ def external_status(user: Identity = Depends(identity)):
             "deepseek": bool(cfg.deepseek_api_key.get_secret_value()),
             "dashscope": bool(cfg.dashscope_api_key.get_secret_value()),
             "mineru": bool(cfg.mineru_api_key.get_secret_value()),
+            "chatanywhere": bool(cfg.chatanywhere_api_key.get_secret_value()),
+            "openrouter": bool(cfg.openrouter_api_key.get_secret_value()),
         },
         "account_quotas_verified": False,
         "research_qa_available": False,

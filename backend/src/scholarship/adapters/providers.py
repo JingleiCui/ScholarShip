@@ -274,48 +274,57 @@ class Answerer(OfflineWire):
                 ],
             },
         )
-        try:
-            choice = d["choices"][0]
-            if choice["finish_reason"] != "stop" or choice["message"].get("tool_calls"):
-                raise ContractError("incomplete_or_tool_response")
-            answer = json.loads(choice["message"]["content"])
-            if (
-                not isinstance(answer.get("answer"), str)
-                or type(answer.get("insufficient_evidence")) is not bool
-                or not isinstance(answer.get("claims"), list)
-            ):
-                raise ContractError("invalid_answer_schema")
-            if answer["insufficient_evidence"] and answer["claims"]:
-                raise ContractError("unsupported_claims")
-            if not answer["insufficient_evidence"] and not answer["claims"]:
-                raise ContractError("uncited_answer")
-            for claim in answer["claims"]:
-                if not isinstance(claim.get("text"), str) or not claim["text"] or not claim.get("citations"):
-                    raise ContractError("uncited_claim")
-                for citation in claim["citations"]:
-                    e = ids.get(citation["evidence_id"])
-                    a = integer(citation["start"])
-                    b = integer(citation["end"], minimum=1)
-                    if (
-                        not e
-                        or e.representation != "verbatim"
-                        or not a < b <= len(e.text)
-                        or citation["quote"] != e.text[a:b]
-                    ):
-                        raise ContractError("citation_not_exact_original_span")
-                    citation["page"] = e.page  # Provider cannot choose a page from another document.
-            answer["verification"] = "exact_citation_spans_only"
-            if answer["insufficient_evidence"]:
-                answer["answer"] = "证据不足，无法据此回答。"
+        return validate_answer_response(d, evidence)
+
+
+def validate_answer_response(d, evidence, *, require_usage=True):
+    """Shared exact-span validator; missing usage remains unknown for new adapters."""
+    ids = {e.id: e for e in evidence}
+    try:
+        choice = d["choices"][0]
+        if choice["finish_reason"] != "stop" or choice["message"].get("tool_calls"):
+            raise ContractError("incomplete_or_tool_response")
+        answer = json.loads(choice["message"]["content"])
+        if (
+            not isinstance(answer.get("answer"), str)
+            or type(answer.get("insufficient_evidence")) is not bool
+            or not isinstance(answer.get("claims"), list)
+        ):
+            raise ContractError("invalid_answer_schema")
+        if answer["insufficient_evidence"] and answer["claims"]:
+            raise ContractError("unsupported_claims")
+        if not answer["insufficient_evidence"] and not answer["claims"]:
+            raise ContractError("uncited_answer")
+        for claim in answer["claims"]:
+            if not isinstance(claim.get("text"), str) or not claim["text"] or not claim.get("citations"):
+                raise ContractError("uncited_claim")
+            for citation in claim["citations"]:
+                e = ids.get(citation["evidence_id"])
+                a = integer(citation["start"])
+                b = integer(citation["end"], minimum=1)
+                if (
+                    not e
+                    or e.representation != "verbatim"
+                    or not a < b <= len(e.text)
+                    or citation["quote"] != e.text[a:b]
+                ):
+                    raise ContractError("citation_not_exact_original_span")
+                citation["page"] = e.page  # Provider cannot choose a page from another document.
+        answer["verification"] = "exact_citation_spans_only"
+        if answer["insufficient_evidence"]:
+            answer["answer"] = "证据不足，无法据此回答。"
+        if require_usage or "usage" in d:
             usage = {
                 "input_tokens": integer(d["usage"]["prompt_tokens"]),
                 "output_tokens": integer(d["usage"]["completion_tokens"]),
             }
-            return ProviderResult(answer, usage, d.get("model"), d.get("id"))
-        except (KeyError, TypeError, AttributeError, IndexError, ValueError) as exc:
-            if isinstance(exc, ContractError):
-                raise
-            raise ContractError("invalid_answer_response") from None
+        else:
+            usage = {"input_tokens": None, "output_tokens": None}
+        return ProviderResult(answer, usage, d.get("model"), d.get("id"))
+    except (KeyError, TypeError, AttributeError, IndexError, ValueError) as exc:
+        if isinstance(exc, ContractError):
+            raise
+        raise ContractError("invalid_answer_response") from None
 
 
 class MinerU(OfflineWire):

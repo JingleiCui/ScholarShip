@@ -1,6 +1,6 @@
 # M2 下一阶段评审：真实联调准入准备
 
-状态：待用户确认。离线业务链路已通过[验收](business-report.md)，真实科研质量尚未验收。
+状态：已转入新的统一模型方案。ChatAnywhere、OpenRouter 与 MinerU 凭据已填写，但只检测存在性；本批配置见[说明](../models/configuration.md)，后续真实联调见[新评审](../models/live-review.md)。原文保留为历史准备范围。离线业务链路已通过[验收](business-report.md)，真实科研质量尚未验收。
 
 建议下一批仅准备凭据配置和账户额度核验：
 

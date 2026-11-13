@@ -8,6 +8,8 @@
 
 2026-11-13：需求、技术、架构、数据设计和环境方案均已确认。**M0 已验收，M1 文献导入与本地预览已实现**，详见[初始化验收报告](docs/initialization-report.md)。文献库和原文预览已可使用；M2 离线业务链路已接通（76 项测试通过），含合成深解析、混合检索、持久化问答与引用定位，见 [本批报告](docs/m2/business-report.md)。外部服务关闭，合成演示不代表科研效果。真实 OCR、翻译、问答及其余模块待后续增量开发。见 [M1 验收报告](docs/m1-report.md)。
 
+多模型配置已实现（114 项回归通过）：默认选择 ChatAnywhere 文本模型＋OpenRouter Nemotron 免费向量/重排，本地/合成配置保留。密钥存在性已检测，实际权限、免费额度与推理仍未验证，见[配置说明](docs/models/configuration.md)和[本批报告](docs/models/report.md)。常用选项在根目录 `model_config.py`，真实请求保持关闭。
+
 PyCharm 已绑定本项目 `.venv/bin/python`（3.12.16）。日常选择 **ScholarShip All** 或直接运行 `dev.py`；页面为 http://127.0.0.1:15173 ，API 文档为 http://127.0.0.1:18080/docs 。数据库等基础容器需已启动。
 
 首次运行 `bootstrap.py`，健康诊断运行 `doctor.py`，一键验收运行 `validate.py`。配置集中在各入口文件顶部；密钥在不入 Git 的 `.env` 中。账号 `researcher` / `reviewer` 的初始密码分别读取 `INITIAL_USER_PASSWORD` / `INITIAL_REVIEWER_PASSWORD`；已有账号不会被初始化脚本重置。详见[运行手册](docs/runbook.md)。

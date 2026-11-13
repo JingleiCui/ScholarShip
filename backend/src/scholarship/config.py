@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     api_port: int = 18080
     frontend_port: int = 15173
     external_services_enabled: bool = False
+    chatanywhere_api_key: SecretStr = SecretStr("")
+    openrouter_api_key: SecretStr = SecretStr("")
     deepseek_api_key: SecretStr = SecretStr("")
     dashscope_workspace_id: str = ""
     dashscope_api_key: SecretStr = SecretStr("")

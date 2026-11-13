@@ -19,6 +19,7 @@ from scholarship.domains.retrieval_profile import canonical, digest
 from scholarship.domains.runs import emit, public_run
 from scholarship.infrastructure.database import tenant_transaction
 from scholarship.infrastructure.schema import tables as T
+from scholarship.models.configuration import load_selection
 
 # USER CONFIGURATION: tiny explicit fixtures, not competition acceptance answers.
 DEMO_DOCS = [
@@ -77,7 +78,23 @@ def enqueue(owner, project, kind, key, inputs, *, dispatch=True):
                     idempotency_key=key,
                     request_sha256=h,
                     input_json=inputs,
-                    config_json={"mode": "synthetic", "revision": "offline-business-v1"},
+                    config_json={
+                        "mode": "synthetic",
+                        "revision": "offline-business-v1",
+                        "models": load_selection(
+                            "mock",
+                            overrides={
+                                role: key
+                                for role, key in {
+                                    "chat": "mock_chat",
+                                    "translation": "mock_chat",
+                                    "embedding": "mock_embedding",
+                                    "rerank": "mock_rerank",
+                                    "parser": "mock_parser",
+                                }.items()
+                            },
+                        ).snapshot(),
+                    },
                     input_scope_json={"generations": scope},
                     next_event_seq=1,
                     event_floor=1,

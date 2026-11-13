@@ -91,18 +91,26 @@ def block_rows(conn, pid):
     )
 
 
-def prepare_generation(owner, vid, pid):
+def prepare_generation(owner, vid, pid, profile_id=None):
     with tenant_transaction(owner) as conn:
         v = version_scope(conn, vid)
         conn.execute(sa.select(T["paper_versions"].c.id).where(T["paper_versions"].c.id == vid).with_for_update())
-        p = profile(conn)
+        p = (
+            profile(conn)
+            if profile_id is None
+            else conn.execute(sa.select(T["index_profiles"]).where(T["index_profiles"].c.id == profile_id))
+            .mappings()
+            .one()
+        )
+        if profile_id is not None and p["config_json"].get("simulated") is not True:
+            raise ContractError("simulation_profile_required")
         parse = (
             conn.execute(
                 sa.select(T["document_parses"]).where(
                     T["document_parses"].c.id == pid,
                     T["document_parses"].c.version_id == vid,
                     T["document_parses"].c.status == "ready",
-                    T["document_parses"].c.parser_name == "synthetic-deep",
+                    T["document_parses"].c.mode == "deep",
                 )
             )
             .mappings()
@@ -127,7 +135,7 @@ def prepare_generation(owner, vid, pid):
                 T["index_generations"].c.version_id == vid
             )
         )
-        collection = f"ss_p_{v['project_id'].hex}_{PROFILE_HASH[:16]}"
+        collection = f"ss_p_{v['project_id'].hex}_{p['fingerprint'][:16]}"
         gid = conn.scalar(
             T["index_generations"]
             .insert()
@@ -221,12 +229,12 @@ def payload(g, c, v):
     }
 
 
-def ensure_collection(client, name):
+def ensure_collection(client, name, dimensions=1024):
     # Serialize create/index initialization across generations in the same project.
     if not client.collection_exists(name):
         client.create_collection(
             name,
-            vectors_config={"dense": m.VectorParams(size=1024, distance=m.Distance.COSINE, on_disk=True)},
+            vectors_config={"dense": m.VectorParams(size=dimensions, distance=m.Distance.COSINE, on_disk=True)},
             on_disk_payload=True,
         )
     for key in [
@@ -254,8 +262,42 @@ def ensure_collection(client, name):
     )
 
 
-def build_index(owner, vid, pid, run, *, after_upsert=None):
-    g = prepare_generation(owner, vid, pid)
+def build_index(owner, vid, pid, run, *, after_upsert=None, model_selection=None, model_client=None):
+    profile_id = None
+    expected_vectors = {}
+    dimensions = 1024
+    if model_selection is not None:
+        from scholarship.models.runtime import ModelExecutor, register_embedding_profile
+        from scholarship.models.adapters import ModelResult
+        from scholarship.models.configuration import fingerprint
+
+        if model_client is None or model_client.spec != model_selection.roles["embedding"]:
+            raise ContractError("embedding_config_mismatch")
+        with tenant_transaction(owner) as conn:
+            version_scope(conn, vid)
+            texts = [
+                text
+                for b in block_rows(conn, pid)
+                if b["kind"] != "other"
+                for _, _, text, _ in chunks(b["canonical_text"], b["kind"])
+            ]
+        if not texts:
+            raise ContractError("no_indexable_blocks")
+        executor_new = ModelExecutor(owner)
+        probe_key = f"dimension:{pid}:{fingerprint(model_selection.snapshot())[:16]}"
+        probe = executor_new.execute(
+            run,
+            probe_key,
+            model_selection,
+            "embedding",
+            model_client,
+            {"texts": [texts[0]], "input_kind": "document"},
+            "embed",
+        )
+        result = ModelResult(**probe)
+        profile_id = register_embedding_profile(owner, model_client.spec, result)
+        dimensions = result.dimensions
+    g = prepare_generation(owner, vid, pid, profile_id)
     if g["status"] == "ready":
         return g["id"]
     with tenant_transaction(owner) as conn:
@@ -277,25 +319,41 @@ def build_index(owner, vid, pid, run, *, after_upsert=None):
     with closing(qdrant_client()) as client:
         with tenant_transaction(owner) as conn:
             conn.execute(sa.text("SELECT pg_advisory_xact_lock(hashtextextended(:k,0))"), {"k": g["collection_name"]})
-            ensure_collection(client, g["collection_name"])
+            ensure_collection(client, g["collection_name"], dimensions)
         for offset in range(0, len(rows), 10):
             batch = rows[offset : offset + 10]
             arguments = {"texts": [c["canonical_text"] for c in batch]}
-            step = call_step(owner, g["project_id"], run, f"index:{g['id']}:{offset}", arguments)
-            receipt = executor.execute(
-                step,
-                f"index:{g['id']}:{offset}",
-                embed,
-                "embedding",
-                arguments,
-                maximum_input=sum(len(t.encode()) for t in arguments["texts"]),
-            )
-            finish_call(owner, step, receipt)
+            if model_selection is None:
+                step = call_step(owner, g["project_id"], run, f"index:{g['id']}:{offset}", arguments)
+                receipt = executor.execute(
+                    step,
+                    f"index:{g['id']}:{offset}",
+                    embed,
+                    "embedding",
+                    arguments,
+                    maximum_input=sum(len(t.encode()) for t in arguments["texts"]),
+                )
+                finish_call(owner, step, receipt)
+                vectors = receipt["result"]
+            else:
+                receipt = executor_new.execute(
+                    run,
+                    f"embed:{g['id']}:{offset}",
+                    model_selection,
+                    "embedding",
+                    model_client,
+                    {**arguments, "expected_dimensions": dimensions, "input_kind": "document"},
+                    "embed",
+                )
+                vectors = receipt["value"]
+            for c, vec in zip(batch, vectors, strict=True):
+                length = sum(n * n for n in vec) ** 0.5
+                expected_vectors[str(c["point_id"])] = [n / length for n in vec]
             client.upsert(
                 g["collection_name"],
                 points=[
                     m.PointStruct(id=str(c["point_id"]), vector={"dense": vec}, payload=payload(g, c, v))
-                    for c, vec in zip(batch, receipt["result"], strict=True)
+                    for c, vec in zip(batch, vectors, strict=True)
                 ],
                 wait=True,
             )
@@ -310,11 +368,11 @@ def build_index(owner, vid, pid, run, *, after_upsert=None):
             raise ContractError("index_manifest_count_mismatch")
         for c in rows:
             point = byid.get(str(c["point_id"]))
-            expected = receipt_vector(c["canonical_text"])
+            expected = expected_vectors[str(c["point_id"])]
             if (
                 not point
                 or point.payload != payload(g, c, v)
-                or len(point.vector.get("dense", [])) != 1024
+                or len(point.vector.get("dense", [])) != dimensions
                 or any(abs(a - b) > 1e-5 for a, b in zip(point.vector["dense"], expected, strict=True))
             ):
                 raise ContractError("index_manifest_content_mismatch")

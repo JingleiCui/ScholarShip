@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import ServiceStatus from "./ServiceStatus";
+import ModelConfiguration from "./ModelConfiguration";
 import OfflineResearch from "./OfflineResearch";
 const Library = React.lazy(() => import("./Library"));
 
@@ -300,7 +301,8 @@ function App() {
         </header>
         <div className="content">
           {active === -1 && <ServiceStatus userId={user?.id} />}
-          {(active === -1 || active === 2) && <OfflineResearch key={`${user?.id}:${project}`} project={project} userId={user?.id} role={user?.role} />}
+          {active === -1 && <ModelConfiguration key={`models:${user?.id}:${project}`} project={project} role={user?.role} />}
+          {(active === -1 || active === 2) && <OfflineResearch key={`offline:${user?.id}:${project}`} project={project} userId={user?.id} role={user?.role} />}
           {(active === 0 || active === 1) && (
             <React.Suspense fallback={<p>正在加载文献阅读器…</p>}>
               <Library project={project} />

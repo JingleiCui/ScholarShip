@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 CATALOG_PATH = Path(__file__).with_name("schema_catalog.json")
-REVISION = "0005_offline_profile"
+REVISION = "0006_model_runtime"
 
 
 def constraint_name(kind: str, table: str, detail: str) -> str:

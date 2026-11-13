@@ -59,7 +59,7 @@ def public_meta():
     return {
         "name": "ScholarShip",
         "version": "0.1.0",
-        "stage": "M2 · 离线检索与证据链路",
+        "stage": "M2 · 多模型统一配置",
         "modules": [
             {"name": name, "status": "planned"}
             for name in ["文献管理", "论文阅读与翻译", "检索与推荐", "知识图谱", "写作与研究核验", "数据分析与绘图"]

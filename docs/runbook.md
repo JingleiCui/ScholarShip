@@ -56,3 +56,7 @@ Run `verify_m2.py` 执行四类适配契约和独立测试库账务检查，不�
 ## M2 离线业务演示
 
 研究账号在工作台点击“准备合成文档与索引”，选择文献后运行离线问答，点击引用查看原文。刷新会恢复最近任务；所有回答明确标记合成数据。Run `verify_m2_business.py` 验证新增业务链路，Run `storage_preflight.py` 检查共享文件。真实模型、云端解析和科研效果尚未验收，见[本批报告](m2/business-report.md)。
+
+## 统一模型配置
+
+根目录 `model_config.py` 集中配置 mock/local/free_api，私有 `.env` 保存 Key。工作台可为当前项目保存命名配置组，配置变更不启用推理；有索引变更提示时保留原活动索引。Run `verify_models.py` 默认只做脱敏配置诊断；Run `local_models.py` 默认只检查隔离环境，不安装、不推理。依赖准备与启动选项见[配置说明](models/configuration.md)。本批 114 项回归通过，真实 HTTP 执行器和账户联调尚未开放。

@@ -25,6 +25,20 @@ WORKER_START_TIMEOUT = 20
 
 @pytest.fixture(scope="session", autouse=True)
 def database():
+    # Provider credentials must never enter integration-test processes.
+    provider_keys = [
+        "DEEPSEEK_API_KEY",
+        "DASHSCOPE_API_KEY",
+        "DASHSCOPE_WORKSPACE_ID",
+        "MINERU_API_KEY",
+        "CHATANYWHERE_API_KEY",
+        "OPENROUTER_API_KEY",
+        "EXTERNAL_SERVICES_ENABLED",
+        "LANGSMITH_TRACING",
+    ]
+    previous_provider_environment = {key: os.environ.get(key) for key in provider_keys}
+    for key in provider_keys:
+        os.environ[key] = "false" if key in {"EXTERNAL_SERVICES_ENABLED", "LANGSMITH_TRACING"} else ""
     name = TEST_DATABASE_PREFIX + uuid4().hex
     admin = admin_engine("postgres")
     with admin.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
@@ -83,6 +97,11 @@ def database():
             os.environ["SCHOLAR_DATA_DIR"] = previous_data_env
         if test_data.parent == PROJECT_ROOT / "var/tests" and test_data.name.startswith(TEST_DATABASE_PREFIX):
             shutil.rmtree(test_data, ignore_errors=True)
+        for key, previous_value in previous_provider_environment.items():
+            if previous_value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = previous_value
         settings.cache_clear()
 
 
