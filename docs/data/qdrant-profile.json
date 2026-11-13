@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "status": "design_confirmed_not_deployed",
+  "design_date": "2026-11-13",
+  "profile_key": "dashscope_text_embedding_v4_d1024_chunk_v1_lex_v1",
+  "embedding": {
+    "provider": "dashscope",
+    "model": "text-embedding-v4",
+    "dimensions": 1024,
+    "distance": "Cosine",
+    "document_prefix": "",
+    "query_prefix": "",
+    "batch_size": 10,
+    "provider_max_tokens_per_item": 8192
+  },
+  "chunking": {
+    "revision": "v1",
+    "target_tokens": 600,
+    "max_tokens": 900,
+    "overlap_tokens": 80,
+    "tokenizer": "version_to_be_locked_before_initialization",
+    "preserve_formula": true,
+    "split_large_tables_by_rows": true
+  },
+  "point_identity": {
+    "algorithm": "UUIDv5",
+    "namespace": "7e5ecc3f-57fc-589c-8601-f1e4b15b3dc4",
+    "name_format": "{project_id}:{index_generation_id}:{chunk_no}"
+  },
+  "collection": {
+    "scope": "one_per_project_per_profile",
+    "name_format": "ss_p_{project_uuid_compact}_{profile_fingerprint_12}",
+    "create_template": {
+      "vectors": {
+        "dense": {
+          "size": 1024,
+          "distance": "Cosine",
+          "on_disk": true
+        }
+      },
+      "shard_number": 1,
+      "replication_factor": 1,
+      "on_disk_payload": true
+    }
+  },
+  "lexical": {
+    "engine": "qdrant_native_full_text_bm25",
+    "revision": "v1",
+    "payload_field": "lexical_text",
+    "preprocess": {
+      "unicode_normalization": "NFKC",
+      "preserve_original_canonical_text": true,
+      "numeric_and_symbol_aliases": true,
+      "cjk_char_bigram": true
+    },
+    "index_schema": {
+      "type": "text",
+      "tokenizer": "word",
+      "min_token_len": 1,
+      "max_token_len": 64,
+      "lowercase": true,
+      "scoring": true
+    }
+  },
+  "payload_indexes": [
+    {
+      "field_name": "owner_id",
+      "field_schema": "keyword"
+    },
+    {
+      "field_name": "project_id",
+      "field_schema": "keyword"
+    },
+    {
+      "field_name": "paper_id",
+      "field_schema": "keyword"
+    },
+    {
+      "field_name": "paper_version_id",
+      "field_schema": "keyword"
+    },
+    {
+      "field_name": "parse_revision_id",
+      "field_schema": "keyword"
+    },
+    {
+      "field_name": "index_generation_id",
+      "field_schema": "keyword"
+    },
+    {
+      "field_name": "profile_id",
+      "field_schema": "keyword"
+    },
+    {
+      "field_name": "chunk_id",
+      "field_schema": "keyword"
+    },
+    {
+      "field_name": "content_sha256",
+      "field_schema": "keyword"
+    },
+    {
+      "field_name": "block_kind",
+      "field_schema": "keyword"
+    },
+    {
+      "field_name": "page_start",
+      "field_schema": "integer"
+    },
+    {
+      "field_name": "page_end",
+      "field_schema": "integer"
+    }
+  ],
+  "required_payload_fields": [
+    "owner_id",
+    "project_id",
+    "paper_id",
+    "paper_version_id",
+    "parse_revision_id",
+    "index_generation_id",
+    "profile_id",
+    "chunk_id",
+    "content_sha256",
+    "block_kind",
+    "page_start",
+    "page_end",
+    "section_path",
+    "lexical_text"
+  ],
+  "retrieval": {
+    "dense_prefetch": 40,
+    "bm25_prefetch": 40,
+    "fusion": "rrf",
+    "rrf_k": 60,
+    "weights": [
+      1,
+      1
+    ],
+    "fusion_candidates": 40,
+    "rerank_candidates": 20,
+    "evidence_limit": 8,
+    "rerank_model_candidate": "qwen3-rerank",
+    "allow_silent_single_retriever_fallback": false,
+    "allow_silent_rerank_fallback": false
+  },
+  "authorization": {
+    "pre_filter_fields": [
+      "owner_id",
+      "project_id",
+      "profile_id",
+      "paper_version_id",
+      "index_generation_id"
+    ],
+    "postgres_post_validation": true,
+    "accept_client_collection_name": false,
+    "payload_is_authority": false
+  },
+  "compatibility_gate": [
+    "Verify server/client support native BM25 scoring and text/dense RRF before deploying",
+    "Record actual tokenizer and model identity; no collection exists yet",
+    "on_disk template must be checked against the selected pinned Qdrant version"
+  ]
+}

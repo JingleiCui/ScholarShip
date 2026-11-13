@@ -1,0 +1,564 @@
+{
+  "audit_date": "2026-11-13",
+  "source_root": "/Users/cuijinglei/Documents/homework/比赛/科研小助手",
+  "inspection_method": "PyMuPDF 2.1; file SHA-256, page count, first 3 pages text-layer sampling only",
+  "scope_limit": "Not OCR, deep parsing, retrieval or application acceptance. No source files modified or uploaded.",
+  "requirements_pdf": {
+    "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/科研小助手Agent-AI大模型.pdf",
+    "pages": 7,
+    "sha256": "58b406ac67aa2b53ff013ae9cac1920c8579ebdd0d3134afe4c06524f77862f6"
+  },
+  "summary": {
+    "pdf_count": 39,
+    "total_pages": 1986,
+    "total_bytes": 131842159
+  },
+  "files": [
+    {
+      "filename": "1607.06450v1.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/1607.06450v1.pdf",
+      "bytes": 612446,
+      "sha256": "c464f839fb8d59f7fde92f9b4caa67c2d1f2f196b88f93fb60502249df0aaef7",
+      "pages": 14,
+      "first_three_pages_text_chars": [
+        3652,
+        3822,
+        3897
+      ],
+      "first_page_excerpt": "Layer Normalization Jimmy Lei Ba University of Toronto jimmy@psi.toronto.edu Jamie Ryan Kiros University of Toronto rkiros@cs.toronto.edu Geoffrey E. Hinton Uni",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "1706.03762v1.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/1706.03762v1.pdf",
+      "bytes": 2128686,
+      "sha256": "0a9bff1be3575cf9fe26a4a3d3a9175bc791ecec90de8b9deba4cff75d2b9476",
+      "pages": 15,
+      "first_three_pages_text_chars": [
+        2718,
+        4149,
+        1389
+      ],
+      "first_page_excerpt": "Attention Is All You Need Ashish Vaswani∗ Google Brain avaswani@google.com Noam Shazeer∗ Google Brain noam@google.com Niki Parmar∗ Google Research nikip@google.",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "1706.03762v1_img.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/1706.03762v1_img.pdf",
+      "bytes": 4672118,
+      "sha256": "64094fe169dd4ff454f579e9f197298df1c118c24b71b1f1ca8bb218c9e4801d",
+      "pages": 15,
+      "first_three_pages_text_chars": [
+        0,
+        0,
+        0
+      ],
+      "first_page_excerpt": null,
+      "text_layer_note": "sampled_pages_have_no_text"
+    },
+    {
+      "filename": "1706.03762v7.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/1706.03762v7.pdf",
+      "bytes": 2215244,
+      "sha256": "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+      "pages": 15,
+      "first_three_pages_text_chars": [
+        2857,
+        4255,
+        1826
+      ],
+      "first_page_excerpt": "Provided proper attribution is provided, Google hereby grants permission to reproduce the tables and figures in this paper solely for use in journalistic or sch",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "1707.06347v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/1707.06347v2.pdf",
+      "bytes": 2923532,
+      "sha256": "e78feadadbdbb0b601b3c2bcc81404722cd431a489b307545f9b7bea1e8c4f5b",
+      "pages": 12,
+      "first_three_pages_text_chars": [
+        3334,
+        2655,
+        2401
+      ],
+      "first_page_excerpt": "Proximal Policy Optimization Algorithms John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov OpenAI {joschu, filip, prafulla, alec, oleg}@o",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "1910.02054v3.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/1910.02054v3.pdf",
+      "bytes": 779206,
+      "sha256": "c531734c7d9ee647fda9b4f0e1a6abd6d58ad34e862bc945451b09032be3167e",
+      "pages": 24,
+      "first_three_pages_text_chars": [
+        2680,
+        4026,
+        2438
+      ],
+      "first_page_excerpt": "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models Samyam Rajbhandari∗, JeﬀRasley∗, Olatunji Ruwase, Yuxiong He {samyamr, jerasley, olruwase, ",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "1910.10683v4.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/1910.10683v4.pdf",
+      "bytes": 1190021,
+      "sha256": "ad07e47cedf437a4156419ce5d3076e08a3e59bbfd6dac7cc53df1009cdcbe7f",
+      "pages": 67,
+      "first_three_pages_text_chars": [
+        2564,
+        3925,
+        2763
+      ],
+      "first_page_excerpt": "Journal of Machine Learning Research 21 (2020) 1-67 Submitted 1/20; Revised 6/20; Published 6/20 Exploring the Limits of Transfer Learning with a Unified Text-t",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2001.08361v1.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2001.08361v1.pdf",
+      "bytes": 2493004,
+      "sha256": "a41bd7877fd1a6bcbba096b2619618bd2f90e02488f2365644903eb2f7c6a494",
+      "pages": 30,
+      "first_three_pages_text_chars": [
+        1656,
+        1884,
+        3581
+      ],
+      "first_page_excerpt": "Scaling Laws for Neural Language Models Jared Kaplan ∗ Johns Hopkins University, OpenAI jaredk@jhu.edu Sam McCandlish∗ OpenAI sam@openai.com Tom Henighan OpenAI",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2002.04745v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2002.04745v2.pdf",
+      "bytes": 779713,
+      "sha256": "e1fa0519ed8e09a676d56c983e99ead5effd7ef840ae86a186729287469bf883",
+      "pages": 17,
+      "first_three_pages_text_chars": [
+        4704,
+        4827,
+        5128
+      ],
+      "first_page_excerpt": "On Layer Normalization in the Transformer Architecture Ruibin Xiong†* 1 2 Yunchang Yang* 3 Di He 4 5 Kai Zheng 4 Shuxin Zheng 5 Chen Xing 6 Huishuai Zhang 5 Yan",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2005.14165v4.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2005.14165v4.pdf",
+      "bytes": 6768044,
+      "sha256": "97fd272f1fdfc18677462d0292f5fbf26ca86b4d1b485c2dba03269b643a0e83",
+      "pages": 75,
+      "first_three_pages_text_chars": [
+        2425,
+        2340,
+        3732
+      ],
+      "first_page_excerpt": "Language Models are Few-Shot Learners Tom B. Brown∗ Benjamin Mann∗ Nick Ryder∗ Melanie Subbiah∗ Jared Kaplan† Prafulla Dhariwal Arvind Neelakantan Pranav Shyam ",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2010.11929v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2010.11929v2.pdf",
+      "bytes": 3743814,
+      "sha256": "8ce7b83971a14508ca711a27c875c9b6914c4f6767cf3150fb1ca6c07aa056d6",
+      "pages": 22,
+      "first_three_pages_text_chars": [
+        3500,
+        4608,
+        2872
+      ],
+      "first_page_excerpt": "Published as a conference paper at ICLR 2021 AN IMAGE IS WORTH 16X16 WORDS: TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE Alexey Dosovitskiy∗,†, Lucas Beyer∗, Ale",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "209_Emergent_Abilities_of_Larg.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/209_Emergent_Abilities_of_Larg.pdf",
+      "bytes": 629661,
+      "sha256": "2d5d4690b43be8965a6b17ae28b370ab4b8774b2213c41111c1f584cc3c447a3",
+      "pages": 30,
+      "first_three_pages_text_chars": [
+        2604,
+        4400,
+        4414
+      ],
+      "first_page_excerpt": "Published in Transactions on Machine Learning Research (08/2022) Emergent Abilities of Large Language Models Jason Wei 1 jasonwei@google.com Yi Tay 1 yitay@goog",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2101.03961v3.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2101.03961v3.pdf",
+      "bytes": 1304157,
+      "sha256": "f340f6ace31abf7d0730ef461404279f40d3c890e9cc2daeb7068b3304afdbd6",
+      "pages": 40,
+      "first_three_pages_text_chars": [
+        2300,
+        1933,
+        2538
+      ],
+      "first_page_excerpt": "Journal of Machine Learning Research 23 (2022) 1-40 Submitted 8/21; Revised 3/22; Published 4/22 Switch Transformers: Scaling to Trillion Parameter Models with ",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2103.00020v1.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2103.00020v1.pdf",
+      "bytes": 6813639,
+      "sha256": "6478b6e571a7d6fcd846d8ef77bfd60c285f1986abb8f475eedc43de403074f5",
+      "pages": 48,
+      "first_three_pages_text_chars": [
+        4629,
+        4697,
+        5137
+      ],
+      "first_page_excerpt": "Learning Transferable Visual Models From Natural Language Supervision Alec Radford * 1 Jong Wook Kim * 1 Chris Hallacy 1 Aditya Ramesh 1 Gabriel Goh 1 Sandhini ",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2106.09685v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2106.09685v2.pdf",
+      "bytes": 1609513,
+      "sha256": "e9a0d3128767db616085dc0f4e6e455e672e89af823e8ed1282793682787395a",
+      "pages": 26,
+      "first_three_pages_text_chars": [
+        3101,
+        3900,
+        4028
+      ],
+      "first_page_excerpt": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS Edward Hu∗ Yelong Shen∗ Phillip Wallis Zeyuan Allen-Zhu Yuanzhi Li Shean Wang Lu Wang Weizhu Chen Microsoft",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2107.03374v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2107.03374v2.pdf",
+      "bytes": 1885177,
+      "sha256": "ebae72ea0e8a5eb2ecbccdb985aec6cc1254a7c4d29e6d4de7866db1e66c4855",
+      "pages": 35,
+      "first_three_pages_text_chars": [
+        4372,
+        4846,
+        1929
+      ],
+      "first_page_excerpt": "Evaluating Large Language Models Trained on Code Mark Chen * 1 Jerry Tworek * 1 Heewoo Jun * 1 Qiming Yuan * 1 Henrique Ponde de Oliveira Pinto * 1 Jared Kaplan",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2201.11903v6.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2201.11903v6.pdf",
+      "bytes": 891773,
+      "sha256": "7d9f878c23b460e4566aa4ec9201b1abfb3b8faefb2b1356e411cb90fef72a12",
+      "pages": 43,
+      "first_three_pages_text_chars": [
+        2302,
+        4399,
+        4195
+      ],
+      "first_page_excerpt": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models Jason Wei Xuezhi Wang Dale Schuurmans Maarten Bosma Brian Ichter Fei Xia Ed H. Chi Quoc V.",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2203.02155v1.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2203.02155v1.pdf",
+      "bytes": 1797405,
+      "sha256": "c1984bb50a5b90fddb895fdc3a0f72e5bc977148c9f63ef6040cbe7a3e1f0d98",
+      "pages": 68,
+      "first_three_pages_text_chars": [
+        2529,
+        3669,
+        2838
+      ],
+      "first_page_excerpt": "Training language models to follow instructions with human feedback Long Ouyang∗ Jeff Wu∗ Xu Jiang∗ Diogo Almeida∗ Carroll L. Wainwright∗ Pamela Mishkin∗ Chong ",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2205.14135v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2205.14135v2.pdf",
+      "bytes": 2630825,
+      "sha256": "ca7f9fda10b90fc05dd291a3accc85e9c1a4a860b99b31928dab03ed3fcb14e4",
+      "pages": 34,
+      "first_three_pages_text_chars": [
+        3560,
+        4030,
+        4316
+      ],
+      "first_page_excerpt": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention with IO-Awareness Tri Dao†, Daniel Y. Fu†, Stefano Ermon†, Atri Rudra‡, and Christopher Ré† †Department ",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2206.07682v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2206.07682v2.pdf",
+      "bytes": 842905,
+      "sha256": "f457f08102eb381f2300e1653bf4c82a9aa5dce0eb8dba8fe744ccc2500c3755",
+      "pages": 30,
+      "first_three_pages_text_chars": [
+        2645,
+        4400,
+        4414
+      ],
+      "first_page_excerpt": "Published in Transactions on Machine Learning Research (08/2022) Emergent Abilities of Large Language Models Jason Wei 1 jasonwei@google.com Yi Tay 1 yitay@goog",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2210.02414v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2210.02414v2.pdf",
+      "bytes": 4743570,
+      "sha256": "82d5b9634b3d2601b3eb494dcc9e2189132f5d6e479233b91c7ce411dbdfcfa4",
+      "pages": 56,
+      "first_three_pages_text_chars": [
+        3605,
+        4423,
+        3547
+      ],
+      "first_page_excerpt": "Published as a conference paper at ICLR 2023 GLM-130B: AN OPEN BILINGUAL PRE-TRAINED MODEL Aohan Zeng⋄†∗, Xiao Liu⋄†∗, Zhengxiao Du⋄†, Zihan Wang⋄, Hanyu Lai⋄, ",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2211.05100v4.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2211.05100v4.pdf",
+      "bytes": 3029243,
+      "sha256": "8033c3e611aaa120cb7294085ebd6ee297ffae9ec02393b1c4f1593d7e6ee065",
+      "pages": 73,
+      "first_three_pages_text_chars": [
+        3763,
+        3970,
+        3479
+      ],
+      "first_page_excerpt": "BLOOM: A 176B-Parameter Open-Access Multilingual Language Model BigScience Workshop∗ Major Contributors Teven Le Scao, Angela Fan, Christopher Akiki, Ellie Pavl",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2212.04356v1.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2212.04356v1.pdf",
+      "bytes": 1008644,
+      "sha256": "6337bde031b2f237547a977b022f831169a7e05b4d9047f29501166d83594566",
+      "pages": 28,
+      "first_three_pages_text_chars": [
+        4654,
+        5540,
+        5647
+      ],
+      "first_page_excerpt": "Robust Speech Recognition via Large-Scale Weak Supervision Alec Radford * 1 Jong Wook Kim * 1 Tao Xu 1 Greg Brockman 1 Christine McLeavey 1 Ilya Sutskever 1 Abs",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2303.08774v6.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2303.08774v6.pdf",
+      "bytes": 5245564,
+      "sha256": "c33a66dadca2388d7b172d6293b00dc32b71110c6f38fafe0d41112e61be7774",
+      "pages": 100,
+      "first_three_pages_text_chars": [
+        3437,
+        4006,
+        1134
+      ],
+      "first_page_excerpt": "GPT-4 Technical Report OpenAI∗ Abstract We report the development of GPT-4, a large-scale, multimodal model which can accept image and text inputs and produce t",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2304.08485v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2304.08485v2.pdf",
+      "bytes": 5906135,
+      "sha256": "dc8bace378a282ea78caa9b5959306202fbfa3b8cedaf8a66541a9af18f4d3bf",
+      "pages": 25,
+      "first_three_pages_text_chars": [
+        3710,
+        4710,
+        4413
+      ],
+      "first_page_excerpt": "Visual Instruction Tuning Haotian Liu1∗, Chunyuan Li2∗, Qingyang Wu3, Yong Jae Lee1 1University of Wisconsin–Madison 2Microsoft Research 3Columbia University ht",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2305.13048v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2305.13048v2.pdf",
+      "bytes": 1590242,
+      "sha256": "57d18c40bdbb4bc1ab69c078a304f97e31657b4f543c408d8a5520e672a3fab0",
+      "pages": 30,
+      "first_three_pages_text_chars": [
+        3850,
+        3857,
+        3241
+      ],
+      "first_page_excerpt": "RWKV: Reinventing RNNs for the Transformer Era Bo Peng1,2∗Eric Alcaide2,3,4∗Quentin Anthony2,5∗ Alon Albalak2,6 Samuel Arcadinho2,7 Stella Biderman2,8 Huanqi Ca",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2305.14314v1.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2305.14314v1.pdf",
+      "bytes": 1065470,
+      "sha256": "33a4e757c19d6ea8d3cca8958fce8fe405e290272e135c99ee66065c775d5bd1",
+      "pages": 26,
+      "first_three_pages_text_chars": [
+        3050,
+        4809,
+        2787
+      ],
+      "first_page_excerpt": "QLORA: Efficient Finetuning of Quantized LLMs Tim Dettmers∗ Artidoro Pagnoni∗ Ari Holtzman Luke Zettlemoyer University of Washington {dettmers,artidoro,ahai,lsz",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2305.18290v3.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2305.18290v3.pdf",
+      "bytes": 1299212,
+      "sha256": "92cb3a2b71362acda98a789b03d88688fd33cf5fcf13f81d2b1de30ee7d3b67a",
+      "pages": 27,
+      "first_three_pages_text_chars": [
+        3175,
+        4583,
+        4595
+      ],
+      "first_page_excerpt": "Direct Preference Optimization: Your Language Model is Secretly a Reward Model Rafael Rafailov∗† Archit Sharma∗† Eric Mitchell∗† Stefano Ermon†‡ Christopher D. ",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2307.09288v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2307.09288v2.pdf",
+      "bytes": 13661300,
+      "sha256": "1df284ce95f783002074bfe8f21d47c646b396ceb1736ea3ec0ea212fc070d91",
+      "pages": 77,
+      "first_three_pages_text_chars": [
+        1894,
+        2452,
+        3725
+      ],
+      "first_page_excerpt": "Llama 2: Open Foundation and Fine-Tuned Chat Models Hugo Touvron∗ Louis Martin† Kevin Stone† Peter Albert Amjad Almahairi Yasmine Babaei Nikolay Bashlykov Soumy",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2310.06825v1.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2310.06825v1.pdf",
+      "bytes": 3749788,
+      "sha256": "dfbac4e7035344b305c947481f2e7e8a02f7a24a563917eb6e47f6591d14c5ae",
+      "pages": 9,
+      "first_three_pages_text_chars": [
+        2704,
+        3291,
+        2758
+      ],
+      "first_page_excerpt": "Mistral 7B Albert Q. Jiang, Alexandre Sablayrolles, Arthur Mensch, Chris Bamford, Devendra Singh Chaplot, Diego de las Casas, Florian Bressand, Gianna Lengyel, ",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2406.14491v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2406.14491v2.pdf",
+      "bytes": 843992,
+      "sha256": "8bc106e62eeb6f6f15328e8af107df8eb66ce7ddc3ba694a2ef8ea743f829f0f",
+      "pages": 22,
+      "first_three_pages_text_chars": [
+        4442,
+        4818,
+        3922
+      ],
+      "first_page_excerpt": "Instruction Pre-Training: Language Models are Supervised Multitask Learners Daixuan Cheng†* Yuxian Gu‡ Shaohan Huang†B Junyu Bi† Minlie Huang‡B Furu Wei† † Micr",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2407.21783v3.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2407.21783v3.pdf",
+      "bytes": 9833173,
+      "sha256": "481f1599468f95a07d05e97fafe55bbe786dc1624c6f881bcb4c7d14c933d083",
+      "pages": 92,
+      "first_three_pages_text_chars": [
+        3393,
+        3738,
+        4161
+      ],
+      "first_page_excerpt": "The Llama 3 Herd of Models Llama Team, AI @ Meta1 1A detailed contributor list can be found in the appendix of this paper. Modern artificial intelligence (AI) s",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2412.15115v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2412.15115v2.pdf",
+      "bytes": 1938604,
+      "sha256": "73b3292bead3ac8896679d3ac8be87439756faf356566cbda3ccc8a3dc7d79d3",
+      "pages": 26,
+      "first_three_pages_text_chars": [
+        2882,
+        4923,
+        4250
+      ],
+      "first_page_excerpt": "2025-01-06 Qwen2.5 Technical Report Qwen Team https://huggingface.co/Qwen https://modelscope.cn/organization/qwen https://github.com/QwenLM/Qwen2.5 Abstract In ",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2412.19437v1.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2412.19437v1.pdf",
+      "bytes": 1887607,
+      "sha256": "a67e18a4ca6e2c81abc030239a3ee53705f656b79efab8ce1d6b5ac25630c2a5",
+      "pages": 53,
+      "first_three_pages_text_chars": [
+        1817,
+        2634,
+        1715
+      ],
+      "first_page_excerpt": "DeepSeek-V3 Technical Report DeepSeek-AI research@deepseek.com Abstract We present DeepSeek-V3, a strong Mixture-of-Experts (MoE) language model with 671B total",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "2501.12948v2.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/2501.12948v2.pdf",
+      "bytes": 5034998,
+      "sha256": "b191b0a365a64b4ab2791d117069ed17a2933d03554a662ced58b37df52018f4",
+      "pages": 86,
+      "first_three_pages_text_chars": [
+        2920,
+        3645,
+        2930
+      ],
+      "first_page_excerpt": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning DeepSeek-AI research@deepseek.com Abstract General reasoning represents a lon",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "333078981_693988129081760_4712707815225756708_n.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/333078981_693988129081760_4712707815225756708_n.pdf",
+      "bytes": 621427,
+      "sha256": "775ff8d09b6e5b06314135d87c194ce3535a821eeaee4be9051b331162c5fefd",
+      "pages": 27,
+      "first_three_pages_text_chars": [
+        4019,
+        4316,
+        3495
+      ],
+      "first_page_excerpt": "LLaMA: Open and Efficient Foundation Language Models Hugo Touvron∗, Thibaut Lavril∗, Gautier Izacard∗, Xavier Martinet Marie-Anne Lachaux, Timothee Lacroix, Bap",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "N19-1423.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/N19-1423.pdf",
+      "bytes": 786279,
+      "sha256": "987545ffb087f1ece898142c403a516baeabeb70ce19089397fac6f7db12c3d4",
+      "pages": 16,
+      "first_three_pages_text_chars": [
+        4061,
+        4531,
+        3706
+      ],
+      "first_page_excerpt": "Proceedings of NAACL-HLT 2019, pages 4171–4186 Minneapolis, Minnesota, June 2 - June 7, 2019. c⃝2019 Association for Computational Linguistics 4171 BERT: Pre-tr",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "UnderstandingDeepLearning_02_09_26_C.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/UnderstandingDeepLearning_02_09_26_C.pdf",
+      "bytes": 22344992,
+      "sha256": "f8237d393163900fa8e43210e680a3f987b45ccac7750b372e156fae3df0bf32",
+      "pages": 541,
+      "first_three_pages_text_chars": [
+        683,
+        0,
+        230
+      ],
+      "first_page_excerpt": "Understanding Deep Learning Simon J.D. Prince February 8, 2026 The most recent version of this document can be found at http://udlbook.com. Copyright in this wo",
+      "text_layer_note": "sampled_pages_contain_text"
+    },
+    {
+      "filename": "language_understanding_paper.pdf",
+      "source_path": "/Users/cuijinglei/Documents/homework/比赛/科研小助手/pdf/language_understanding_paper.pdf",
+      "bytes": 541036,
+      "sha256": "eb81a65e0856bd38e855e1f1de6ee12e7c3eb92ae05c8270d345a475beb631d0",
+      "pages": 12,
+      "first_three_pages_text_chars": [
+        3355,
+        4902,
+        3341
+      ],
+      "first_page_excerpt": "Improving Language Understanding by Generative Pre-Training Alec Radford OpenAI alec@openai.com Karthik Narasimhan OpenAI karthikn@openai.com Tim Salimans OpenA",
+      "text_layer_note": "sampled_pages_contain_text"
+    }
+  ]
+}

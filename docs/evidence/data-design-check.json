@@ -1,0 +1,29 @@
+{
+  "checked_on": "2026-11-13",
+  "kind": "static_design_consistency_only",
+  "passed": true,
+  "counts": {
+    "business_tables": 41,
+    "columns": 494,
+    "foreign_keys": 147,
+    "markdown_files": 10
+  },
+  "checks": [
+    "catalog keys, column types and indexes",
+    "FK arity, target unique key, type and owner/project scope",
+    "required version/parse/run/budget consistency FKs",
+    "dictionary table and field coverage",
+    "local documentation links and fenced blocks",
+    "vector dimensions, token limits, retrieval limits and authorization config",
+    "deterministic point ID consistency"
+  ],
+  "not_executed": [
+    "PostgreSQL DDL/Alembic migrations",
+    "RLS and role tests",
+    "transaction, concurrency, crash or restore tests",
+    "Qdrant collection, BM25 or hybrid query execution",
+    "actual embedding, rerank, OCR or paid APIs",
+    "performance benchmarks"
+  ],
+  "issues": []
+}

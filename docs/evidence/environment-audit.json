@@ -1,0 +1,88 @@
+{
+  "checked_on": "2026-11-13",
+  "scope": "read_only_environment_inspection_and_temporary_dependency_resolution",
+  "host": {
+    "architecture": "arm64",
+    "memory_bytes": 38654705664,
+    "default_python": "3.15.0",
+    "existing_python_312": "3.12.8",
+    "existing_node": "24.10.0",
+    "existing_pnpm": "8.11.0",
+    "existing_npm": "11.6.0",
+    "existing_corepack": "0.34.0",
+    "uv_in_path": false,
+    "pycharm": "2026.1.2",
+    "docker_engine": "24.0.7",
+    "docker_compose": "2.23.3-desktop.2",
+    "docker_architecture": "aarch64",
+    "docker_cpus": 14,
+    "docker_memory_bytes": 4118585344,
+    "existing_other_containers": 9,
+    "other_container_sample_sum_mib": 2503.494,
+    "global_git_identity_present": {
+      "user.name": true,
+      "user.email": true
+    }
+  },
+  "port_check": {
+    "method": "lsof LISTEN snapshot",
+    "proposed_ports": [
+      15173,
+      18080,
+      15432,
+      16333,
+      16379,
+      18081
+    ],
+    "occupied_proposed_ports": [],
+    "recheck_before_start": true
+  },
+  "python_resolution": {
+    "passed": true,
+    "mode": "pip --dry-run --ignore-installed --only-binary=:all:",
+    "interpreter": "3.12.8 macOS arm64",
+    "direct_requirements": 27,
+    "resolved_distributions": 105,
+    "installed": false,
+    "temporary_report_sha256": "06d303e631ae313e3481be058b520f6c64021db8c6f72a04a0eb6eab9012d230",
+    "target_python_and_linux_container_tests": "not_run"
+  },
+  "frontend_resolution": {
+    "passed": true,
+    "mode": "npm --package-lock-only --ignore-scripts --no-audit --no-fund in temporary directory",
+    "node": "24.10.0",
+    "direct_packages": 17,
+    "lock_packages": 236,
+    "temporary_lock_sha256": "0f50f4c847257ee1322ff32198f2156974e1522361c430db408fbf337de93778",
+    "project_pnpm_lock_generated": false,
+    "install_scripts_executed": false,
+    "typecheck_build_browser_tests": "not_run"
+  },
+  "qdrant_capability": {
+    "server_candidate": "1.20.0",
+    "release_notes_confirm_native_bm25": true,
+    "release_source": "https://github.com/qdrant/qdrant/releases/tag/v1.20.0",
+    "client_wheel_inspected": "qdrant_client-1.20.0-py3-none-any.whl",
+    "classes_present": [
+      "TextQuery",
+      "TextIndexParams",
+      "Bm25Scoring",
+      "RrfQuery"
+    ],
+    "text_index_scoring_field_present": true,
+    "server_query_test": "not_run"
+  },
+  "registry_limitations": [
+    "Docker Hub public tag listing returned HTTP 429; Official Images source index used instead",
+    "Image digests, pulls and architecture execution not yet verified"
+  ],
+  "not_performed": [
+    "global tool upgrades",
+    "project toolchain or dependency installation",
+    "ScholarShip service startup",
+    "database initialization or migrations",
+    "paid provider calls",
+    "Git initialization or commits",
+    "PyCharm project/window changes"
+  ]
+}
