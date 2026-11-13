@@ -45,4 +45,5 @@ def external_status(user: Identity = Depends(identity)):
         },
         "account_quotas_verified": False,
         "research_qa_available": False,
+        "offline_demo_available": True,
     }

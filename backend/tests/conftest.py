@@ -46,6 +46,23 @@ def database():
         seed(db)
         yield db
     finally:
+        # Background fixture has stopped before this session fixture tears down.
+        # Reconcile exact collection mappings before dropping the only ownership manifest.
+        from scholarship.infrastructure.health import qdrant_client
+
+        with db.connect() as conn:
+            mapped = conn.execute(
+                sa.select(
+                    tables["index_generations"].c.collection_name, tables["index_generations"].c.project_id
+                ).distinct()
+            ).all()
+        vector_client = qdrant_client()
+        try:
+            for collection, project in mapped:
+                if collection.startswith("ss_p_" + project.hex + "_") and vector_client.collection_exists(collection):
+                    vector_client.delete_collection(collection)
+        finally:
+            vector_client.close()
         for role in ("runtime", "auth", "checkpoint"):
             engine(role).dispose()
         engine.cache_clear()

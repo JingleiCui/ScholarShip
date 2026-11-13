@@ -50,7 +50,12 @@ def dispatch():
         # A failed send leaves the claim to expire; a successful but unrecorded send
         # may be delivered again. The run lease fences duplicate completion.
         app.send_task(
-            "scholarship.preview_parse" if row["command"] == "preview_parse" else "scholarship.execute_probe",
+            {
+                "preview_parse": "scholarship.preview_parse",
+                "offline_build": "scholarship.execute_offline",
+                "offline_qa": "scholarship.execute_offline",
+                "system_probe": "scholarship.execute_probe",
+            }[row["command"]],
             args=[str(row["owner_id"]), str(row["project_id"]), str(row["run_id"])],
         )
         with tenant_transaction(row["owner_id"]) as conn:

@@ -32,6 +32,10 @@ def create_app():
 
     app.include_router(services_router, prefix="/api/v1")
 
+    from scholarship.api.offline import router as offline_router
+
+    app.include_router(offline_router, prefix="/api/v1")
+
     @app.middleware("http")
     async def request_id(request, call_next):
         rid = str(uuid4())

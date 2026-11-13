@@ -19,7 +19,7 @@ REPORT_DIR = ROOT / "var/reports"
 RUN_FROZEN_INSTALL = True
 RUN_DATABASE_INTEGRATION_TESTS = True  # creates and removes its own ss_test_<uuid> DB
 TIMEOUT_SECONDS = 600
-MILESTONE = "M2-offline"
+MILESTONE = "M2-offline-business"
 
 
 def run_check(name, args, cwd=ROOT):
@@ -104,6 +104,8 @@ def main():
                 "recover_m1.py",
                 "estimate_m2.py",
                 "verify_m2.py",
+                "verify_m2_business.py",
+                "storage_preflight.py",
             ],
         )
     )

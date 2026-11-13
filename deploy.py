@@ -5,6 +5,7 @@ import fcntl
 from pathlib import Path
 
 from bootstrap import compose_args, run, tool_env
+from storage_preflight import SHARED_DATA_DIR, main as check_storage
 
 # USER CONFIGURATION
 ACTION = "up"  # up / stop / build / status
@@ -15,6 +16,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--action", choices=["up", "stop", "build", "status"], default=ACTION)
     action = parser.parse_args().action
+    env = tool_env()
+    env["SCHOLAR_SHARED_DATA_DIR"] = str(SHARED_DATA_DIR.resolve())
+    if action in {"up", "build"}:
+        check_storage()
     if action == "up":
         for name in ["api", "worker", "beat"]:
             path = ROOT / f"var/locks/{name}.lock"
@@ -26,13 +31,13 @@ def main():
                         raise SystemExit(
                             "Local development is running. Stop its launcher before switching to containers."
                         )
-        run(compose_args("--profile", "app", "up", "-d", "--wait"), env=tool_env())
+        run(compose_args("--profile", "app", "up", "-d", "--wait"), env=env)
     elif action == "stop":
-        run(compose_args("--profile", "app", "stop", "web", "beat", "worker", "api"), env=tool_env())
+        run(compose_args("--profile", "app", "stop", "web", "beat", "worker", "api"), env=env)
     elif action == "build":
-        run(compose_args("--profile", "app", "build"), env=tool_env())
+        run(compose_args("--profile", "app", "build"), env=env)
     else:
-        run(compose_args("--profile", "app", "ps"), env=tool_env())
+        run(compose_args("--profile", "app", "ps"), env=env)
 
 
 if __name__ == "__main__":

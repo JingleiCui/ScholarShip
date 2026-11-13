@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import ServiceStatus from "./ServiceStatus";
+import OfflineResearch from "./OfflineResearch";
 const Library = React.lazy(() => import("./Library"));
 
 type User = {
@@ -276,7 +277,7 @@ function App() {
           <small>每一条结论，都有来处。</small>
           <div className="stage">
             <span />
-            M2 · 离线适配
+            M2 · 离线业务链路
           </div>
         </div>
       </aside>
@@ -299,6 +300,7 @@ function App() {
         </header>
         <div className="content">
           {active === -1 && <ServiceStatus userId={user?.id} />}
+          {(active === -1 || active === 2) && <OfflineResearch key={`${user?.id}:${project}`} project={project} userId={user?.id} role={user?.role} />}
           {(active === 0 || active === 1) && (
             <React.Suspense fallback={<p>正在加载文献阅读器…</p>}>
               <Library project={project} />
@@ -389,7 +391,7 @@ function App() {
                 <h2>{active < 0 ? "你的研究工具箱" : modules[active].title}</h2>
                 <p>六个能力模块，一个连贯的研究过程。</p>
               </div>
-              <span className="outline-tag">M2 · 离线适配</span>
+              <span className="outline-tag">M2 · 离线业务链路</span>
             </div>
             <div className="module-grid">
               {modules.map((m, i) => (
@@ -418,7 +420,7 @@ function App() {
                 </button>
               ))}
             </div>
-            {active >= 2 && (
+            {active >= 3 && (
               <div className="notice" role="status">
                 {modules[active].title}
                 尚未实现。当前页面用于确认工作台结构，后续开发会在此提供真实数据与操作。

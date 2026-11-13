@@ -38,6 +38,8 @@ def version_row(conn, vid):
 def stored_file(conn, vid):
     v = version_row(conn, vid)
     f = conn.execute(sa.select(T["file_objects"]).where(T["file_objects"].c.id == v["file_id"])).mappings().one()
+    if f["mime_type"] != "application/pdf":
+        raise HTTPException(404, "original_pdf_unavailable")
     path = (FILE_ROOT / f["storage_key"]).resolve()
     if not path.is_relative_to(FILE_ROOT.resolve()) or not path.is_file():
         raise HTTPException(404, "file_unavailable")
@@ -355,6 +357,7 @@ def papers(project_id: UUID, user: Identity = Depends(identity)):
                     T["papers"].c.project_id == project_id,
                     T["papers"].c.deleted_at.is_(None),
                     T["paper_versions"].c.deleted_at.is_(None),
+                    T["paper_versions"].c.metadata_json["synthetic"].as_boolean().is_distinct_from(True),
                 )
             )
             .mappings()

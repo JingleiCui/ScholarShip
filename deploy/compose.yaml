@@ -62,7 +62,7 @@ services:
       LANGSMITH_TRACING: "false"
       AUTH_PASSWORD: ${AUTH_PASSWORD}
       SESSION_SECRET: ${SESSION_SECRET}
-    volumes: ["file_data:/app/var"]
+    volumes: ["${SCHOLAR_SHARED_DATA_DIR:-./var}:/app/var"]
     mem_limit: 384m
     depends_on:
       postgres: {condition: service_healthy}
@@ -83,7 +83,7 @@ services:
       SESSION_SECRET: ""
       CHECKPOINT_PASSWORD: ${CHECKPOINT_PASSWORD}
     command: [python, -m, celery, -A, "scholarship.workers.celery_app:app", worker, --pool=solo, --concurrency=1, --loglevel=WARNING, --without-gossip, --without-mingle]
-    volumes: ["file_data:/app/var"]
+    volumes: ["${SCHOLAR_SHARED_DATA_DIR:-./var}:/app/var"]
     mem_limit: 384m
     depends_on:
       api: {condition: service_healthy}
@@ -96,7 +96,7 @@ services:
       AUTH_PASSWORD: ""
       SESSION_SECRET: ""
     command: [python, -m, celery, -A, "scholarship.workers.celery_app:app", beat, --loglevel=WARNING, --schedule, /app/var/celerybeat-container]
-    volumes: ["file_data:/app/var"]
+    volumes: ["${SCHOLAR_SHARED_DATA_DIR:-./var}:/app/var"]
     mem_limit: 192m
     depends_on:
       api: {condition: service_healthy}
@@ -116,4 +116,3 @@ volumes:
   postgres_data:
   qdrant_data:
   redis_data:
-  file_data:
