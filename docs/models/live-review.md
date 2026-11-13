@@ -1,6 +1,6 @@
 # 下一阶段：受控真实执行器与合成 API 小样本联调
 
-状态：待用户确认。当前只完成配置与 Mock 契约，不是实际接口连通。
+状态：用户已确认；受控执行器已实现，但首次 ChatAnywhere 只读额度查询返回 HTTP 403，已依约停止，真实推理 0/5。见[结果报告](live-report.md)。以下保留原授权范围。
 
 拟先接通受控真实 transport、请求准入与回执记录，然后最多发起 5 次纯合成请求：ChatAnywhere gpt-4o-mini 2 次（短文本、带合成证据的 JSON 回答），OpenRouter Nemotron Embed 2 次（文档/问题分别一次），Nemotron Rerank 1 次。每次最多 3 条短文本，不包含论文、账号信息、密钥正文或本地文件；聊天输出上限 256 Token。
 

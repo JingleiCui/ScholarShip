@@ -43,7 +43,7 @@ EXTERNAL_SERVICES_ENABLED=false
 
 ## 当前边界与本地服务准备
 
-**配置已实现不等于真实服务已开通。** ProviderClient 本批只接受 MockTransport，不提供真实 HTTP 执行器。即使只改外部开关，也不会调用模型；下一阶段需接通受控真实调度并验证账户权限。当前所有非 mock 服务均标记未验证，免费额度未知。
+**配置已实现不等于真实服务已开通。** 普通 ProviderClient 只接受 MockTransport；新增的 LiveExecutor 需要独立审批清单与数据库发送槽，见[联调报告](live-report.md)。仅更改外部开关不能启用任意真实调用。本次审批因额度查询 403 已停止，真实推理 0/5。当前所有非 mock 服务均标记未验证，免费额度未知。
 
 根目录 `verify_models.py` 默认只生成脱敏配置报告，不请求任何模型；将顶部 RUN_TESTS 改为 True 可运行独立数据库契约测试。
 

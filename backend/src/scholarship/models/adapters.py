@@ -278,7 +278,11 @@ class ProviderClient:
             result.append(v)
         if dimensions != (expected_dimensions or self.spec.dimensions or dimensions):
             raise ContractError("embedding_profile_dimension_mismatch")
-        if d.get("model") not in (None, self.spec.model):
+        if d.get("model") not in (
+            None,
+            self.spec.model,
+            self.spec.model.removesuffix(":free") if self.spec.provider == "openrouter" else self.spec.model,
+        ):
             raise ContractError("unexpected_embedding_model")
         return self.result(result, d, elapsed, dimensions)
 
@@ -308,7 +312,11 @@ class ProviderClient:
                     raise ContractError("rerank_index_mismatch")
                 seen.add(i)
                 result.append({"index": i, "score": finite(r["relevance_score"])})
-            if d.get("model") not in (None, self.spec.model):
+            if d.get("model") not in (
+                None,
+                self.spec.model,
+                self.spec.model.removesuffix(":free") if self.spec.provider == "openrouter" else self.spec.model,
+            ):
                 raise ContractError("unexpected_rerank_model")
             return self.result(sorted(result, key=lambda r: r["score"], reverse=True), d, elapsed)
         except (KeyError, TypeError):

@@ -60,3 +60,7 @@ Run `verify_m2.py` 执行四类适配契约和独立测试库账务检查，不�
 ## 统一模型配置
 
 根目录 `model_config.py` 集中配置 mock/local/free_api，私有 `.env` 保存 Key。工作台可为当前项目保存命名配置组，配置变更不启用推理；有索引变更提示时保留原活动索引。Run `verify_models.py` 默认只做脱敏配置诊断；Run `local_models.py` 默认只检查隔离环境，不安装、不推理。依赖准备与启动选项见[配置说明](models/configuration.md)。本批 114 项回归通过，真实 HTTP 执行器和账户联调尚未开放。
+
+## 受控真实联调状态
+
+Run `validate_live_models.py` 默认只读状态，不发请求。当前审批已因 ChatAnywhere 额度查询 HTTP 403 停止，0/5；run 也不能复活授权或重置计数。当前普通服务开关保持关闭，见[联调报告](models/live-report.md)。不要因 403 擅自换域名、换 Key 或发起模型请求；先核实账户条件。

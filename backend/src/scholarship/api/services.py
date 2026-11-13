@@ -34,6 +34,7 @@ def external_status(user: Identity = Depends(identity)):
     return {
         "mode": "offline_contracts_only",
         "live_transport_available": False,
+        "bounded_validation_transport_available": True,
         "requested_external_flag": cfg.external_services_enabled,
         "role_eligible_if_live_authorized": user.role == "researcher",
         "shared_pool": public_pool,

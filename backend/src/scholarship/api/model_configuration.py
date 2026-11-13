@@ -51,7 +51,7 @@ def models(user: Identity = Depends(identity)):
         status["own_simulated_call_counts"] = [
             dict(r)
             for r in conn.execute(
-                sa.text("SELECT provider,state,count(*) AS count FROM model_runtime.calls GROUP BY provider,state")
+                sa.text("SELECT provider,state,count(*) AS count FROM model_runtime.calls WHERE simulated GROUP BY provider,state")
             ).mappings()
         ]
     return status
@@ -65,8 +65,18 @@ def project_models(project: UUID, user: Identity = Depends(identity)):
         status = configuration_status(
             selection.preset, overrides=row["preferences"].get("model_configuration", {}).get("overrides")
         )
+        validations = [
+            dict(r)
+            for r in conn.execute(
+                sa.text(
+                    "SELECT state,max_requests,used_requests,stop_code FROM model_runtime.grants WHERE project_id=:p ORDER BY created_at DESC LIMIT 3"
+                ),
+                {"p": project},
+            ).mappings()
+        ]
         return {
             **status,
+            "bounded_validations": validations,
             "fingerprint": selection.snapshot()["fingerprint"],
             "requires_reindex": row["preferences"].get("model_configuration", {}).get("requires_reindex", False)
             or existing_indexes_need_rebuild(conn, project, selection.roles["embedding"]),

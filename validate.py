@@ -19,7 +19,7 @@ REPORT_DIR = ROOT / "var/reports"
 RUN_FROZEN_INSTALL = True
 RUN_DATABASE_INTEGRATION_TESTS = True  # creates and removes its own ss_test_<uuid> DB
 TIMEOUT_SECONDS = 600
-MILESTONE = "M2-model-configuration"
+MILESTONE = "M2-bounded-live-validation"
 
 
 def run_check(name, args, cwd=ROOT):
@@ -106,6 +106,7 @@ def main():
                 "verify_m2.py",
                 "verify_m2_business.py",
                 "verify_models.py",
+                "validate_live_models.py",
                 "model_config.py",
                 "local_models.py",
                 "local_services",

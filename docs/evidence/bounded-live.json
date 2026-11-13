@@ -1,0 +1,270 @@
+{
+  "created_at": "2026-11-13T18:52:20.838960+00:00",
+  "milestone": "M2-bounded-live-validation",
+  "validation": {
+    "created_at": "2026-11-13T18:45:03.136679+00:00",
+    "milestone": "M2-bounded-live-validation",
+    "passed": true,
+    "checks": [
+      {
+        "name": "uv_frozen",
+        "passed": true,
+        "seconds": 0.14,
+        "log": "var/reports/uv_frozen.log"
+      },
+      {
+        "name": "pnpm_frozen",
+        "passed": true,
+        "seconds": 0.91,
+        "log": "var/reports/pnpm_frozen.log"
+      },
+      {
+        "name": "core_imports",
+        "passed": true
+      },
+      {
+        "name": "ruff",
+        "passed": true,
+        "seconds": 0.08,
+        "log": "var/reports/ruff.log"
+      },
+      {
+        "name": "frontend_build",
+        "passed": true,
+        "seconds": 0.91,
+        "log": "var/reports/frontend_build.log"
+      },
+      {
+        "name": "pytest",
+        "passed": true,
+        "seconds": 33.28,
+        "log": "var/reports/pytest.log"
+      },
+      {
+        "name": "dependency_health",
+        "passed": true
+      },
+      {
+        "name": "secret_scan",
+        "passed": true,
+        "files_with_secret": []
+      }
+    ],
+    "diagnostics": {
+      "python": "3.12.16",
+      "interpreter": "/Users/cuijinglei/PycharmProjects/ScholarShip/.venv/bin/python",
+      "architecture": "arm64",
+      "tools": {
+        "node": "v24.22.3",
+        "pnpm": "11.28.11",
+        "uv": "uv 0.13.8 (3d97a6aad 2026-11-12 aarch64-apple-darwin)"
+      },
+      "configuration": {
+        "dotenv_exists": true,
+        "env_only": false,
+        "postgres_host": "127.0.0.1",
+        "postgres_port": 15432,
+        "postgres_db": "scholarship",
+        "redis_host": "127.0.0.1",
+        "redis_port": 16379,
+        "qdrant_url": "http://127.0.0.1:16333",
+        "runtime_password_present": true,
+        "redis_password_present": true,
+        "qdrant_key_present": true
+      },
+      "dependencies": {
+        "ready": true,
+        "services": {
+          "postgresql": {
+            "ready": true,
+            "revision": "0007_bounded_live",
+            "version": "17.12 (Debian 17.12-1.pgdg12+1)"
+          },
+          "qdrant": {
+            "ready": true,
+            "version": "1.20.0"
+          },
+          "redis": {
+            "ready": true,
+            "version": "7.4.12"
+          }
+        }
+      },
+      "meta": {
+        "name": "ScholarShip",
+        "version": "0.1.0",
+        "stage": "M2 · 多模型统一配置",
+        "modules": [
+          {
+            "name": "文献管理",
+            "status": "planned"
+          },
+          {
+            "name": "论文阅读与翻译",
+            "status": "planned"
+          },
+          {
+            "name": "检索与推荐",
+            "status": "planned"
+          },
+          {
+            "name": "知识图谱",
+            "status": "planned"
+          },
+          {
+            "name": "写作与研究核验",
+            "status": "planned"
+          },
+          {
+            "name": "数据分析与绘图",
+            "status": "planned"
+          }
+        ],
+        "packages": {
+          "fastapi": "0.162.5",
+          "langgraph": "1.2.21",
+          "qdrant-client": "1.20.0",
+          "celery": "5.7.0"
+        },
+        "external_services": {
+          "enabled": false,
+          "deepseek_configured": false,
+          "dashscope_configured": true,
+          "mineru_configured": true
+        },
+        "budget": {
+          "limit_cny": 100,
+          "period_days": 30
+        },
+        "probe": "本地合成基础设施探针；不调用模型，不代表论文问答效果。"
+      }
+    },
+    "tests": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "130",
+      "time": "31.756",
+      "timestamp": "2026-11-14T02:44:29.803503+08:00",
+      "hostname": "cuijingleideMacBook-Pro-2.local"
+    },
+    "images": [
+      {
+        "tag": "postgres:17.12-bookworm",
+        "present_in_image_store": true,
+        "recorded_manifest_digest": "sha256:40865bc877a289da75963d97d72b59633f639fc5af7a4e856bfa3714cae5b536",
+        "digests": [
+          "postgres@sha256:40865bc877a289da75963d97d72b59633f639fc5af7a4e856bfa3714cae5b536"
+        ]
+      },
+      {
+        "tag": "qdrant/qdrant:v1.20.0",
+        "present_in_image_store": true,
+        "recorded_manifest_digest": "sha256:9bfc89f9914fc14876a88c05270685921a55b8877b254a98bcc1cc2f0a424cd2",
+        "digests": [
+          "qdrant/qdrant@sha256:9bfc89f9914fc14876a88c05270685921a55b8877b254a98bcc1cc2f0a424cd2"
+        ]
+      },
+      {
+        "tag": "redis:7.4.12-alpine",
+        "present_in_image_store": true,
+        "recorded_manifest_digest": "sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe",
+        "digests": [
+          "redis@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe",
+          "docker.m.daocloud.io/library/redis@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe"
+        ]
+      },
+      {
+        "tag": "python:3.12.16-slim-bookworm",
+        "present_in_image_store": false,
+        "recorded_manifest_digest": "sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df",
+        "digests": []
+      },
+      {
+        "tag": "node:24.22.3-bookworm-slim",
+        "present_in_image_store": false,
+        "recorded_manifest_digest": "sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54",
+        "digests": []
+      },
+      {
+        "tag": "caddy:2.11.9-alpine",
+        "present_in_image_store": false,
+        "recorded_manifest_digest": "sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0",
+        "digests": []
+      }
+    ],
+    "containers": [
+      {
+        "service": "postgres",
+        "state": "running",
+        "health": "healthy"
+      },
+      {
+        "service": "qdrant",
+        "state": "running",
+        "health": ""
+      },
+      {
+        "service": "redis",
+        "state": "running",
+        "health": "healthy"
+      }
+    ],
+    "not_validated": [
+      "paid provider integrations",
+      "competition A01–A25 business acceptance",
+      "real paper retrieval/translation/plot quality",
+      "public hosting"
+    ],
+    "external_paid_calls": 0
+  },
+  "runtime_local": {
+    "created_at": "2026-11-13T18:47:17.756574+00:00",
+    "target": "local",
+    "external_paid_calls": 0,
+    "passed": true,
+    "run_id": "366a3691-3873-4257-bad3-bcdeb08fc0a7",
+    "events": 3,
+    "session_persisted": true,
+    "queued_task_survived_restart": true
+  },
+  "actual_validation": {
+    "created_at": "2026-11-13T18:47:05.185914+00:00",
+    "approval_key": "2026-11-14-scholarship-synthetic-five-v1",
+    "state": "stopped",
+    "max_inference_requests": 5,
+    "used_request_slots": 0,
+    "stop_code": "chatanywhere_preflight_403",
+    "preflight": {
+      "code": 40300,
+      "provider": "chatanywhere",
+      "data_shape": "NoneType",
+      "http_status": 403,
+      "inference_requests": 0
+    },
+    "read_only_account_queries": 1,
+    "preflight_endpoint": "https://chatanywhere.tech/api/anonymous/query/balance",
+    "preflight_method": "POST",
+    "pdf_uploads": 0,
+    "mineru_requests": 0,
+    "recharges": 0,
+    "calls": [],
+    "global_external_services_unchanged": true
+  },
+  "targeted_tests": {
+    "passed": 16,
+    "log": "var/logs/bounded-live-final-tests.log"
+  },
+  "browser": {
+    "verified": true,
+    "state": "stopped",
+    "used_request_slots": 0,
+    "screenshot": "var/reports/bounded-live-stop.png"
+  },
+  "global_inference_enabled": false,
+  "mineru_requests": 0,
+  "application_containers_rebuilt": false,
+  "account_quotas_verified": false,
+  "provider_inference_verified": false
+}
