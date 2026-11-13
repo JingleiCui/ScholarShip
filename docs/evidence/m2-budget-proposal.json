@@ -1,0 +1,20 @@
+{
+  "proposal_only": true,
+  "source_date": "2026-11-13",
+  "free_allowance_assumed": 0,
+  "questions": 30,
+  "embedding_input_tokens": 495360,
+  "rerank_input_tokens_including_repeated_query": 847200,
+  "cost_cny": {
+    "llm": "1.21152",
+    "embedding": "0.24768",
+    "reranking": "0.4236"
+  },
+  "estimated_model_cny": "1.89",
+  "estimated_with_50_percent_margin_cny": "2.83",
+  "proposed_trial_cap_cny": "5",
+  "mineru_cny": null,
+  "mineru_status": "unknown; separate confirmation required before upload",
+  "includes_hosting": false,
+  "network_calls": 0
+}
