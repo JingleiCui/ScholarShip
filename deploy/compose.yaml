@@ -1,0 +1,119 @@
+name: scholarship
+services:
+  postgres:
+    image: postgres:17.12-bookworm@sha256:40865bc877a289da75963d97d72b59633f639fc5af7a4e856bfa3714cae5b536
+    profiles: [infra, app]
+    environment:
+      POSTGRES_USER: scholar_owner
+      POSTGRES_DB: scholarship
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run bootstrap first}
+    ports: ["127.0.0.1:15432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    mem_limit: 512m
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U scholar_owner -d scholarship"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+  qdrant:
+    image: qdrant/qdrant:v1.20.0@sha256:9bfc89f9914fc14876a88c05270685921a55b8877b254a98bcc1cc2f0a424cd2
+    profiles: [infra, app]
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?Run bootstrap first}
+      QDRANT__TELEMETRY_DISABLED: "true"
+    ports: ["127.0.0.1:16333:6333"]
+    volumes: ["qdrant_data:/qdrant/storage"]
+    mem_limit: 768m
+    restart: unless-stopped
+  redis:
+    image: redis:7.4.12-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
+    profiles: [infra, app]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Run bootstrap first}
+    command: [sh, -c, 'exec redis-server --appendonly yes --maxmemory 80mb --maxmemory-policy noeviction --requirepass "$$REDIS_PASSWORD"']
+    ports: ["127.0.0.1:16379:6379"]
+    volumes: ["redis_data:/data"]
+    mem_limit: 128m
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+  api:
+    image: scholarship-api:0.1.0
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.api
+    profiles: [app]
+    environment: &app_environment
+      SCHOLAR_ENV_ONLY: "1"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: scholarship
+      RUNTIME_PASSWORD: ${RUNTIME_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      EXTERNAL_SERVICES_ENABLED: "false"
+      LANGSMITH_TRACING: "false"
+      AUTH_PASSWORD: ${AUTH_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET}
+    volumes: ["file_data:/app/var"]
+    mem_limit: 384m
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      qdrant: {condition: service_started}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=10)"]
+      interval: 10s
+      timeout: 12s
+      retries: 12
+    restart: unless-stopped
+  worker:
+    image: scholarship-api:0.1.0
+    profiles: [app]
+    environment:
+      <<: *app_environment
+      AUTH_PASSWORD: ""
+      SESSION_SECRET: ""
+      CHECKPOINT_PASSWORD: ${CHECKPOINT_PASSWORD}
+    command: [python, -m, celery, -A, "scholarship.workers.celery_app:app", worker, --pool=solo, --concurrency=1, --loglevel=WARNING, --without-gossip, --without-mingle]
+    volumes: ["file_data:/app/var"]
+    mem_limit: 384m
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+  beat:
+    image: scholarship-api:0.1.0
+    profiles: [app]
+    environment:
+      <<: *app_environment
+      AUTH_PASSWORD: ""
+      SESSION_SECRET: ""
+    command: [python, -m, celery, -A, "scholarship.workers.celery_app:app", beat, --loglevel=WARNING, --schedule, /app/var/celerybeat-container]
+    volumes: ["file_data:/app/var"]
+    mem_limit: 192m
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+  web:
+    image: scholarship-web:0.1.0
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+    profiles: [app]
+    ports: ["127.0.0.1:18081:8080"]
+    depends_on:
+      api: {condition: service_healthy}
+    mem_limit: 128m
+    restart: unless-stopped
+volumes:
+  postgres_data:
+  qdrant_data:
+  redis_data:
+  file_data:

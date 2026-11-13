@@ -1,0 +1,6400 @@
+{
+  "design_date": "2026-11-13",
+  "status": "design_confirmed_not_deployed",
+  "database": "PostgreSQL",
+  "schema": "scholar",
+  "base_types": {
+    "primary_keys": "uuid",
+    "timestamps": "timestamptz; stored in UTC",
+    "money": "numeric(18,6) CNY",
+    "content_digest": "lowercase SHA-256 hex",
+    "text_offsets": "Unicode code-point, zero-based, half-open"
+  },
+  "scope_rules": {
+    "global": "protected authentication tables or read-only configuration; not arbitrary public access",
+    "account": "owner_id; owner transaction context required",
+    "project": "owner_id + project_id; composite foreign keys"
+  },
+  "tables": [
+    {
+      "name": "users",
+      "group": "账号",
+      "description": "个人用户与手工创建的评审账号",
+      "scope": "global",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "username": {
+          "type": "text",
+          "nullable": false
+        },
+        "password_hash": {
+          "type": "text",
+          "nullable": false
+        },
+        "display_name": {
+          "type": "text",
+          "nullable": false
+        },
+        "role": {
+          "type": "text",
+          "nullable": false
+        },
+        "disabled_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "username"
+        ]
+      ],
+      "foreign_keys": [],
+      "checks": [
+        "role IN ('researcher', 'reviewer')"
+      ],
+      "indexes": [],
+      "states": {
+        "role": [
+          "researcher",
+          "reviewer"
+        ]
+      }
+    },
+    {
+      "name": "auth_sessions",
+      "group": "账号",
+      "description": "仅保存会话令牌摘要及有效期；不保存原始令牌",
+      "scope": "account",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "token_hash": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "csrf_hash": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "expires_at": {
+          "type": "timestamptz",
+          "nullable": false
+        },
+        "revoked_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "id"
+        ],
+        [
+          "token_hash"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "token_hash ~ '^[0-9a-f]{64}$'",
+        "csrf_hash ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "expires_at"
+          ]
+        }
+      ],
+      "states": {}
+    },
+    {
+      "name": "projects",
+      "group": "账号",
+      "description": "个人科研空间；资料默认不跨项目共用",
+      "scope": "account",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "name": {
+          "type": "text",
+          "nullable": false
+        },
+        "description": {
+          "type": "text",
+          "nullable": false
+        },
+        "preferences": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "deleted_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "active_profile_id": {
+          "type": "uuid",
+          "nullable": true
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "active_profile_id"
+          ],
+          "target_table": "index_profiles",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [],
+      "indexes": [
+        {
+          "columns": [
+            "active_profile_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {}
+    },
+    {
+      "name": "file_objects",
+      "group": "文件与文献",
+      "description": "同账号内按内容去重的不可变文件；存储键不包含用户提交的路径",
+      "scope": "account",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "sha256": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "byte_size": {
+          "type": "bigint",
+          "nullable": false
+        },
+        "mime_type": {
+          "type": "text",
+          "nullable": false
+        },
+        "storage_key": {
+          "type": "text",
+          "nullable": false
+        },
+        "state": {
+          "type": "text",
+          "nullable": false
+        },
+        "purge_after": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "sha256"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "byte_size >= 0",
+        "state IN ('staged', 'ready', 'quarantined', 'purge_pending', 'purged')",
+        "sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [],
+      "states": {
+        "state": [
+          "staged",
+          "ready",
+          "quarantined",
+          "purge_pending",
+          "purged"
+        ]
+      }
+    },
+    {
+      "name": "source_records",
+      "group": "发现与推荐",
+      "description": "外部查询返回的不可变来源记录；仅有元数据不等于已验证正文",
+      "scope": "project",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "provider": {
+          "type": "text",
+          "nullable": false
+        },
+        "external_id": {
+          "type": "text",
+          "nullable": false
+        },
+        "request_fingerprint": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "retrieved_at": {
+          "type": "timestamptz",
+          "nullable": false
+        },
+        "record_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "content_sha256": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "access_scope": {
+          "type": "text",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "provider",
+          "request_fingerprint",
+          "external_id",
+          "content_sha256"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "access_scope IN ('metadata', 'abstract', 'full_text')",
+        "request_fingerprint ~ '^[0-9a-f]{64}$'",
+        "content_sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [],
+      "states": {
+        "access_scope": [
+          "metadata",
+          "abstract",
+          "full_text"
+        ]
+      }
+    },
+    {
+      "name": "uploads",
+      "group": "文件与文献",
+      "description": "上传或下载导入回执；显示名与文件内容身份分离",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "file_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "source_record_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "display_name": {
+          "type": "text",
+          "nullable": false
+        },
+        "origin": {
+          "type": "text",
+          "nullable": false
+        },
+        "status": {
+          "type": "text",
+          "nullable": false
+        },
+        "idempotency_key": {
+          "type": "text",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "idempotency_key"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "file_id"
+          ],
+          "target_table": "file_objects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_record_id"
+          ],
+          "target_table": "source_records",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "origin IN ('local_upload', 'scholarly_download')",
+        "status IN ('received', 'checking', 'waiting_user', 'accepted', 'rejected', 'failed')",
+        "origin <> 'scholarly_download' OR source_record_id IS NOT NULL"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "file_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_record_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "origin": [
+          "local_upload",
+          "scholarly_download"
+        ],
+        "status": [
+          "received",
+          "checking",
+          "waiting_user",
+          "accepted",
+          "rejected",
+          "failed"
+        ]
+      }
+    },
+    {
+      "name": "papers",
+      "group": "文件与文献",
+      "description": "项目内学术作品身份；当前版本只是可变指针",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "title": {
+          "type": "text",
+          "nullable": false
+        },
+        "normalized_title": {
+          "type": "text",
+          "nullable": false
+        },
+        "current_version_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "deleted_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "display_metadata": {
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "id",
+            "current_version_id"
+          ],
+          "target_table": "paper_versions",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "paper_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "created_at",
+            "id"
+          ],
+          "where": "deleted_at IS NULL"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "id",
+            "current_version_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {}
+    },
+    {
+      "name": "paper_identifiers",
+      "group": "文件与文献",
+      "description": "经消歧确认的作品级标识；arXiv 基础号去除版本后缀",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "paper_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "scheme": {
+          "type": "text",
+          "nullable": false
+        },
+        "normalized_value": {
+          "type": "text",
+          "nullable": false
+        },
+        "source_record_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "scheme",
+          "normalized_value"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "paper_id"
+          ],
+          "target_table": "papers",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_record_id"
+          ],
+          "target_table": "source_records",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "scheme IN ('doi', 'arxiv', 'pmid', 'openalex')"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "paper_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_record_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "scheme": [
+          "doi",
+          "arxiv",
+          "pmid",
+          "openalex"
+        ]
+      }
+    },
+    {
+      "name": "paper_versions",
+      "group": "文件与文献",
+      "description": "一个不可变文档载体版本；同一 arXiv 版号允许扫描/矢量等不同载体",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "paper_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "file_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "version_label": {
+          "type": "text",
+          "nullable": true
+        },
+        "published_on": {
+          "type": "date",
+          "nullable": true
+        },
+        "metadata_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "active_parse_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "active_index_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "deleted_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "paper_id",
+          "file_id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "paper_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "paper_id"
+          ],
+          "target_table": "papers",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "file_id"
+          ],
+          "target_table": "file_objects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "id",
+            "active_parse_id"
+          ],
+          "target_table": "document_parses",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "version_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "id",
+            "active_parse_id",
+            "active_index_id"
+          ],
+          "target_table": "index_generations",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "version_id",
+            "parse_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "(active_parse_id IS NULL) = (active_index_id IS NULL)"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "file_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "id",
+            "active_parse_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "id",
+            "active_parse_id",
+            "active_index_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {}
+    },
+    {
+      "name": "duplicate_reviews",
+      "group": "文件与文献",
+      "description": "去重候选、正文相似证据及用户决定；候选列表经接口校验",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "upload_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "candidate_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "decision": {
+          "type": "text",
+          "nullable": true
+        },
+        "selected_version_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "decided_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "upload_id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "upload_id"
+          ],
+          "target_table": "uploads",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "selected_version_id"
+          ],
+          "target_table": "paper_versions",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "decision IN ('keep_existing', 'activate_new', 'keep_both', 'reject')"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "selected_version_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "decision": [
+          "keep_existing",
+          "activate_new",
+          "keep_both",
+          "reject"
+        ]
+      }
+    },
+    {
+      "name": "document_parses",
+      "group": "文档与引用",
+      "description": "深解析或预览的一次独立修订；就绪后内容冻结",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "version_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "parser_name": {
+          "type": "text",
+          "nullable": false
+        },
+        "parser_version": {
+          "type": "text",
+          "nullable": false
+        },
+        "config_sha256": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "revision_no": {
+          "type": "integer",
+          "nullable": false
+        },
+        "mode": {
+          "type": "text",
+          "nullable": false
+        },
+        "status": {
+          "type": "text",
+          "nullable": false
+        },
+        "expected_pages": {
+          "type": "integer",
+          "nullable": false
+        },
+        "completed_pages": {
+          "type": "integer",
+          "nullable": false
+        },
+        "manifest_sha256": {
+          "type": "varchar(64)",
+          "nullable": true
+        },
+        "source_text_sha256": {
+          "type": "varchar(64)",
+          "nullable": true
+        },
+        "published_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "version_id",
+          "revision_no"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "version_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "version_id"
+          ],
+          "target_table": "paper_versions",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "revision_no > 0",
+        "expected_pages > 0",
+        "completed_pages >= 0 AND completed_pages <= expected_pages",
+        "mode IN ('preview', 'deep')",
+        "status IN ('pending', 'processing', 'partial', 'ready', 'failed', 'cancelled')",
+        "config_sha256 ~ '^[0-9a-f]{64}$'",
+        "manifest_sha256 ~ '^[0-9a-f]{64}$'",
+        "source_text_sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "version_id",
+            "config_sha256"
+          ]
+        }
+      ],
+      "states": {
+        "mode": [
+          "preview",
+          "deep"
+        ],
+        "status": [
+          "pending",
+          "processing",
+          "partial",
+          "ready",
+          "failed",
+          "cancelled"
+        ]
+      }
+    },
+    {
+      "name": "document_pages",
+      "group": "文档与引用",
+      "description": "页级几何、提取进度及独立重试单元",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "parse_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "page_no": {
+          "type": "integer",
+          "nullable": false
+        },
+        "width": {
+          "type": "double precision",
+          "nullable": false
+        },
+        "height": {
+          "type": "double precision",
+          "nullable": false
+        },
+        "rotation": {
+          "type": "integer",
+          "nullable": false
+        },
+        "status": {
+          "type": "text",
+          "nullable": false
+        },
+        "text_layer_chars": {
+          "type": "integer",
+          "nullable": false
+        },
+        "page_sha256": {
+          "type": "varchar(64)",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "parse_id",
+          "page_no"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "parse_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id"
+          ],
+          "target_table": "document_parses",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "page_no > 0",
+        "width > 0 AND height > 0",
+        "rotation IN (0,90,180,270)",
+        "text_layer_chars >= 0",
+        "status IN ('pending', 'processing', 'ready', 'failed')",
+        "page_sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [],
+      "states": {
+        "status": [
+          "pending",
+          "processing",
+          "ready",
+          "failed"
+        ]
+      }
+    },
+    {
+      "name": "document_blocks",
+      "group": "文档与引用",
+      "description": "结构块；raw_text 保留原提取文本，canonical_text 的变换可追查",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "parse_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "page_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "parent_block_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "ordinal": {
+          "type": "integer",
+          "nullable": false
+        },
+        "kind": {
+          "type": "text",
+          "nullable": false
+        },
+        "raw_text": {
+          "type": "text",
+          "nullable": false
+        },
+        "canonical_text": {
+          "type": "text",
+          "nullable": false
+        },
+        "content_sha256": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "locator_precision": {
+          "type": "text",
+          "nullable": false
+        },
+        "bbox": {
+          "type": "jsonb",
+          "nullable": true
+        },
+        "source_locator": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "structured_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "asset_file_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "parse_id",
+          "page_id",
+          "ordinal"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "parse_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "asset_file_id"
+          ],
+          "target_table": "file_objects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "page_id"
+          ],
+          "target_table": "document_pages",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "parent_block_id"
+          ],
+          "target_table": "document_blocks",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "ordinal >= 0",
+        "(locator_precision = 'page' AND bbox IS NULL) OR (locator_precision = 'bbox' AND bbox IS NOT NULL)",
+        "kind IN ('title', 'author', 'abstract', 'heading', 'paragraph', 'table', 'figure', 'formula', 'reference', 'appendix', 'code', 'other')",
+        "locator_precision IN ('page', 'bbox')",
+        "content_sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "asset_file_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "parent_block_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "kind": [
+          "title",
+          "author",
+          "abstract",
+          "heading",
+          "paragraph",
+          "table",
+          "figure",
+          "formula",
+          "reference",
+          "appendix",
+          "code",
+          "other"
+        ],
+        "locator_precision": [
+          "page",
+          "bbox"
+        ]
+      }
+    },
+    {
+      "name": "bibliographic_refs",
+      "group": "文档与引用",
+      "description": "解析版本中的参考条目、元数据及明确消歧结果",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "parse_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "entry_block_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "marker": {
+          "type": "text",
+          "nullable": false
+        },
+        "raw_reference": {
+          "type": "text",
+          "nullable": false
+        },
+        "metadata_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "resolved_paper_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "source_record_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "resolution_state": {
+          "type": "text",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "parse_id",
+          "marker"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "parse_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id"
+          ],
+          "target_table": "document_parses",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "resolved_paper_id"
+          ],
+          "target_table": "papers",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_record_id"
+          ],
+          "target_table": "source_records",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "entry_block_id"
+          ],
+          "target_table": "document_blocks",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "resolution_state IN ('unresolved', 'ambiguous', 'verified')"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "resolved_paper_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_record_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "entry_block_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "resolution_state": [
+          "unresolved",
+          "ambiguous",
+          "verified"
+        ]
+      }
+    },
+    {
+      "name": "citation_mentions",
+      "group": "文档与引用",
+      "description": "正文引用出现位置；一条参考文献可以有多个出现位置",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "parse_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "source_block_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "reference_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "char_start": {
+          "type": "integer",
+          "nullable": false
+        },
+        "char_end": {
+          "type": "integer",
+          "nullable": false
+        },
+        "context_text": {
+          "type": "text",
+          "nullable": false
+        },
+        "verification": {
+          "type": "text",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "source_block_id",
+          "reference_id",
+          "char_start",
+          "char_end"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "source_block_id"
+          ],
+          "target_table": "document_blocks",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "reference_id"
+          ],
+          "target_table": "bibliographic_refs",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "char_start >= 0 AND char_end > char_start",
+        "verification IN ('extracted', 'confirmed', 'rejected')"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "source_block_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "reference_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "verification": [
+          "extracted",
+          "confirmed",
+          "rejected"
+        ]
+      }
+    },
+    {
+      "name": "index_profiles",
+      "group": "检索与翻译",
+      "description": "只含非敏感模型/分块/词法配置；配置变化新增 profile",
+      "scope": "global",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "profile_key": {
+          "type": "text",
+          "nullable": false
+        },
+        "provider": {
+          "type": "text",
+          "nullable": false
+        },
+        "model_name": {
+          "type": "text",
+          "nullable": false
+        },
+        "dimensions": {
+          "type": "integer",
+          "nullable": false
+        },
+        "metric": {
+          "type": "text",
+          "nullable": false
+        },
+        "chunker_revision": {
+          "type": "text",
+          "nullable": false
+        },
+        "lexical_revision": {
+          "type": "text",
+          "nullable": false
+        },
+        "config_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "fingerprint": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "profile_key"
+        ],
+        [
+          "fingerprint"
+        ]
+      ],
+      "foreign_keys": [],
+      "checks": [
+        "dimensions > 0",
+        "fingerprint ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [],
+      "states": {}
+    },
+    {
+      "name": "index_generations",
+      "group": "检索与翻译",
+      "description": "某个解析版本在一个 profile 下的独立构建世代",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "version_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "parse_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "profile_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "generation_no": {
+          "type": "integer",
+          "nullable": false
+        },
+        "collection_name": {
+          "type": "text",
+          "nullable": false
+        },
+        "status": {
+          "type": "text",
+          "nullable": false
+        },
+        "expected_points": {
+          "type": "integer",
+          "nullable": false
+        },
+        "verified_points": {
+          "type": "integer",
+          "nullable": false
+        },
+        "manifest_sha256": {
+          "type": "varchar(64)",
+          "nullable": true
+        },
+        "manifest_file_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "verified_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "parse_id",
+          "profile_id",
+          "generation_no"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "parse_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "version_id",
+          "parse_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "profile_id"
+          ],
+          "target_table": "index_profiles",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "manifest_file_id"
+          ],
+          "target_table": "file_objects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "version_id",
+            "parse_id"
+          ],
+          "target_table": "document_parses",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "version_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "generation_no > 0",
+        "expected_points >= 0 AND verified_points >= 0 AND verified_points <= expected_points",
+        "status IN ('building', 'verifying', 'ready', 'retired', 'delete_pending', 'deleted', 'failed')",
+        "manifest_sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "profile_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "manifest_file_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "status": [
+          "building",
+          "verifying",
+          "ready",
+          "retired",
+          "delete_pending",
+          "deleted",
+          "failed"
+        ]
+      }
+    },
+    {
+      "name": "retrieval_chunks",
+      "group": "检索与翻译",
+      "description": "保存检索块正文及确定性 point ID，使向量库可重建",
+      "scope": "project",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "generation_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "parse_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "chunk_no": {
+          "type": "integer",
+          "nullable": false
+        },
+        "point_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "canonical_text": {
+          "type": "text",
+          "nullable": false
+        },
+        "lexical_text": {
+          "type": "text",
+          "nullable": false
+        },
+        "content_sha256": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "token_count": {
+          "type": "integer",
+          "nullable": false
+        },
+        "section_path": {
+          "type": "text[]",
+          "nullable": false
+        },
+        "block_kind": {
+          "type": "text",
+          "nullable": false
+        },
+        "page_start": {
+          "type": "integer",
+          "nullable": false
+        },
+        "page_end": {
+          "type": "integer",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "representation": {
+          "type": "text",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "generation_id",
+          "chunk_no"
+        ],
+        [
+          "point_id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "parse_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "generation_id"
+          ],
+          "target_table": "index_generations",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "chunk_no >= 0",
+        "token_count > 0",
+        "page_start > 0 AND page_end >= page_start",
+        "representation IN ('verbatim','structured','generated_description')",
+        "content_sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "generation_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "representation": [
+          "verbatim",
+          "structured",
+          "generated_description"
+        ]
+      }
+    },
+    {
+      "name": "chunk_spans",
+      "group": "检索与翻译",
+      "description": "检索块与原文块的有序多对多映射；偏移为 Unicode 码点半开区间",
+      "scope": "project",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "chunk_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "parse_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "block_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "span_no": {
+          "type": "integer",
+          "nullable": false
+        },
+        "block_start": {
+          "type": "integer",
+          "nullable": false
+        },
+        "block_end": {
+          "type": "integer",
+          "nullable": false
+        },
+        "chunk_start": {
+          "type": "integer",
+          "nullable": false
+        },
+        "chunk_end": {
+          "type": "integer",
+          "nullable": false
+        },
+        "representation": {
+          "type": "text",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "chunk_id",
+          "span_no"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "chunk_id"
+          ],
+          "target_table": "retrieval_chunks",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "block_id"
+          ],
+          "target_table": "document_blocks",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "span_no >= 0",
+        "block_start >= 0 AND block_end > block_start",
+        "chunk_start >= 0 AND chunk_end > chunk_start"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "chunk_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "block_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {}
+    },
+    {
+      "name": "translation_revisions",
+      "group": "检索与翻译",
+      "description": "绑定解析、语言、模型、Prompt 及术语表摘要的一次翻译修订",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "parse_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "target_language": {
+          "type": "text",
+          "nullable": false
+        },
+        "model_name": {
+          "type": "text",
+          "nullable": false
+        },
+        "prompt_revision": {
+          "type": "text",
+          "nullable": false
+        },
+        "glossary_sha256": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "config_sha256": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "revision_no": {
+          "type": "integer",
+          "nullable": false
+        },
+        "status": {
+          "type": "text",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "parse_id",
+          "target_language",
+          "config_sha256",
+          "revision_no"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "parse_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id"
+          ],
+          "target_table": "document_parses",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "revision_no > 0",
+        "status IN ('pending', 'processing', 'partial', 'ready', 'failed', 'cancelled')",
+        "glossary_sha256 ~ '^[0-9a-f]{64}$'",
+        "config_sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [],
+      "states": {
+        "status": [
+          "pending",
+          "processing",
+          "partial",
+          "ready",
+          "failed",
+          "cancelled"
+        ]
+      }
+    },
+    {
+      "name": "translation_segments",
+      "group": "检索与翻译",
+      "description": "按原文块对齐的译文；检查公式/代码占位符后才 ready",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "translation_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "parse_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "block_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "segment_no": {
+          "type": "integer",
+          "nullable": false
+        },
+        "translated_text": {
+          "type": "text",
+          "nullable": false
+        },
+        "placeholders_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "status": {
+          "type": "text",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "translation_id",
+          "block_id",
+          "segment_no"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "translation_id"
+          ],
+          "target_table": "translation_revisions",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "block_id"
+          ],
+          "target_table": "document_blocks",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "segment_no >= 0",
+        "status IN ('pending', 'processing', 'ready', 'failed')"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "translation_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parse_id",
+            "block_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "status": [
+          "pending",
+          "processing",
+          "ready",
+          "failed"
+        ]
+      }
+    },
+    {
+      "name": "conversations",
+      "group": "会话与运行",
+      "description": "对话的 checkpoint 身份、文献范围及串行写入锁版本",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "title": {
+          "type": "text",
+          "nullable": false
+        },
+        "checkpoint_thread_id": {
+          "type": "text",
+          "nullable": false
+        },
+        "context_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "lock_version": {
+          "type": "bigint",
+          "nullable": false
+        },
+        "archived_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "checkpoint_thread_id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "lock_version >= 0"
+      ],
+      "indexes": [],
+      "states": {}
+    },
+    {
+      "name": "runs",
+      "group": "会话与运行",
+      "description": "每次任务的权威状态；幂等键必须与请求摘要配对",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "conversation_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "parent_run_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "kind": {
+          "type": "text",
+          "nullable": false
+        },
+        "status": {
+          "type": "text",
+          "nullable": false
+        },
+        "idempotency_key": {
+          "type": "text",
+          "nullable": false
+        },
+        "request_sha256": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "input_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "config_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "result_json": {
+          "type": "jsonb",
+          "nullable": true
+        },
+        "input_scope_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "next_event_seq": {
+          "type": "bigint",
+          "nullable": false
+        },
+        "event_floor": {
+          "type": "bigint",
+          "nullable": false
+        },
+        "lease_token": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "lease_until": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "heartbeat_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "cancel_requested_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "error_json": {
+          "type": "jsonb",
+          "nullable": true
+        },
+        "finished_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "idempotency_key"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "conversation_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "conversation_id"
+          ],
+          "target_table": "conversations",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parent_run_id"
+          ],
+          "target_table": "runs",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "next_event_seq > 0 AND event_floor > 0 AND event_floor <= next_event_seq",
+        "status IN ('queued', 'running', 'waiting_user', 'succeeded', 'partially_succeeded', 'failed', 'cancelled')",
+        "request_sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "status",
+            "lease_until"
+          ]
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "created_at",
+            "id"
+          ]
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "parent_run_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "status": [
+          "queued",
+          "running",
+          "waiting_user",
+          "succeeded",
+          "partially_succeeded",
+          "failed",
+          "cancelled"
+        ]
+      }
+    },
+    {
+      "name": "messages",
+      "group": "会话与运行",
+      "description": "消息与流式草稿；终态消息冻结，修正追加新消息",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "conversation_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "run_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "ordinal": {
+          "type": "bigint",
+          "nullable": false
+        },
+        "role": {
+          "type": "text",
+          "nullable": false
+        },
+        "content_text": {
+          "type": "text",
+          "nullable": false
+        },
+        "verification_state": {
+          "type": "text",
+          "nullable": false
+        },
+        "final_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "conversation_id",
+          "ordinal"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "run_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "conversation_id"
+          ],
+          "target_table": "conversations",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "conversation_id",
+            "run_id"
+          ],
+          "target_table": "runs",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "conversation_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "ordinal >= 0",
+        "role IN ('user', 'assistant', 'system_notice')",
+        "verification_state IN ('not_applicable', 'provisional', 'supported', 'partially_supported', 'insufficient')"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "conversation_id",
+            "run_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "role": [
+          "user",
+          "assistant",
+          "system_notice"
+        ],
+        "verification_state": [
+          "not_applicable",
+          "provisional",
+          "supported",
+          "partially_supported",
+          "insufficient"
+        ]
+      }
+    },
+    {
+      "name": "run_steps",
+      "group": "会话与运行",
+      "description": "单步执行尝试；未知外部结果先核对回执，不直接发起新尝试",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "run_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "step_key": {
+          "type": "text",
+          "nullable": false
+        },
+        "attempt_no": {
+          "type": "integer",
+          "nullable": false
+        },
+        "tool_name": {
+          "type": "text",
+          "nullable": false
+        },
+        "status": {
+          "type": "text",
+          "nullable": false
+        },
+        "lease_token": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "lease_until": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "input_sha256": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "output_json": {
+          "type": "jsonb",
+          "nullable": true
+        },
+        "error_json": {
+          "type": "jsonb",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "run_id",
+          "step_key",
+          "attempt_no"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "run_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id"
+          ],
+          "target_table": "runs",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "attempt_no BETWEEN 1 AND 3",
+        "status IN ('pending', 'running', 'unknown', 'succeeded', 'failed', 'cancelled')",
+        "input_sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [],
+      "states": {
+        "status": [
+          "pending",
+          "running",
+          "unknown",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ]
+      }
+    },
+    {
+      "name": "external_calls",
+      "group": "会话与运行",
+      "description": "外部请求意图与回执；完整响应可保存为受控文件",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "step_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "provider": {
+          "type": "text",
+          "nullable": false
+        },
+        "operation": {
+          "type": "text",
+          "nullable": false
+        },
+        "intent_key": {
+          "type": "text",
+          "nullable": false
+        },
+        "request_sha256": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "remote_id": {
+          "type": "text",
+          "nullable": true
+        },
+        "status": {
+          "type": "text",
+          "nullable": false
+        },
+        "response_file_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "receipt_json": {
+          "type": "jsonb",
+          "nullable": true
+        },
+        "started_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "finished_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "provider",
+          "intent_key"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "step_id"
+          ],
+          "target_table": "run_steps",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "response_file_id"
+          ],
+          "target_table": "file_objects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "status IN ('prepared', 'sent', 'unknown', 'succeeded', 'failed', 'cancelled')",
+        "request_sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "step_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "response_file_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "status": [
+          "prepared",
+          "sent",
+          "unknown",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ]
+      }
+    },
+    {
+      "name": "run_events",
+      "group": "会话与运行",
+      "description": "提交后才发送的公开事件；不保存隐藏思维链或密钥",
+      "scope": "project",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "run_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "seq": {
+          "type": "bigint",
+          "nullable": false
+        },
+        "event_type": {
+          "type": "text",
+          "nullable": false
+        },
+        "public_payload": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "run_id",
+          "seq"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id"
+          ],
+          "target_table": "runs",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "seq > 0"
+      ],
+      "indexes": [],
+      "states": {}
+    },
+    {
+      "name": "task_outbox",
+      "group": "会话与运行",
+      "description": "事务内记录待投递命令；dispatcher 持有限时租约",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "run_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "event_key": {
+          "type": "text",
+          "nullable": false
+        },
+        "command": {
+          "type": "text",
+          "nullable": false
+        },
+        "payload_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "available_at": {
+          "type": "timestamptz",
+          "nullable": false
+        },
+        "dispatched_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "lease_token": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "lease_until": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "delivery_attempts": {
+          "type": "integer",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "event_key"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id"
+          ],
+          "target_table": "runs",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "delivery_attempts >= 0"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "available_at",
+            "id"
+          ],
+          "where": "dispatched_at IS NULL"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {}
+    },
+    {
+      "name": "evidence_items",
+      "group": "证据与产物",
+      "description": "原文或外部来源证据；固定版本、原文范围和检索回执",
+      "scope": "project",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "run_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "block_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "source_record_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "evidence_kind": {
+          "type": "text",
+          "nullable": false
+        },
+        "quote_text": {
+          "type": "text",
+          "nullable": true
+        },
+        "char_start": {
+          "type": "integer",
+          "nullable": true
+        },
+        "char_end": {
+          "type": "integer",
+          "nullable": true
+        },
+        "locator_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "retrieval_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "run_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id"
+          ],
+          "target_table": "runs",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "block_id"
+          ],
+          "target_table": "document_blocks",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_record_id"
+          ],
+          "target_table": "source_records",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "(evidence_kind = 'block' AND block_id IS NOT NULL AND source_record_id IS NULL AND quote_text IS NOT NULL AND char_start IS NOT NULL AND char_end IS NOT NULL AND char_start >= 0 AND char_end > char_start) OR (evidence_kind = 'external_record' AND source_record_id IS NOT NULL AND block_id IS NULL)",
+        "evidence_kind IN ('block', 'external_record')"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "block_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_record_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "evidence_kind": [
+          "block",
+          "external_record"
+        ]
+      }
+    },
+    {
+      "name": "artifacts",
+      "group": "证据与产物",
+      "description": "图表/脚本/草稿/图谱等逻辑产物，当前版本指针可改变",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "kind": {
+          "type": "text",
+          "nullable": false
+        },
+        "name": {
+          "type": "text",
+          "nullable": false
+        },
+        "current_version_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "deleted_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "id",
+            "current_version_id"
+          ],
+          "target_table": "artifact_versions",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "artifact_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "id",
+            "current_version_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {}
+    },
+    {
+      "name": "artifact_versions",
+      "group": "证据与产物",
+      "description": "产物版本绑定文件和执行来源；元数据必须带类型 schema 版本",
+      "scope": "project",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "artifact_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "file_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "producing_run_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "producing_step_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "revision_no": {
+          "type": "integer",
+          "nullable": false
+        },
+        "metadata_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "config_sha256": {
+          "type": "varchar(64)",
+          "nullable": false
+        },
+        "published_at": {
+          "type": "timestamptz",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "artifact_id",
+          "revision_no"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "artifact_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "producing_run_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "artifact_id"
+          ],
+          "target_table": "artifacts",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "file_id"
+          ],
+          "target_table": "file_objects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "producing_run_id"
+          ],
+          "target_table": "runs",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "producing_run_id",
+            "producing_step_id"
+          ],
+          "target_table": "run_steps",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "revision_no > 0",
+        "config_sha256 ~ '^[0-9a-f]{64}$'"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "file_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "producing_run_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "producing_run_id",
+            "producing_step_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {}
+    },
+    {
+      "name": "artifact_inputs",
+      "group": "证据与产物",
+      "description": "产物版本的输入血缘；四类来源必须且只能选择一种",
+      "scope": "project",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "output_version_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "source_file_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "source_parse_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "source_artifact_version_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "source_message_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "input_role": {
+          "type": "text",
+          "nullable": false
+        },
+        "ordinal": {
+          "type": "integer",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "output_version_id",
+          "ordinal"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "output_version_id"
+          ],
+          "target_table": "artifact_versions",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "source_file_id"
+          ],
+          "target_table": "file_objects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_parse_id"
+          ],
+          "target_table": "document_parses",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_artifact_version_id"
+          ],
+          "target_table": "artifact_versions",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_message_id"
+          ],
+          "target_table": "messages",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "ordinal >= 0",
+        "num_nonnulls(source_file_id,source_parse_id,source_artifact_version_id,source_message_id) = 1",
+        "source_artifact_version_id IS DISTINCT FROM output_version_id"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "source_file_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_parse_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_artifact_version_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_message_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {}
+    },
+    {
+      "name": "claims",
+      "group": "证据与产物",
+      "description": "消息或产物中的可核查论断；计算过程与原始操作数证据分开保存",
+      "scope": "project",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "run_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "message_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "artifact_version_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "ordinal": {
+          "type": "integer",
+          "nullable": false
+        },
+        "claim_text": {
+          "type": "text",
+          "nullable": false
+        },
+        "claim_kind": {
+          "type": "text",
+          "nullable": false
+        },
+        "verification_state": {
+          "type": "text",
+          "nullable": false
+        },
+        "calculation_json": {
+          "type": "jsonb",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "run_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "message_id",
+          "ordinal"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "artifact_version_id",
+          "ordinal"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id"
+          ],
+          "target_table": "runs",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "message_id"
+          ],
+          "target_table": "messages",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "artifact_version_id"
+          ],
+          "target_table": "artifact_versions",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "message_id"
+          ],
+          "target_table": "messages",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "artifact_version_id"
+          ],
+          "target_table": "artifact_versions",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "producing_run_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "ordinal >= 0",
+        "num_nonnulls(message_id,artifact_version_id) = 1",
+        "claim_kind IN ('factual', 'derived_numeric', 'hypothesis', 'planned_work')",
+        "verification_state IN ('supported', 'partially_supported', 'insufficient', 'not_applicable')"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "message_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "artifact_version_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "message_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "artifact_version_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "claim_kind": [
+          "factual",
+          "derived_numeric",
+          "hypothesis",
+          "planned_work"
+        ],
+        "verification_state": [
+          "supported",
+          "partially_supported",
+          "insufficient",
+          "not_applicable"
+        ]
+      }
+    },
+    {
+      "name": "claim_evidence",
+      "group": "证据与产物",
+      "description": "论断与证据多对多关系；引用反对证据同样允许",
+      "scope": "project",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "claim_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "evidence_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "relation": {
+          "type": "text",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "run_id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "claim_id",
+          "evidence_id",
+          "relation"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "claim_id"
+          ],
+          "target_table": "claims",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "evidence_id"
+          ],
+          "target_table": "evidence_items",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "claim_id"
+          ],
+          "target_table": "claims",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "evidence_id"
+          ],
+          "target_table": "evidence_items",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "relation IN ('supports', 'contrasts', 'context', 'operand')"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "evidence_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "claim_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id",
+            "evidence_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "relation": [
+          "supports",
+          "contrasts",
+          "context",
+          "operand"
+        ]
+      }
+    },
+    {
+      "name": "subscriptions",
+      "group": "发现与推荐",
+      "description": "定时增量追踪配置；每来源游标与时间窗口独立",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "name": {
+          "type": "text",
+          "nullable": false
+        },
+        "sources_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "query_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "schedule_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "timezone": {
+          "type": "text",
+          "nullable": false
+        },
+        "cursor_state": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "next_due_at": {
+          "type": "timestamptz",
+          "nullable": false
+        },
+        "enabled": {
+          "type": "boolean",
+          "nullable": false
+        },
+        "lease_token": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "lease_until": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [],
+      "indexes": [
+        {
+          "columns": [
+            "next_due_at",
+            "id"
+          ],
+          "where": "enabled = true"
+        }
+      ],
+      "states": {}
+    },
+    {
+      "name": "recommendations",
+      "group": "发现与推荐",
+      "description": "推荐某条已保存来源记录；分数、理由及代码可用性可解释",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "source_record_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "subscription_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "canonical_work_key": {
+          "type": "text",
+          "nullable": false
+        },
+        "score_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "reason_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "code_state_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "algorithm_revision": {
+          "type": "text",
+          "nullable": false
+        },
+        "seen_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "canonical_work_key",
+          "algorithm_revision"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_record_id"
+          ],
+          "target_table": "source_records",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "subscription_id"
+          ],
+          "target_table": "subscriptions",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "source_record_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "subscription_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {}
+    },
+    {
+      "name": "recommendation_feedback",
+      "group": "发现与推荐",
+      "description": "当前账号对推荐的显式反馈，修改保留审计记录",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "recommendation_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "vote": {
+          "type": "smallint",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "recommendation_id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "recommendation_id"
+          ],
+          "target_table": "recommendations",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "vote IN (-1,0,1)"
+      ],
+      "indexes": [],
+      "states": {}
+    },
+    {
+      "name": "budget_accounts",
+      "group": "成本与审计",
+      "description": "账号某周期/类别的预算；行锁保护并发准入",
+      "scope": "account",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "period_start": {
+          "type": "timestamptz",
+          "nullable": false
+        },
+        "period_end": {
+          "type": "timestamptz",
+          "nullable": false
+        },
+        "category": {
+          "type": "text",
+          "nullable": false
+        },
+        "currency": {
+          "type": "text",
+          "nullable": false
+        },
+        "limit_amount": {
+          "type": "numeric(18,6)",
+          "nullable": false
+        },
+        "spent_amount": {
+          "type": "numeric(18,6)",
+          "nullable": false
+        },
+        "reserved_amount": {
+          "type": "numeric(18,6)",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "period_start",
+          "period_end",
+          "category"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "period_end > period_start",
+        "currency = 'CNY'",
+        "limit_amount >= 0 AND spent_amount >= 0 AND reserved_amount >= 0"
+      ],
+      "indexes": [],
+      "states": {},
+      "cross_row_invariants": [
+        {
+          "invariant": "No overlapping tstzrange(period_start, period_end, [)) for same owner/category",
+          "implementation": "All budget configuration writes acquire an owner/category advisory transaction lock and validate overlap before insert/update; protected write service only. Test concurrent configuration."
+        }
+      ]
+    },
+    {
+      "name": "budget_reservations",
+      "group": "成本与审计",
+      "description": "调用前预留；未知回执保留预留，不代表实际已扣款",
+      "scope": "project",
+      "write_mode": "controlled_mutation",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "account_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "call_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "reserved_amount": {
+          "type": "numeric(18,6)",
+          "nullable": false
+        },
+        "state": {
+          "type": "text",
+          "nullable": false
+        },
+        "settled_at": {
+          "type": "timestamptz",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "call_id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "account_id",
+          "call_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "account_id"
+          ],
+          "target_table": "budget_accounts",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "call_id"
+          ],
+          "target_table": "external_calls",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "reserved_amount >= 0",
+        "state IN ('held', 'unknown', 'settled', 'released')"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "account_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "state": [
+          "held",
+          "unknown",
+          "settled",
+          "released"
+        ]
+      }
+    },
+    {
+      "name": "usage_ledger",
+      "group": "成本与审计",
+      "description": "费用追加账本；估价和供应商账单核对分别标记，调整不改旧行",
+      "scope": "project",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "account_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "call_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "reservation_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "entry_key": {
+          "type": "text",
+          "nullable": false
+        },
+        "delta_amount": {
+          "type": "numeric(18,6)",
+          "nullable": false
+        },
+        "basis": {
+          "type": "text",
+          "nullable": false
+        },
+        "model_name": {
+          "type": "text",
+          "nullable": true
+        },
+        "price_snapshot": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "usage_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ],
+        [
+          "owner_id",
+          "entry_key"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "account_id"
+          ],
+          "target_table": "budget_accounts",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "call_id"
+          ],
+          "target_table": "external_calls",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "reservation_id"
+          ],
+          "target_table": "budget_reservations",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "account_id",
+            "call_id",
+            "reservation_id"
+          ],
+          "target_table": "budget_reservations",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "account_id",
+            "call_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [
+        "basis IN ('usage_estimate', 'billing_reconciliation', 'refund')"
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "account_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "call_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "reservation_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "account_id",
+            "call_id",
+            "reservation_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {
+        "basis": [
+          "usage_estimate",
+          "billing_reconciliation",
+          "refund"
+        ]
+      }
+    },
+    {
+      "name": "audit_events",
+      "group": "成本与审计",
+      "description": "不含密钥的关键业务操作与设计版本记录",
+      "scope": "project",
+      "write_mode": "append_only",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "owner_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "project_id": {
+          "type": "uuid",
+          "nullable": false
+        },
+        "run_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "action": {
+          "type": "text",
+          "nullable": false
+        },
+        "subject_json": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "safe_payload": {
+          "type": "jsonb",
+          "nullable": false
+        },
+        "created_at": {
+          "type": "timestamptz",
+          "nullable": false,
+          "default": "now()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "unique_keys": [
+        [
+          "id"
+        ],
+        [
+          "owner_id",
+          "project_id",
+          "id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_id"
+          ],
+          "target_table": "users",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id"
+          ],
+          "target_table": "projects",
+          "target_columns": [
+            "owner_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id"
+          ],
+          "target_table": "runs",
+          "target_columns": [
+            "owner_id",
+            "project_id",
+            "id"
+          ],
+          "on_delete": "RESTRICT",
+          "deferrable": false
+        }
+      ],
+      "checks": [],
+      "indexes": [
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "created_at",
+            "id"
+          ]
+        },
+        {
+          "columns": [
+            "owner_id",
+            "project_id",
+            "run_id"
+          ],
+          "purpose": "foreign_key_lookup"
+        }
+      ],
+      "states": {}
+    }
+  ]
+}

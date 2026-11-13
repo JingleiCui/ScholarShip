@@ -1,6 +1,6 @@
 # 环境搭建与脚手架初始化方案
 
-日期：2026-11-13。状态：**待用户确认**。需求、技术、架构及数据设计已确认；本轮完成本机检查、公开版本核验和依赖解析预检，尚未安装项目依赖、启动 ScholarShip 容器、建库或初始化代码。
+日期：2026-11-13。状态：**方案已由用户确认，M0 初始化已执行**。本文保留确认时的实施方案与预检边界；实际结果以[初始化验收报告](initialization-report.md)为准。
 
 配套文件：[初始化评审单](environment-review.md)、[精确候选版本](environment/dependency-candidates.json)、[本机与预检记录](evidence/environment-audit.json)、[镜像来源核验](evidence/image-candidates.json)。版本清单是待落地候选，不等同于已生成的 uv.lock/pnpm-lock.yaml 或运行测试结果。
 

@@ -1,0 +1,10 @@
+FROM python:3.12.16-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 UV_PROJECT_ENVIRONMENT=/app/.venv UV_NO_MANAGED_PYTHON=1 PATH=/app/.venv/bin:$PATH MPLCONFIGDIR=/tmp/matplotlib
+WORKDIR /app
+RUN pip install --no-cache-dir uv==0.13.8
+COPY pyproject.toml uv.lock README.md ./
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-install-project
+COPY backend ./backend
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev && useradd -u 10001 -m scholar && mkdir -p /app/var && chown -R scholar:scholar /app/var
+USER scholar
+CMD ["python", "-m", "uvicorn", "scholarship.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
