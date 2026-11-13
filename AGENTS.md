@@ -7,5 +7,5 @@
 - Keep `.env`, credentials, original PDFs, runtime files, logs, caches and dependencies out of Git. Never print credential values or full connection strings. The original competition materials directory is read-only.
 - PostgreSQL is authoritative; tenant transactions must set `app.owner_id` locally. Runtime/auth/checkpoint roles have separate purposes. Only explicit migration tooling reads administrator credentials.
 - Treat the initial Alembic implementation and catalog snapshots as frozen. Add migrations for subsequent changes; don't edit a deployed migration to change existing databases.
-- Business modules are pending. Do not portray a local infrastructure probe, synthetic vectors, empty UI or configured credentials as a successful research result. Paid external services are disabled at M0.
+- M1 adds local PDF import, candidate review, versioning and page preview. OCR/QA and the other business modules are pending. Do not portray a local infrastructure probe, synthetic vectors, empty UI or configured credentials as a successful research result. Paid external services are disabled at M0.
 - Run `validate.py` for meaningful foundation changes. It owns a unique temporary test database and isolated queue/collection; never clean unrelated resources. For process lifecycle changes, also use `runtime_smoke.py` with existing local launchers stopped.

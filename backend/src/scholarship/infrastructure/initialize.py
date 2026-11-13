@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import URL
 
 from scholarship.config import PROJECT_ROOT, settings
-from scholarship.infrastructure.schema import tables
+from scholarship.infrastructure.schema import tables, REVISION
 from scholarship.infrastructure.security import assert_catalog
 
 
@@ -147,7 +147,7 @@ def main():
     print(
         json.dumps(
             {
-                "migration": "0001_foundation",
+                "migration": REVISION,
                 "business_tables": 41,
                 "seed": "existing accounts preserved",
                 "external_calls": 0,

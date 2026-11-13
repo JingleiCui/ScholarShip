@@ -45,12 +45,13 @@ def graph_probe(run_id):
 @app.task(name="scholarship.dispatch")
 def dispatch():
     with engine().begin() as conn:
-        rows = conn.execute(sa.text("SELECT * FROM scholar.claim_outbox(10)")).mappings().all()
+        rows = conn.execute(sa.text("SELECT * FROM scholar.claim_outbox_v2(10)")).mappings().all()
     for row in rows:
         # A failed send leaves the claim to expire; a successful but unrecorded send
         # may be delivered again. The run lease fences duplicate completion.
         app.send_task(
-            "scholarship.execute_probe", args=[str(row["owner_id"]), str(row["project_id"]), str(row["run_id"])]
+            "scholarship.preview_parse" if row["command"] == "preview_parse" else "scholarship.execute_probe",
+            args=[str(row["owner_id"]), str(row["project_id"]), str(row["run_id"])],
         )
         with tenant_transaction(row["owner_id"]) as conn:
             conn.execute(

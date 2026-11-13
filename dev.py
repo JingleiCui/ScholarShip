@@ -114,6 +114,7 @@ def main():
     for name, port in [("api", API_PORT), ("frontend", 15173)]:
         if name in selected:
             with socket.socket() as sock:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 try:
                     sock.bind((API_HOST, port))
                 except OSError:

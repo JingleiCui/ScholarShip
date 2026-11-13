@@ -11,12 +11,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Editable defaults. Process environment overrides .env, which overrides these.
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DATA_DIR = PROJECT_ROOT / "var"
+DATA_DIR = Path(os.environ.get("SCHOLAR_DATA_DIR", PROJECT_ROOT / "var"))
 SOURCE_PDF_DIR = Path("/Users/cuijinglei/Documents/homework/比赛/科研小助手")
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore", case_sensitive=False)
+    scholar_data_dir: str = str(DATA_DIR)
     postgres_host: str = "127.0.0.1"
     postgres_port: int = 15432
     postgres_db: str = "scholarship"

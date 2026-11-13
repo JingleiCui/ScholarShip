@@ -1,7 +1,9 @@
 from celery import Celery
 from scholarship.config import settings
 
-app = Celery("scholarship", broker=settings().broker_url, include=["scholarship.workers.tasks"])
+app = Celery(
+    "scholarship", broker=settings().broker_url, include=["scholarship.workers.tasks", "scholarship.workers.documents"]
+)
 app.conf.update(
     task_default_queue=settings().celery_queue,
     task_serializer="json",

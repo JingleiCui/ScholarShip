@@ -1,6 +1,7 @@
 """Integration fixtures own an isolated, disposable PostgreSQL database."""
 
 import os
+import shutil
 import signal
 import subprocess
 import time
@@ -28,6 +29,13 @@ def database():
     admin = admin_engine("postgres")
     with admin.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         conn.connection.driver_connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+    from scholarship.api import library
+
+    previous_files = library.FILE_ROOT
+    previous_data_env = os.environ.get("SCHOLAR_DATA_DIR")
+    test_data = PROJECT_ROOT / "var/tests" / name
+    os.environ["SCHOLAR_DATA_DIR"] = str(test_data)
+    library.FILE_ROOT = test_data / "files"
     previous = os.environ.get("POSTGRES_DB")
     os.environ["POSTGRES_DB"] = name
     settings.cache_clear()
@@ -51,6 +59,13 @@ def database():
             os.environ.pop("POSTGRES_DB", None)
         else:
             os.environ["POSTGRES_DB"] = previous
+        library.FILE_ROOT = previous_files
+        if previous_data_env is None:
+            os.environ.pop("SCHOLAR_DATA_DIR", None)
+        else:
+            os.environ["SCHOLAR_DATA_DIR"] = previous_data_env
+        if test_data.parent == PROJECT_ROOT / "var/tests" and test_data.name.startswith(TEST_DATABASE_PREFIX):
+            shutil.rmtree(test_data, ignore_errors=True)
         settings.cache_clear()
 
 

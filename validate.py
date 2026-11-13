@@ -19,6 +19,7 @@ REPORT_DIR = ROOT / "var/reports"
 RUN_FROZEN_INSTALL = True
 RUN_DATABASE_INTEGRATION_TESTS = True  # creates and removes its own ss_test_<uuid> DB
 TIMEOUT_SECONDS = 600
+MILESTONE = "M1"
 
 
 def run_check(name, args, cwd=ROOT):
@@ -99,6 +100,8 @@ def main():
                 "stop.py",
                 "validate.py",
                 "runtime_smoke.py",
+                "evaluate_m1.py",
+                "recover_m1.py",
             ],
         )
     )
@@ -142,7 +145,7 @@ def main():
         tests = dict(suite.attrib) if suite is not None else None
     result = {
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "milestone": "M0",
+        "milestone": MILESTONE,
         "passed": all(c["passed"] for c in checks),
         "checks": checks,
         "diagnostics": diagnosis,

@@ -41,7 +41,7 @@ def dependency_health():
         client = qdrant_client()
         try:
             version = client.info().version
-            checks["qdrant"] = {"ready": version == '1.20.0', "version": version}
+            checks["qdrant"] = {"ready": version == "1.20.0", "version": version}
         finally:
             client.close()
     except Exception as exc:
@@ -59,7 +59,7 @@ def public_meta():
     return {
         "name": "ScholarShip",
         "version": "0.1.0",
-        "stage": "M0 · 环境与脚手架",
+        "stage": "M1 · 文献与本地预览",
         "modules": [
             {"name": name, "status": "planned"}
             for name in ["文献管理", "论文阅读与翻译", "检索与推荐", "知识图谱", "写作与研究核验", "数据分析与绘图"]

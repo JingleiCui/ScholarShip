@@ -25,6 +25,9 @@ class ProbeRequest(BaseModel):
 def create_app():
     app = FastAPI(title="ScholarShip", version="0.1.0")
     app.include_router(auth_router, prefix="/api/v1")
+    from scholarship.api.library import router as library_router
+
+    app.include_router(library_router, prefix="/api/v1")
 
     @app.middleware("http")
     async def request_id(request, call_next):
