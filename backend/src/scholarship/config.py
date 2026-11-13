@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     frontend_port: int = 15173
     external_services_enabled: bool = False
     deepseek_api_key: SecretStr = SecretStr("")
+    dashscope_workspace_id: str = ""
     dashscope_api_key: SecretStr = SecretStr("")
     mineru_api_key: SecretStr = SecretStr("")
     ai_budget_cny: int = 100

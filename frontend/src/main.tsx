@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
+import ServiceStatus from "./ServiceStatus";
 const Library = React.lazy(() => import("./Library"));
 
 type User = {
@@ -275,7 +276,7 @@ function App() {
           <small>每一条结论，都有来处。</small>
           <div className="stage">
             <span />
-            M1 · 文献导入
+            M2 · 离线适配
           </div>
         </div>
       </aside>
@@ -297,6 +298,7 @@ function App() {
           </div>
         </header>
         <div className="content">
+          {active === -1 && <ServiceStatus userId={user?.id} />}
           {(active === 0 || active === 1) && (
             <React.Suspense fallback={<p>正在加载文献阅读器…</p>}>
               <Library project={project} />
@@ -387,7 +389,7 @@ function App() {
                 <h2>{active < 0 ? "你的研究工具箱" : modules[active].title}</h2>
                 <p>六个能力模块，一个连贯的研究过程。</p>
               </div>
-              <span className="outline-tag">M1 · 文献导入</span>
+              <span className="outline-tag">M2 · 离线适配</span>
             </div>
             <div className="module-grid">
               {modules.map((m, i) => (
@@ -522,7 +524,7 @@ function App() {
           <footer>
             <span>ScholarShip · 学者之船</span>
             <span>
-              2026 研究生组参赛项目 <i>·</i> M1 文献与本地预览
+              2026 研究生组参赛项目 <i>·</i> M2 离线适配与预算
             </span>
           </footer>
         </div>

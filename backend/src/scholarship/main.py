@@ -28,6 +28,9 @@ def create_app():
     from scholarship.api.library import router as library_router
 
     app.include_router(library_router, prefix="/api/v1")
+    from scholarship.api.services import router as services_router
+
+    app.include_router(services_router, prefix="/api/v1")
 
     @app.middleware("http")
     async def request_id(request, call_next):

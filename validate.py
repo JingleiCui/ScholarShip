@@ -1,4 +1,4 @@
-"""Repeatable M0 checks. Run in PyCharm; reports contain no credentials."""
+"""Repeatable project checks. Run in PyCharm; reports contain no credentials."""
 
 from datetime import datetime, timezone
 import importlib
@@ -19,7 +19,7 @@ REPORT_DIR = ROOT / "var/reports"
 RUN_FROZEN_INSTALL = True
 RUN_DATABASE_INTEGRATION_TESTS = True  # creates and removes its own ss_test_<uuid> DB
 TIMEOUT_SECONDS = 600
-MILESTONE = "M1"
+MILESTONE = "M2-offline"
 
 
 def run_check(name, args, cwd=ROOT):
@@ -102,6 +102,8 @@ def main():
                 "runtime_smoke.py",
                 "evaluate_m1.py",
                 "recover_m1.py",
+                "estimate_m2.py",
+                "verify_m2.py",
             ],
         )
     )

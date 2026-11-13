@@ -226,7 +226,7 @@ def test_cost_reference_cannot_use_another_accounts_budget(accounts, database):
         other_budget = conn.scalar(
             sa.select(tables["budget_accounts"].c.id).where(tables["budget_accounts"].c.owner_id == b["user"]["id"])
         )
-    with tenant_transaction(a["user"]["id"]) as conn:
+    with database.begin() as conn:
         scope = {"owner_id": a["user"]["id"], "project_id": a["project"]["id"]}
         rid = conn.scalar(
             tables["runs"]
@@ -273,7 +273,7 @@ def test_cost_reference_cannot_use_another_accounts_budget(accounts, database):
             )
             .returning(tables["external_calls"].c.id)
         )
-    with pytest.raises(DBAPIError) as caught, tenant_transaction(a["user"]["id"]) as conn:
+    with pytest.raises(DBAPIError) as caught, database.begin() as conn:
         conn.execute(
             tables["budget_reservations"]
             .insert()
