@@ -7,6 +7,11 @@ from scholarship.models.adapters import ProviderClient
 from scholarship.models.runtime import ModelExecutor
 from scholarship.models.live import LiveExecutor
 from scholarship.models.transports import network_transport
+from scholarship.models.configuration import restore_snapshot
+from scholarship.models.live import request_hash
+from scholarship.infrastructure.database import tenant_transaction
+from scholarship.adapters.providers import ContractError
+import sqlalchemy as sa
 
 
 class ModelGateway(Protocol):
@@ -64,3 +69,60 @@ class GrantedGateway(AbstractContextManager):
         for transport in self.transports.values():
             transport.close()
         self.transports.clear()
+
+
+class ReuseRetrievalGateway(AbstractContextManager):
+    """Reuse exact successful retrieval receipts; only the new answer can send."""
+
+    def __init__(self, owner, grant, selection, predecessor, source):
+        self.owner, self.selection, self.predecessor = owner, selection, predecessor
+        with tenant_transaction(owner) as conn:
+            old = (
+                conn.execute(sa.text("SELECT * FROM model_runtime.grants WHERE id=:id"), {"id": predecessor})
+                .mappings()
+                .one()
+            )
+            new = (
+                conn.execute(sa.text("SELECT * FROM model_runtime.grants WHERE id=:id"), {"id": grant}).mappings().one()
+            )
+        expected_scope = {"source": source, "reuse_grant_id": str(predecessor)}
+        if (
+            old["project_id"] != new["project_id"]
+            or old["manifest_json"].get("data_scope") != source
+            or new["manifest_json"].get("data_scope") != expected_scope
+        ):
+            raise ContractError("retrieval_reuse_scope_mismatch")
+        self.previous_selection = restore_snapshot(old["manifest_json"]["snapshot"])
+        for role in ("embedding", "rerank"):
+            if (
+                self.previous_selection.roles[role] != selection.roles[role]
+                or self.previous_selection.bindings[role] != selection.bindings[role]
+            ):
+                raise ContractError("retrieval_reuse_model_changed")
+        self.answer = GrantedGateway(owner, grant, selection)
+
+    def invoke(self, intent, role, operation, arguments):
+        if role == "chat":
+            return self.answer.invoke(intent, role, operation, arguments)
+        if role not in {"embedding", "rerank"}:
+            raise ContractError("retrieval_reuse_role_not_allowed")
+        with tenant_transaction(self.owner) as conn:
+            row = (
+                conn.execute(
+                    sa.text("SELECT * FROM model_runtime.calls WHERE grant_id=:id AND intent=:intent"),
+                    {"id": self.predecessor, "intent": intent},
+                )
+                .mappings()
+                .one()
+            )
+        if (
+            row["state"] != "succeeded"
+            or row["simulated"]
+            or row["request_sha256"] != request_hash(self.previous_selection, role, operation, arguments)
+            or row["config_json"] != self.previous_selection.snapshot()
+        ):
+            raise ContractError("retrieval_receipt_not_reusable")
+        return row["receipt_json"]  # read-only: no transport, quota reservation or retry
+
+    def __exit__(self, *exc):
+        self.answer.__exit__(*exc)

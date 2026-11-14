@@ -456,3 +456,25 @@ def test_gemma_chat_and_evidence_contract():
     assert load_selection("free_api").roles["chat"].model == "gpt-4o-mini"
     with pytest.raises(ValueError):
         replace(load_selection("free_gemma").roles["chat"], model="google/gemma-4-31b-it").validate("chat")
+
+
+def test_quote_locations_are_computed_locally_without_another_request():
+    from scholarship.models.adapters import resolve_quote_offsets
+
+    evidence = [Evidence("e", "前言🙂 Alpha GPU: 8 P100. 后文", 7)]
+    body = {
+        "answer": "8 P100",
+        "insufficient_evidence": False,
+        "claims": [
+            {"text": "8 P100", "citations": [{"evidence_id": "e", "quote": "8 P100", "start": 999, "end": 1000}]}
+        ],
+    }
+    normalized = json.loads(resolve_quote_offsets(json.dumps(body), evidence))
+    citation = normalized["claims"][0]["citations"][0]
+    assert evidence[0].text[citation["start"] : citation["end"]] == "8 P100"
+    body["claims"][0]["citations"][0] = {"evidence_id": "e", "quote": "invented"}
+    with pytest.raises(ContractError):
+        resolve_quote_offsets(json.dumps(body), evidence)
+    body["claims"][0]["citations"][0] = {"evidence_id": "e", "quote": "8"}
+    with pytest.raises(ContractError):
+        resolve_quote_offsets(json.dumps(body), [Evidence("e", "8 and 8", 7)])

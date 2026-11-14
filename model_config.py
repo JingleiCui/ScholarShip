@@ -13,10 +13,13 @@ MAX_OUTPUT_TOKENS = 2048
 MAX_REQUESTS_PER_RUN = 30
 # Explicit transport route for this machine. Set {} on hosts with direct access.
 # Never put credentials here; cloud TLS still verifies the destination certificate.
-LIVE_PROXY_URLS = {"openrouter": "http://127.0.0.1:7897"}
+LIVE_PROXY_URLS = {"openrouter": "http://127.0.0.1:7897", "mineru_download": "http://127.0.0.1:7897"}
 
 # Provider plugins: an existing protocol can be reused by another approved host.
 # Only environment variable NAMES belong here. Key values stay in .env.
+# Public DNS verified on 2026-11-14; original HTTPS host and certificate remain verified.
+DOWNLOAD_DNS_OVERRIDES = {"cdn-mineru.openxlab.org.cn": "8.222.82.255"}
+
 PROVIDER_DEFINITIONS = {
     "mock": {
         "roles": {r: "synthetic" for r in ("chat", "translation", "embedding", "rerank", "parser")},

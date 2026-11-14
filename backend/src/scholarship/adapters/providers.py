@@ -21,7 +21,7 @@ CHAT_MODEL = "deepseek-flash"
 MAX_OUTPUT_TOKENS = 2048
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_PDF_BYTES = 128 * 1024 * 1024
-MAX_PAGES = 600
+MAX_PAGES = 200  # Current MinerU official per-file limit, checked 2026-11-14.
 SIGNED_UPLOAD_HOSTS = {"mineru.oss-cn-shanghai.aliyuncs.com"}
 RESULT_HOSTS = {"cdn-mineru.openxlab.org.cn", "mineru.oss-cn-shanghai.aliyuncs.com"}
 

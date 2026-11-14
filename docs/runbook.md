@@ -67,6 +67,10 @@ Run `verify_models.py` 做脱敏配置诊断；Run `verify_model_pipeline.py` �
 
 ## 真实联调状态
 
-统一入口 `validate_live_models.py` 默认 status；当前 stopped，累计 **6/6**，run 不发送请求。ChatAnywhere 聊天及 Nemotron 文档向量实测成功（4096 维）；其余连接/回执未知或 Gemma 429，重排未调用，云端完整流程未验收。旧记录与占额不重置，多个一次性续测脚本已合并。
+统一入口 `validate_live_models.py` 默认 status。当前最终模型验证 completed，累计 12/12；issue 开关已关闭，run 只读完成状态。本轮用标准论文两段短片段跑通真实向量、检索、重排与 ChatAnywhere 引文回答，不代表全文题集、扫描入库问答或比赛六模块已通过。Gemma 429 与早前失败记录保留。
 
-需要新的明确授权后才能增加推理名额；不上传论文、不调用 MinerU 云端、不充值。`diagnose_model_network.py` 仅在主动运行时发送无 Key、无模型输入的网络诊断请求，诊断可达不代表推理可用。常规服务开关继续关闭。详见[联调记录](models/live-report.md)。
+可选 action：`mineru-status` 查看唯一授权扫描件；`mineru-run` 复用其已完成结果。扫描件 15 页 OCR 与样例参数核对已通过，只上传一次；申请/上传授权开关也已关闭。原始 ZIP/Markdown 保存在忽略的 var/mineru-validation；结果 URL 不公开。
+
+本机结果 CDN 的 DNS/连接问题使用 model_config.py 中 DOWNLOAD_DNS_OVERRIDES 修复：地址来自当日公开 DNS，仍验证原域名的 HTTPS 证书；不改系统 hosts。其他主机可清空该字典，回到原生 httpx；保留覆盖时需本机 curl 支持。签名 URL 通过 stdin 传递，不在进程参数或输出中。此路径已在本机测试，新应用容器尚未重建验收。
+
+MinerU 当前单文件 200 页，541 页教材需三部分及原始页码映射；分区计划已测，未上传教材。供应商未返回账号剩余优先级页数，不能当成已验证数值。详情见[真实报告](models/live-official-report.md)、[比赛审计](competition/audit-2026-11-14.md)及[下一增量](m2/live-business-review.md)。

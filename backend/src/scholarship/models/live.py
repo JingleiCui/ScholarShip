@@ -2,6 +2,7 @@
 
 from dataclasses import asdict, replace, is_dataclass
 import json
+import re
 
 import httpx
 import sqlalchemy as sa
@@ -46,11 +47,14 @@ class Captured(RuntimeError):
     pass
 
 
-def make_manifest(selection, requests):
+def make_manifest(selection, requests, *, data_scope=None):
     """Build exact approved wire hashes without sending HTTP or reading any key."""
     if not 1 <= len(requests) <= 5 or not 1 <= selection.max_output_tokens <= 256:
         raise ValueError("invalid_live_validation_limits")
     manifest = {"revision": "synthetic-live-v1", "snapshot": selection.snapshot(), "requests": {}}
+    if data_scope is not None:
+        manifest["revision"] = "bounded-live-v2"
+        manifest["data_scope"] = serialize(data_scope)
     for item in requests:
         intent, role, operation, arguments = item
         spec = selection.roles[role]
@@ -210,6 +214,10 @@ class LiveExecutor:
                         "status": exc.status if isinstance(exc, ProviderFailure) else None,
                         "transport_kind": exc.transport_kind if isinstance(exc, ProviderFailure) else None,
                         "retry_after": exc.retry_after if isinstance(exc, ProviderFailure) else None,
+                        "contract_code": str(exc)
+                        if isinstance(exc, ContractError) and re.fullmatch(r"[a-z_]{1,100}", str(exc))
+                        else None,
+                        "finish_reason": client.failure_diagnostic()["finish_reason"] if client is not None else None,
                         "simulated": False,
                     },
                 )

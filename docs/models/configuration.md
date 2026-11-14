@@ -13,7 +13,7 @@
 
 当前研究项目已保存 free_gemma。ChatAnywhere 与 Ollama 选项保留；项目选择优先于 ACTIVE_PRESET，单角色优先级为配置组 → ROLE_OVERRIDES → 项目覆盖。
 
-Gemma 用于聊天、证据问答、摘要和翻译，不能替代 embedding 或 rerank。本轮实际 ChatAnywhere 聊天成功；Nemotron 文档向量返回 **4096 维**；问题向量超时、Gemma 429、重排未调用。详见[真实联调记录](live-report.md)。这不代表云端全流程已完成。
+Gemma 用于聊天、证据问答、摘要和翻译，不能替代 embedding 或 rerank。最新已用 Nemotron 4096 维向量/重排和临时 ChatAnywhere 组合完成标准论文两段短片段的真实联调；Gemma 仍 429。唯一授权扫描件的 15 页 OCR 样例也通过。详见[最新报告](live-official-report.md)。尚未发布真实业务深解析/索引，不能当作全文科研问答或比赛六模块通过。
 
 ## 如何切换
 
@@ -72,6 +72,8 @@ Run `diagnose_model_network.py` 只用无 Key、无模型输入的 HTTP 请求�
 - Run `verify_models.py`：脱敏配置诊断；顶部 RUN_TESTS 可开启协议测试。
 - Run `verify_model_pipeline.py`：自动创建隔离测试库/向量 collection，完成多组合与配置新增平台的端到端测试；模型响应全部合成，不调用云端。
 - Run `validate.py`：全部回归、迁移、构建、依赖和密钥扫描。
-- Run `validate_live_models.py`：统一真实联调入口，默认 status。此前多个续测脚本已合并；旧授权和 unknown 保留在 PG。当前累计 6/6 且停止，没有新授权；run 不发送请求，issue 在读管理员连接之前拒绝。
+- Run `validate_live_models.py`：统一真实联调入口，默认 status。此前多个续测脚本已合并；旧授权和 unknown 保留在 PG。当前累计 12/12 已结束，模型与扫描件签发开关均关闭；run 不发送推理，mineru-run 复用已完成产物。需要下一阶段明确批准后才增加云端用量。
 
 本地工具保留 `local_models.py`，默认仅检查。当前只有 Ollama qwen3.5:9b 权重已下载；未把合成 Ollama/MinerU 契约测试冒充本地推理、OCR 安装或 541 页教材解析验收。
+
+下载 CDN 的本机 DNS 覆盖配置见 DOWNLOAD_DNS_OVERRIDES；不影响模型协议或 embedding profile。其他机器清空或重新核验地址，仍保留原域名 HTTPS 证书校验。

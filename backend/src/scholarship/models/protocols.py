@@ -13,7 +13,7 @@ class WireRequest:
 
 
 class OpenAIChat:
-    revision = "openai-chat-v1"
+    revision = "openai-chat-v2"
     roles = {"chat", "translation"}
     usage_style = "openai"
 
@@ -35,7 +35,7 @@ class OpenAIChat:
 
 
 class OllamaChat:
-    revision = "ollama-chat-v1"
+    revision = "ollama-chat-v2"
     roles = {"chat", "translation"}
     usage_style = "ollama"
 

@@ -1,0 +1,252 @@
+{
+  "source": {
+    "kind": "public_pdf_excerpt",
+    "filename": "1706.03762v1.pdf",
+    "sha256": "0a9bff1be3575cf9fe26a4a3d3a9175bc791ecec90de8b9deba4cff75d2b9476",
+    "pages": 15,
+    "parser": "pypdf-text-preview",
+    "locators": [
+      {
+        "evidence_id": "transformer-hardware",
+        "pdf_page": 7,
+        "page_text_start": 333,
+        "page_text_end": 732,
+        "text_sha256": "1935e433a8b45594d954e0995be1321422ca29976672e10c9540577204714aad"
+      },
+      {
+        "evidence_id": "transformer-optimizer",
+        "pdf_page": 7,
+        "page_text_start": 747,
+        "page_text_end": 814,
+        "text_sha256": "152bf6b4082b7712cbe1c29d01911abc34d463352aa6ee145d8b651acc1c9220"
+      }
+    ],
+    "pdf_uploads": 0,
+    "scientific_acceptance_question": "official-single-paper-3"
+  },
+  "steps": [
+    {
+      "step": "document_embeddings",
+      "dimensions": 4096,
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3.5-embed-8b:free"
+    },
+    {
+      "step": "query_embedding",
+      "dimensions": 4096
+    },
+    {
+      "step": "hybrid_retrieval",
+      "collection": "ss_live_probe_2e1253f4fc6340fcb1bbbc3dc5732853",
+      "dense": [
+        "e2fc2be4-61f8-5b16-a656-95f53dc3de7f",
+        "2e9b2135-3f97-555c-ae4e-2726881d9e32"
+      ],
+      "bm25": [
+        "e2fc2be4-61f8-5b16-a656-95f53dc3de7f",
+        "2e9b2135-3f97-555c-ae4e-2726881d9e32"
+      ],
+      "rrf": {
+        "e2fc2be4-61f8-5b16-a656-95f53dc3de7f": 0.03278688524590164,
+        "2e9b2135-3f97-555c-ae4e-2726881d9e32": 0.03225806451612903
+      },
+      "first_evidence_id": "transformer-hardware"
+    },
+    {
+      "step": "rerank",
+      "ranking": [
+        {
+          "index": 0,
+          "score": 0.1619288861277175
+        },
+        {
+          "index": 1,
+          "score": 0.04391149275152885
+        }
+      ]
+    },
+    {
+      "step": "grounded_answer",
+      "citation_count": 1
+    }
+  ],
+  "passed": true,
+  "question": "How many NVIDIA P100 GPUs were used to train the Transformer base model?",
+  "validation_only": true,
+  "pdf_uploads": 0,
+  "business_index_published": false,
+  "answer": {
+    "answer": "8 NVIDIA P100 GPUs were used to train the Transformer base model.",
+    "insufficient_evidence": false,
+    "claims": [
+      {
+        "text": "We trained our models on one machine with 8 NVIDIA P100 GPUs.",
+        "citations": [
+          {
+            "evidence_id": "transformer-hardware",
+            "quote": "We trained our models on one machine with 8 NVIDIA P100 GPUs.",
+            "start": 0,
+            "end": 61,
+            "page": 7
+          }
+        ]
+      }
+    ],
+    "verification": "exact_citation_spans_only"
+  },
+  "citations": [
+    {
+      "evidence_id": "transformer-hardware",
+      "quote": "We trained our models on one machine with 8 NVIDIA P100 GPUs.",
+      "start": 0,
+      "end": 61,
+      "page": 7,
+      "pdf_page": 7,
+      "source_sha256": "0a9bff1be3575cf9fe26a4a3d3a9175bc791ecec90de8b9deba4cff75d2b9476",
+      "page_text_start": 333,
+      "page_text_end": 394
+    }
+  ],
+  "dimensions": 4096,
+  "scope": "two_curated_excerpts_not_full_paper_acceptance",
+  "validation": {
+    "passed": true,
+    "tests": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "156",
+      "time": "43.642",
+      "timestamp": "2026-11-14T18:00:52.186896+08:00",
+      "hostname": "cuijingleideMacBook-Pro-2.local"
+    }
+  },
+  "model_calls": [
+    {
+      "intent": "chat_plain",
+      "state": "succeeded",
+      "provider": "chatanywhere",
+      "model": "gpt-4o-mini",
+      "dimensions": null,
+      "reported_model": "gpt-4o-mini-2024-07-18",
+      "usage": {
+        "input_tokens": 25,
+        "output_tokens": 4
+      }
+    },
+    {
+      "intent": "embed_documents",
+      "state": "unknown",
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3.5-embed-8b:free",
+      "error_code": "provider_transport_outcome_unknown",
+      "status": null
+    },
+    {
+      "intent": "embed_documents",
+      "state": "unknown",
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3.5-embed-8b:free",
+      "error_code": "provider_transport_outcome_unknown",
+      "status": null
+    },
+    {
+      "intent": "embed_documents",
+      "state": "succeeded",
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3.5-embed-8b:free",
+      "dimensions": 4096,
+      "reported_model": "nvidia/nemotron-3.5-embed-8b",
+      "usage": {
+        "input_tokens": 26,
+        "output_tokens": null
+      }
+    },
+    {
+      "intent": "embed_query",
+      "state": "unknown",
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3.5-embed-8b:free",
+      "error_code": "provider_transport_outcome_unknown",
+      "status": null
+    },
+    {
+      "intent": "chat_evidence",
+      "state": "rejected",
+      "provider": "openrouter",
+      "model": "google/gemma-4-31b-it:free",
+      "error_code": "rate_limited",
+      "status": 429
+    },
+    {
+      "intent": "paper_documents",
+      "state": "succeeded",
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3.5-embed-8b:free",
+      "dimensions": 4096,
+      "reported_model": "nvidia/nemotron-3.5-embed-8b",
+      "usage": {
+        "input_tokens": 161,
+        "total_tokens": 161,
+        "output_tokens": null
+      }
+    },
+    {
+      "intent": "paper_query",
+      "state": "succeeded",
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3.5-embed-8b:free",
+      "dimensions": 4096,
+      "reported_model": "nvidia/nemotron-3.5-embed-8b",
+      "usage": {
+        "input_tokens": 23,
+        "total_tokens": 23,
+        "output_tokens": null
+      }
+    },
+    {
+      "intent": "paper_rerank",
+      "state": "succeeded",
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3.5-rerank-8b:free",
+      "dimensions": null,
+      "reported_model": "nvidia/nemotron-3.5-rerank-8b",
+      "usage": {
+        "input_tokens": null,
+        "total_tokens": 207,
+        "output_tokens": null
+      }
+    },
+    {
+      "intent": "paper_answer",
+      "state": "rejected",
+      "provider": "openrouter",
+      "model": "google/gemma-4-31b-it:free",
+      "error_code": "rate_limited",
+      "status": 429
+    },
+    {
+      "intent": "paper_answer",
+      "state": "unknown",
+      "provider": "chatanywhere",
+      "model": "gpt-4o-mini",
+      "error_code": "live_contract_failure",
+      "status": null
+    },
+    {
+      "intent": "paper_answer",
+      "state": "succeeded",
+      "provider": "chatanywhere",
+      "model": "gpt-4o-mini",
+      "dimensions": null,
+      "reported_model": "gpt-4o-mini-2024-07-18",
+      "usage": {
+        "input_tokens": 237,
+        "total_tokens": 342,
+        "output_tokens": 105
+      }
+    }
+  ],
+  "cumulative_request_slots": 12
+}

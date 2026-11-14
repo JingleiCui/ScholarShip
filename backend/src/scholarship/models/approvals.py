@@ -13,11 +13,21 @@ from scholarship.infrastructure.schema import tables as T
 
 
 def issue_approval(
-    db, *, key, selection, requests, total_limit, prior_keys=(), owner_id=None, project_id=None, approved=False
+    db,
+    *,
+    key,
+    selection,
+    requests,
+    total_limit,
+    prior_keys=(),
+    owner_id=None,
+    project_id=None,
+    approved=False,
+    data_scope=None,
 ):
     if approved is not True:
         raise ExternalDisabled("explicit_approval_required")
-    manifest = make_manifest(selection, requests)
+    manifest = make_manifest(selection, requests, data_scope=data_scope)
     if type(total_limit) is not int or not 1 <= total_limit <= 200 or len(set(prior_keys)) != len(prior_keys):
         raise ValueError("invalid_cumulative_limit")
     with db.begin() as conn:
@@ -78,7 +88,7 @@ def issue_approval(
                 status="running",
                 idempotency_key=key,
                 request_sha256=fingerprint(manifest),
-                input_json={"synthetic": True, "total_limit": total_limit},
+                input_json={"synthetic": data_scope is None, "total_limit": total_limit, "data_scope": data_scope},
                 config_json={"models": selection.snapshot()},
                 input_scope_json={},
                 next_event_seq=1,

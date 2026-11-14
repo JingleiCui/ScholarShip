@@ -87,3 +87,75 @@ def network_transport(provider):
         except (ValueError, TypeError):
             raise ValueError("invalid_local_proxy") from None
     return httpx.HTTPTransport(retries=0, trust_env=False, proxy=proxy)
+
+
+def download_with_dns_override(url, target, *, address, proxy=None, max_bytes=128 * 1024 * 1024, timeout=120):
+    """Per-request DNS repair; keep original HTTPS SNI/certificate verification.
+
+    Signed URL travels through stdin, never a process argument or error output.
+    """
+    import ipaddress
+    import os
+    from pathlib import Path
+    import shutil
+    import subprocess
+
+    endpoint = urlsplit(url)
+    ip = ipaddress.ip_address(address)
+    if (
+        endpoint.scheme != "https"
+        or not ip.is_global
+        or endpoint.port not in (None, 443)
+        or endpoint.username
+        or endpoint.password
+        or endpoint.fragment
+    ):
+        raise ContractError("invalid_download_dns_override")
+    executable = shutil.which("curl")
+    if not executable:
+        raise ContractError("curl_not_available")
+    target = Path(target)
+    command = [
+        executable,
+        "--disable",
+        "--silent",
+        "--fail",
+        "--proto",
+        "=https",
+        "--max-time",
+        str(timeout),
+        "--max-filesize",
+        str(max_bytes),
+        "--output",
+        str(target),
+        "--config",
+        "-",
+    ]
+    if proxy:
+        route = urlsplit(proxy)
+        if (
+            route.scheme != "http"
+            or route.hostname not in {"127.0.0.1", "localhost"}
+            or not route.port
+            or route.username
+            or route.password
+            or route.query
+            or route.fragment
+            or route.path not in {"", "/"}
+        ):
+            raise ContractError("invalid_download_proxy")
+        command += ["--proxy", proxy, "--connect-to", endpoint.hostname + ":443:" + address + ":443"]
+    else:
+        command += ["--noproxy", "*", "--resolve", endpoint.hostname + ":443:" + address]
+    result = subprocess.run(
+        command,
+        input="url = " + json.dumps(url) + "\n",
+        capture_output=True,
+        text=True,
+        timeout=timeout + 5,
+        env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")},
+    )
+    if result.returncode:
+        raise ProviderFailure("download_dns_transport_failed", unknown=True)
+    if not target.exists() or target.stat().st_size > max_bytes:
+        raise ContractError("download_size_limit")
