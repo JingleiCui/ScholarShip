@@ -4,7 +4,9 @@ from datetime import datetime, timedelta, timezone
 from threading import Event, Thread
 from uuid import UUID, uuid4
 import sqlalchemy as sa
-from scholarship.adapters.providers import ContractError, UnknownOutcome
+from scholarship.adapters.providers import ContractError, UnknownOutcome, ExternalDisabled
+from scholarship.models.contracts import ProviderFailure
+from scholarship.domains.research import execute_research
 from scholarship.config import settings
 from scholarship.domains.offline_workflow import build_demo, qa_graph
 from scholarship.domains.runs import emit
@@ -25,7 +27,7 @@ def execute_offline(owner, project, run_id):
                 .where(
                     T["runs"].c.id == run_id,
                     T["runs"].c.project_id == project,
-                    T["runs"].c.kind.in_(["offline_build", "offline_qa"]),
+                    T["runs"].c.kind.in_(["offline_build", "offline_qa", "research_build", "research_qa"]),
                 )
                 .with_for_update()
             )
@@ -95,7 +97,7 @@ def execute_offline(owner, project, run_id):
             )
             .returning(T["run_steps"].c.id)
         )
-        emit(conn, run_id, "running", {"message": "正在执行合成业务链路；真实外部服务关闭。", "attempt": attempts + 1})
+        emit(conn, run_id, "running", {"message": "执行已固定文献版本与模型配置的任务。", "attempt": attempts + 1})
     stop = Event()
 
     def heartbeat():
@@ -120,11 +122,17 @@ def execute_offline(owner, project, run_id):
     error = None
     status = "succeeded"
     try:
-        result = (
-            build_demo(owner, project, run_id) if r["kind"] == "offline_build" else qa_graph(owner, project, run_id)
-        )
+        if r["kind"].startswith("research_"):
+            result = execute_research(owner, project, run_id)
+        else:
+            result = (
+                build_demo(owner, project, run_id) if r["kind"] == "offline_build" else qa_graph(owner, project, run_id)
+            )
         if result is None:
             raise RuntimeError("graph_incomplete")
+    except (ProviderFailure, ExternalDisabled) as exc:
+        status = "waiting_user"
+        error = {"code": exc.code if isinstance(exc, ProviderFailure) else "production_admission_closed"}
     except UnknownOutcome:
         status = "waiting_user"
         error = {"code": "offline_call_unknown_reconcile_required"}
@@ -170,7 +178,9 @@ def execute_offline(owner, project, run_id):
             run_id,
             status,
             {
-                "message": "离线合成任务完成。" if status == "succeeded" else "离线任务暂停或等待有界恢复。",
+                "message": "任务完成；请按结果中的来源与模拟标记评估。"
+                if status == "succeeded"
+                else "离线任务暂停或等待有界恢复。",
                 "error": error,
             },
         )

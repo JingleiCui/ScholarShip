@@ -436,6 +436,10 @@ def page(parse_id: UUID, page_no: int, user: Identity = Depends(identity)):
         )
         if not row:
             raise HTTPException(404, "page_not_found")
+        parse_version = conn.scalar(
+            sa.select(T["document_parses"].c.version_id).where(T["document_parses"].c.id == parse_id)
+        )
+        version_row(conn, parse_version)
         blocks = (
             conn.execute(
                 sa.select(T["document_blocks"])

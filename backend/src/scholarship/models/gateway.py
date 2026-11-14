@@ -23,6 +23,8 @@ class ModelGateway(Protocol):
 class SimulatedGateway(AbstractContextManager):
     """Mock-only contract gateway; an injected transport cannot open real HTTP."""
 
+    simulated = True
+
     def __init__(self, owner, run, selection, transport_factory):
         self.owner, self.run, self.selection = owner, run, selection
         self.transport_factory = transport_factory

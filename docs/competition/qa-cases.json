@@ -1,0 +1,19 @@
+{
+  "revision": "official-qa-v1",
+  "source": "科研小助手Agent-AI大模型.pdf 第 2 页",
+  "evaluation_policy": "题目与评分证据分开；模拟回答仅验业务契约，不能计为科学问答通过。正确性、完整性、数值和原文须单独人工核验。",
+  "cases": [
+    {"id":"single-1","group":"official_single","question":"论文 Attention Is All You Need 的第 6 作者是谁，在哪个公司或机构工作？","requires":["作者顺序","机构对应"],"scientific_status":"pending"},
+    {"id":"single-2","group":"official_single","question":"其中 Adam 优化器的超参数 β₁ 和 β₂ 分别设置为多少？","requires":["多轮上文指代","公式数值"],"scientific_status":"pending"},
+    {"id":"single-3","group":"official_single","question":"这篇论文的 Transformer Base 模型训练用了多少个 GPU，具体什么型号？","requires":["训练硬件原文","数值与型号"],"scientific_status":"pending_full_text"},
+    {"id":"single-4","group":"official_single","question":"Transformer (big) 在 English-to-German 上的 BLEU 是多少，当时最先进模型是多少，提升多少？","requires":["表格行列","比较基准","减法与单位"],"scientific_status":"pending"},
+    {"id":"single-5","group":"official_single","question":"列出该论文 References 中 Layer Normalization 文献的完整作者和年份。","requires":["参考文献完整条目"],"scientific_status":"pending"},
+    {"id":"multi-1","group":"official_multi","question":"对比 Attention Is All You Need 与 BERT：BERT 与原 Transformer Encoder 有什么承袭关系，丢弃了哪部分？","requires":["Transformer","BERT","跨文引用"],"scientific_status":"blocked_missing_published_corpus"},
+    {"id":"multi-2","group":"official_multi","question":"对比 GPT-1、GPT-2、GPT-3 的参数规模变化。","requires":["GPT-1","GPT-2","GPT-3","数值单位"],"scientific_status":"blocked_missing_published_corpus"},
+    {"id":"multi-3","group":"official_multi","question":"GPT-2 相比 GPT-1 对 Layer Normalization 位置作了什么关键调整？","requires":["GPT-1","GPT-2","方法位置原文"],"scientific_status":"blocked_missing_published_corpus"},
+    {"id":"multi-4","group":"official_multi","question":"GPT-1 到 GPT-3 的最大上下文 Token 长度分别是多少？","requires":["GPT-1","GPT-2","GPT-3","原文与单位"],"scientific_status":"blocked_missing_published_corpus"},
+    {"id":"negative-1","group":"refusal","question":"这篇论文没有报告的个人电话号码是什么？","requires":["不编造","无支持则拒答"],"scientific_status":"pending"},
+    {"id":"conflict-1","group":"conflict","question":"两份来源给出不同数值时，分别引用各自版本并指出差异，不合并为一个事实。","requires":["两份明确冲突的来源","逐条引用"],"scientific_status":"blocked_missing_conflict_corpus"},
+    {"id":"version-1","group":"version","question":"比较 Transformer v1 和 v7 的内容差异，引用各自固定版本。","requires":["v1","v7","版本隔离"],"scientific_status":"blocked_missing_published_v7"}
+  ]
+}

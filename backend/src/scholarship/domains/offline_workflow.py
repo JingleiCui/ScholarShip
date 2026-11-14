@@ -227,15 +227,24 @@ def persist_answer(owner, project, run, question, answer, selected, trace):
                 sa.select(T["paper_versions"].c.id).where(T["paper_versions"].c.id == UUID(vid)).with_for_update()
             )
             version_scope(conn, UUID(vid))
+        model_simulated = row["config_json"]["mode"] != "cloud"
+        source_synthetic = any(
+            version_scope(conn, UUID(v))["metadata_json"].get("synthetic", False)
+            for v in row["input_json"].get("version_ids", [])
+        )
         scope = {"owner_id": owner, "project_id": project}
         conversation = conn.scalar(
             T["conversations"]
             .insert()
             .values(
                 **scope,
-                title="离线合成问答",
+                title="文献问答 · 离线验收" if model_simulated else "文献证据问答",
                 checkpoint_thread_id=f"offline:{run}",
-                context_json={"synthetic": True},
+                context_json={
+                    "synthetic": model_simulated,
+                    "source_synthetic": source_synthetic,
+                    "models": row["config_json"].get("models"),
+                },
                 lock_version=0,
             )
             .returning(T["conversations"].c.id)
@@ -307,12 +316,13 @@ def persist_answer(owner, project, run, question, answer, selected, trace):
                             "parse_id": item["parse_id"],
                             "page": item["page"],
                             "bbox": item["bbox"],
-                            "synthetic": True,
+                            "synthetic": source_synthetic,
+                            "model_simulated": model_simulated,
                         },
                         retrieval_json={
                             "generation_id": item["generation_id"],
                             "chunk_id": item["id"],
-                            "mode": "dense_bm25_rrf_rerank_offline",
+                            "mode": "dense_bm25_rrf_rerank",
                         },
                     )
                     .returning(T["evidence_items"].c.id)
@@ -334,15 +344,18 @@ def persist_answer(owner, project, run, question, answer, selected, trace):
                     }
                 )
         result = {
-            "synthetic": True,
+            "synthetic": model_simulated,
+            "model_simulated": model_simulated,
+            "source_synthetic": source_synthetic,
             "answer": answer["answer"],
             "insufficient_evidence": answer["insufficient_evidence"],
             "verification": "exact_citation_spans_only",
             "citations": citations,
             "trace": trace,
             "scope": row["input_scope_json"],
-            "limitations": "合成响应；只核对逐字引文，不证明科研事实、数值或推理正确。",
-            "external_requests": 0,
+            "limitations": ("合成响应；" if model_simulated else "")
+            + "只核对逐字引文，不证明科研事实、数值或推理正确。",
+            "external_requests": 0 if model_simulated else None,
         }
         conn.execute(
             T["runs"].update().where(T["runs"].c.id == run).values(conversation_id=conversation, result_json=result)
@@ -357,7 +370,7 @@ def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
             .mappings()
             .one()
         )
-        if row["kind"] not in ({"model_qa"} if model_gateway is not None else {"offline_qa"}):
+        if row["kind"] not in ({"model_qa", "research_qa"} if model_gateway is not None else {"offline_qa"}):
             raise ContractError("qa_run_required")
         question = row["input_json"]["question"]
         scope = row["input_scope_json"]["generations"]
@@ -386,9 +399,14 @@ def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
         if role == "embedding":
             actual.update(input_kind="query", expected_dimensions=expected_dimensions)
         receipt = model_gateway.invoke(intent, role, operation, actual)
-        if not receipt["simulated"]:
-            raise ContractError("synthetic_workflow_requires_simulated_receipt")
-        return {"result": receipt["value"], "usage": receipt["usage"], "model": receipt["requested_model"]}
+        if receipt["simulated"] != (row["config_json"]["mode"] != "cloud"):
+            raise ContractError("workflow_simulation_mode_mismatch")
+        return {
+            "result": receipt["value"],
+            "usage": receipt["usage"],
+            "model": receipt["requested_model"],
+            "simulated": receipt["simulated"],
+        }
 
     def retrieve(state):
         arguments = {"texts": [question]}
@@ -422,6 +440,8 @@ def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
     def answer(state):
         selected = state["selected"]
         validate_selected(owner, project, selected)
+        if model_gateway is not None and not selected:
+            return {"answer": {"answer": "缺少可核验的原文证据。", "claims": [], "insufficient_evidence": True}}
         evidence = [Evidence(i["id"], i["text"], i["page"]) for i in selected]
         arguments = {"question": question, "evidence": evidence}
         step = call_step(owner, project, run, "answer", {"question": question, "selected": selected})

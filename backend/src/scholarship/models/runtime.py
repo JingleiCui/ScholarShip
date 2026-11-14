@@ -115,14 +115,14 @@ class ModelExecutor:
             conn.execute(stmt, {"id": cid, "state": state, "receipt": receipt})
 
 
-def register_embedding_profile(owner, spec, result):
+def register_embedding_profile(owner, spec, result, *, call_id=None):
     from scholarship.models.catalog import binding_snapshot
 
     if (
         result.provider != spec.provider
         or result.requested_model != spec.model
         or result.dimensions is None
-        or not result.simulated
+        or (not result.simulated and call_id is None)
     ):
         raise ContractError("validated_simulated_embedding_receipt_required")
     config = {
@@ -131,7 +131,7 @@ def register_embedding_profile(owner, spec, result):
         "model": spec.model,
         "base_url": spec.base_url,
         "dimensions": result.dimensions,
-        "simulated": True,
+        "simulated": result.simulated,
         "metric": "cosine",
         "tokenizer": "utf8-bytes-v1",
         "target_tokens": 600,
@@ -147,7 +147,11 @@ def register_embedding_profile(owner, spec, result):
         "normalization": "original-unmodified",
     }
     with tenant_transaction(owner) as conn:
-        stmt = sa.text("SELECT model_runtime.register_profile(:config,:hash,:dim)").bindparams(
-            sa.bindparam("config", type_=JSONB)
+        stmt = sa.text(
+            "SELECT model_runtime.register_profile(:config,:hash,:dim)"
+            if result.simulated
+            else "SELECT model_runtime.register_real_profile(:call,:config,:hash,:dim)"
+        ).bindparams(sa.bindparam("config", type_=JSONB))
+        return conn.scalar(
+            stmt, {"config": config, "hash": fingerprint(config), "dim": result.dimensions, "call": call_id}
         )
-        return conn.scalar(stmt, {"config": config, "hash": fingerprint(config), "dim": result.dimensions})

@@ -116,10 +116,38 @@ class Rerank:
         return data.get("results")
 
 
+class SyntheticProtocol:
+    """Mock-only wire contract. Keeps the existing pinned lifecycle revision."""
+
+    revision = "synthetic-lifecycle-v1"
+    roles = {"chat", "translation", "embedding", "rerank", "parser"}
+    usage_style = "openai"
+
+    def prepare(self, spec, definition, **arguments):
+        if "texts" in arguments:
+            body = {"model": spec.model, "input": arguments["texts"]}
+            path = "/embeddings"
+        elif "documents" in arguments:
+            body = {"model": spec.model, **arguments}
+            path = "/rerank"
+        elif "messages" in arguments:
+            body = {"model": spec.model, "messages": arguments["messages"]}
+            path = "/chat/completions"
+        else:
+            raise ContractError("synthetic_parser_requires_layout_lifecycle")
+        return WireRequest("https://scholarship.invalid" + path, body)
+
+    def read(self, data, **unused):
+        if "choices" in data:
+            return OpenAIChat().read(data)
+        if "data" in data:
+            return OpenAIEmbedding().read(data, count=unused["count"])
+        return data.get("results")
+
+
 # Register a new protocol here; existing protocols require only catalog entries.
 _ADAPTERS = {}
 _LIFECYCLES = {
-    "synthetic": {"chat", "translation", "embedding", "rerank", "parser"},
     "mineru_local": {"parser"},
     "mineru_cloud": {"parser"},
 }
@@ -146,6 +174,7 @@ def resolve_protocol(name):
 
 
 for _name, _adapter in {
+    "synthetic": SyntheticProtocol(),
     "openai_chat": OpenAIChat(),
     "ollama_chat": OllamaChat(),
     "openai_embedding": OpenAIEmbedding(),

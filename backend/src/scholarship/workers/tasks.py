@@ -54,6 +54,8 @@ def dispatch():
                 "preview_parse": "scholarship.preview_parse",
                 "offline_build": "scholarship.execute_offline",
                 "offline_qa": "scholarship.execute_offline",
+                "research_build": "scholarship.execute_offline",
+                "research_qa": "scholarship.execute_offline",
                 "system_probe": "scholarship.execute_probe",
             }[row["command"]],
             args=[str(row["owner_id"]), str(row["project_id"]), str(row["run_id"])],

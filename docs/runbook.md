@@ -74,3 +74,15 @@ Run `verify_models.py` 做脱敏配置诊断；Run `verify_model_pipeline.py` �
 本机结果 CDN 的 DNS/连接问题使用 model_config.py 中 DOWNLOAD_DNS_OVERRIDES 修复：地址来自当日公开 DNS，仍验证原域名的 HTTPS 证书；不改系统 hosts。其他主机可清空该字典，回到原生 httpx；保留覆盖时需本机 curl 支持。签名 URL 通过 stdin 传递，不在进程参数或输出中。此路径已在本机测试，新应用容器尚未重建验收。
 
 MinerU 当前单文件 200 页，541 页教材需三部分及原始页码映射；分区计划已测，未上传教材。供应商未返回账号剩余优先级页数，不能当成已验证数值。详情见[真实报告](models/live-official-report.md)、[比赛审计](competition/audit-2026-11-14.md)及[下一增量](m2/live-business-review.md)。
+
+## M2 正式业务闭环（本批更新）
+
+本节更新上文“真实产物未入库”的历史状态。当前迁移为 `0010_profile_input_policy`。唯一已授权扫描件的 MinerU 产物已正式入库；新问答面板位于工作台及“检索与推荐”页。勾选 OCR 文献，默认“离线验收”，可建模拟索引、提交问题、查看任务和点击引用，进入固定修订 PDF 阅读器。目录、页码、文字块和图片可定位；模拟回答不代表科学正确性。
+
+运行 `verify_m2_live_business.py`：顶部 `ACTION='status'` 查看；`import` 复用已下载 ZIP 并校验原授权来源后本地入库；`acceptance` 幂等建立正式扫描来源的模拟索引并逐项跑官方五问和拒答；`validate` 在隔离测试库跑新增测试。正常开发直接 Run `dev.py`；不需要在页面填写新的 Key。
+
+当前 `free_gemma` 保留；新任务读取项目保存的配置组和单项覆盖，旧任务固定快照。mock/local/free_api/free_gemma 的离线验收全部用模拟 transport。`local` 的真实推理、真实标准双栏/教材深解析、跨文及多轮科研质量仍待验收。
+
+云端业务入口已接线但拒绝执行：外部总开关仍关，生产策略未创建/启用。旧 12/12 名额和唯一扫描件生命周期不变。不要为尝试新页面而修改旧授权或开上传开关。正式启用需要独立的明确免费/限额策略、共享 live budget 和配置准入；本次不配置这些权限。
+
+详见[设计](m2/live-business-design.md)、[验收](m2/live-business-report.md)和[官方题集](competition/qa-cases.json)。

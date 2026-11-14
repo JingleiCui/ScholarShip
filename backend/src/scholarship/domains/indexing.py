@@ -61,7 +61,11 @@ def finish_call(owner, step, receipt):
             .where(T["run_steps"].c.id == step)
             .values(
                 status="succeeded",
-                output_json={"offline": True, "usage": receipt["usage"], "model": receipt["model"]},
+                output_json={
+                    "offline": receipt.get("simulated", receipt.get("offline", True)),
+                    "usage": receipt["usage"],
+                    "model": receipt["model"],
+                },
                 updated_at=sa.func.now(),
             )
         )
@@ -91,10 +95,10 @@ def block_rows(conn, pid):
     )
 
 
-def prepare_generation(owner, vid, pid, profile_id=None):
+def prepare_generation(owner, vid, pid, profile_id=None, *, simulated=True, generation_step=None):
     with tenant_transaction(owner) as conn:
-        v = version_scope(conn, vid)
         conn.execute(sa.select(T["paper_versions"].c.id).where(T["paper_versions"].c.id == vid).with_for_update())
+        v = version_scope(conn, vid)
         p = (
             profile(conn)
             if profile_id is None
@@ -102,8 +106,15 @@ def prepare_generation(owner, vid, pid, profile_id=None):
             .mappings()
             .one()
         )
-        if profile_id is not None and p["config_json"].get("simulated") is not True:
+        if profile_id is not None and p["config_json"].get("simulated") is not simulated:
             raise ContractError("simulation_profile_required")
+        if not simulated and not conn.scalar(
+            sa.text(
+                "SELECT EXISTS(SELECT 1 FROM model_runtime.real_profile_proofs WHERE profile_id=:p AND project_id=:project)"
+            ),
+            {"p": p["id"], "project": v["project_id"]},
+        ):
+            raise ContractError("real_profile_project_proof_required")
         parse = (
             conn.execute(
                 sa.select(T["document_parses"]).where(
@@ -117,17 +128,52 @@ def prepare_generation(owner, vid, pid, profile_id=None):
             .first()
         )
         if not parse:
-            raise ContractError("ready_synthetic_parse_required")
+            raise ContractError("ready_deep_parse_required")
+        if generation_step is not None:
+            step = (
+                conn.execute(
+                    sa.select(T["run_steps"])
+                    .where(T["run_steps"].c.id == generation_step, T["run_steps"].c.project_id == v["project_id"])
+                    .with_for_update()
+                )
+                .mappings()
+                .one()
+            )
+            remembered = (step["output_json"] or {}).get("generation_id")
+            if remembered:
+                saved = (
+                    conn.execute(
+                        sa.select(T["index_generations"]).where(
+                            T["index_generations"].c.id == UUID(remembered),
+                            T["index_generations"].c.version_id == vid,
+                            T["index_generations"].c.parse_id == pid,
+                            T["index_generations"].c.profile_id == p["id"],
+                        )
+                    )
+                    .mappings()
+                    .one()
+                )
+                return dict(saved)
         old = (
             conn.execute(
-                sa.select(T["index_generations"]).where(
-                    T["index_generations"].c.parse_id == pid, T["index_generations"].c.profile_id == p["id"]
-                )
+                sa.select(T["index_generations"])
+                .where(T["index_generations"].c.parse_id == pid, T["index_generations"].c.profile_id == p["id"])
+                .order_by(T["index_generations"].c.generation_no.desc())
             )
             .mappings()
             .first()
         )
-        if old:
+        if old and (generation_step is None or old["id"] == v["active_index_id"]):
+            if generation_step is not None:
+                conn.execute(
+                    T["run_steps"]
+                    .update()
+                    .where(T["run_steps"].c.id == generation_step)
+                    .values(
+                        output_json={"generation_id": str(old["id"])},
+                        status="succeeded" if old["status"] == "ready" else "running",
+                    )
+                )
             return dict(old)
         scope = {"owner_id": owner, "project_id": v["project_id"]}
         number = 1 + conn.scalar(
@@ -205,6 +251,13 @@ def prepare_generation(owner, vid, pid, profile_id=None):
             .where(T["index_generations"].c.id == gid)
             .values(expected_points=len(manifest), manifest_sha256=digest(canonical(manifest)))
         )
+        if generation_step is not None:
+            conn.execute(
+                T["run_steps"]
+                .update()
+                .where(T["run_steps"].c.id == generation_step)
+                .values(output_json={"generation_id": str(gid)}, status="running")
+            )
         return dict(
             conn.execute(sa.select(T["index_generations"]).where(T["index_generations"].c.id == gid)).mappings().one()
         )
@@ -225,7 +278,7 @@ def payload(g, c, v):
         "page_start": c["page_start"],
         "page_end": c["page_end"],
         "lexical_text": c["lexical_text"],
-        "synthetic": True,
+        "synthetic": bool(v["metadata_json"].get("synthetic", False)),
     }
 
 
@@ -262,16 +315,30 @@ def ensure_collection(client, name, dimensions=1024):
     )
 
 
-def build_index(owner, vid, pid, run, *, after_upsert=None, model_selection=None, model_client=None):
+def build_index(
+    owner,
+    vid,
+    pid,
+    run,
+    *,
+    after_upsert=None,
+    model_selection=None,
+    model_client=None,
+    model_gateway=None,
+    task_generation=False,
+):
     profile_id = None
     expected_vectors = {}
     dimensions = 1024
+    if model_gateway is not None:
+        model_selection = model_gateway.selection
+    simulated = True if model_gateway is None else model_gateway.simulated
     if model_selection is not None:
         from scholarship.models.runtime import ModelExecutor, register_embedding_profile
         from scholarship.models.adapters import ModelResult
         from scholarship.models.configuration import fingerprint
 
-        if model_client is None or model_client.spec != model_selection.roles["embedding"]:
+        if model_gateway is None and (model_client is None or model_client.spec != model_selection.roles["embedding"]):
             raise ContractError("embedding_config_mismatch")
         with tenant_transaction(owner) as conn:
             version_scope(conn, vid)
@@ -285,20 +352,38 @@ def build_index(owner, vid, pid, run, *, after_upsert=None, model_selection=None
             raise ContractError("no_indexable_blocks")
         executor_new = ModelExecutor(owner)
         probe_key = f"dimension:{pid}:{fingerprint(model_selection.snapshot())[:16]}"
-        probe = executor_new.execute(
-            run,
+
+        def invoke(intent, arguments):
+            if model_gateway is not None:
+                return model_gateway.invoke(intent, "embedding", "embed", arguments)
+            return executor_new.execute(run, intent, model_selection, "embedding", model_client, arguments, "embed")
+
+        probe = invoke(
             probe_key,
-            model_selection,
-            "embedding",
-            model_client,
             {"texts": [texts[0]], "input_kind": "document"},
-            "embed",
         )
         result = ModelResult(**probe)
-        profile_id = register_embedding_profile(owner, model_client.spec, result)
+        call_id = None
+        if not simulated:
+            with tenant_transaction(owner) as conn:
+                call_id = conn.scalar(
+                    sa.text("SELECT id FROM model_runtime.calls WHERE run_id=:r AND intent=:k AND project_id=:p"),
+                    {"r": run, "k": probe_key, "p": version_scope(conn, vid)["project_id"]},
+                )
+        profile_id = register_embedding_profile(owner, model_selection.roles["embedding"], result, call_id=call_id)
         dimensions = result.dimensions
-    g = prepare_generation(owner, vid, pid, profile_id)
+    generation_step = None
+    if task_generation:
+        with tenant_transaction(owner) as conn:
+            project_id = version_scope(conn, vid)["project_id"]
+        generation_step = call_step(owner, project_id, run, f"generation:{vid}:{pid}", {"profile_id": str(profile_id)})
+    g = prepare_generation(owner, vid, pid, profile_id, simulated=simulated, generation_step=generation_step)
     if g["status"] == "ready":
+        if generation_step:
+            with tenant_transaction(owner) as conn:
+                conn.execute(
+                    T["run_steps"].update().where(T["run_steps"].c.id == generation_step).values(status="succeeded")
+                )
         return g["id"]
     with tenant_transaction(owner) as conn:
         v = version_scope(conn, vid)
@@ -340,14 +425,9 @@ def build_index(owner, vid, pid, run, *, after_upsert=None, model_selection=None
                 cached = [probe["value"][0]] if offset == 0 and batch[0]["canonical_text"] == texts[0] else []
                 remaining = arguments["texts"][len(cached) :]
                 if remaining:
-                    receipt = executor_new.execute(
-                        run,
+                    receipt = invoke(
                         f"embed:{g['id']}:{offset}",
-                        model_selection,
-                        "embedding",
-                        model_client,
                         {"texts": remaining, "expected_dimensions": dimensions, "input_kind": "document"},
-                        "embed",
                     )
                     vectors = cached + receipt["value"]
                 else:
@@ -416,6 +496,11 @@ def build_index(owner, vid, pid, run, *, after_upsert=None, model_selection=None
                 .where(T["paper_versions"].c.id == vid)
                 .values(active_parse_id=pid, active_index_id=g["id"])
             )
+    if generation_step:
+        with tenant_transaction(owner) as conn:
+            conn.execute(
+                T["run_steps"].update().where(T["run_steps"].c.id == generation_step).values(status="succeeded")
+            )
     return g["id"]
 
 
@@ -425,7 +510,7 @@ def receipt_vector(text):
     return vector(text)
 
 
-def snapshot(owner, project, versions, *, model_selection=None):
+def snapshot(owner, project, versions, *, model_selection=None, simulated=True):
     with tenant_transaction(owner) as conn:
         p = profile(conn) if model_selection is None else None
         result = []
@@ -459,7 +544,7 @@ def snapshot(owner, project, versions, *, model_selection=None):
                 if (
                     actual["provider"] != configured.provider
                     or actual["model_name"] != configured.model
-                    or actual["config_json"].get("simulated") is not True
+                    or actual["config_json"].get("simulated") is not simulated
                     or actual["config_json"].get("adapter_binding") != binding_snapshot(configured, "embedding")
                     or (configured.dimensions is not None and actual["dimensions"] != configured.dimensions)
                 ):
