@@ -1,31 +1,37 @@
-"""One approved five-request synthetic validation; reruns never reset its grant.
-
-Default status is read-only. Current approval is stopped after a 403 preflight.
-"""
+"""Single bounded validation entry. Default status never sends model requests."""
 
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from uuid import UUID, uuid5, NAMESPACE_URL
+from uuid import UUID
 import argparse
 import json
-
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import insert
 
 from scholarship.adapters.providers import Evidence
 from scholarship.models.configuration import load_selection, fingerprint
-from scholarship.models.live import make_manifest, LiveExecutor
+from scholarship.models.live import make_manifest
+from scholarship.models.gateway import GrantedGateway
+from scholarship.models.approvals import issue_approval, history
 from scholarship.infrastructure.database import tenant_transaction
-from scholarship.infrastructure.schema import tables as T
 
-# USER CONFIGURATION: this key identifies the user's single approval, not a retry.
+# USER CONFIGURATION: edit here, then Run. CLI options are optional overrides.
 ROOT = Path(__file__).resolve().parent
-ACTION = "status"  # status / record-stop / run
+ACTION = "status"  # status / issue / run
+APPROVAL_CONFIRMED = False  # six historical attempts are exhausted; no new approval
 APPROVAL_KEY = "2026-11-14-scholarship-synthetic-five-v1"
-REPORT = ROOT / "var/reports/live-validation.json"
-PREFLIGHT = ROOT / "var/reports/live-preflight-shape.json"
-REFERENCE = ROOT / "var/reports/live-approval-reference.json"
+CURRENT_APPROVAL_KEY = "2026-11-14-scholarship-six-final-gemma-v1"
+PRIOR_KEYS = [
+    APPROVAL_KEY,
+    "2026-11-14-scholarship-synthetic-six-continuation-v1",
+    "2026-11-14-scholarship-six-proxy-retrieval-v1",
+]
+TOTAL_LIMIT = 6
+MODEL_PRESET = "free_gemma"
+TIMEOUT_SECONDS = 120
+MAX_OUTPUT_TOKENS = 256
+REFERENCE = ROOT / "var/reports/gemma-reference.json"
+REPORT = ROOT / "var/reports/live-status.json"
+
 REQUESTS = [
     (
         "chat_plain",
@@ -74,14 +80,25 @@ REQUESTS = [
     ),
 ]
 
+# Intent names and short synthetic data are reviewable; no local files are read.
+PLANNED_REQUESTS = [REQUESTS[-1]]
+
 
 def selection():
+    """Retain the historical contract fixture for regression tests."""
     return replace(load_selection("free_api"), timeout_seconds=30, max_output_tokens=256, max_requests_per_run=5)
 
 
-class RuntimeApprovalDatabase:
-    """Data-plane reads use the runtime role; no admin credentials are loaded."""
+def planned_selection():
+    return replace(
+        load_selection(MODEL_PRESET),
+        timeout_seconds=TIMEOUT_SECONDS,
+        max_output_tokens=MAX_OUTPUT_TOKENS,
+        max_requests_per_run=len(PLANNED_REQUESTS),
+    )
 
+
+class RuntimeApprovalDatabase:
     def __init__(self, owner):
         self.owner = UUID(str(owner))
 
@@ -92,177 +109,80 @@ class RuntimeApprovalDatabase:
         pass
 
 
-def find_approval(db):
-    with db.connect() as conn:
-        return (
-            conn.execute(sa.text("SELECT * FROM model_runtime.grants WHERE approval_key=:key"), {"key": APPROVAL_KEY})
-            .mappings()
-            .first()
-        )
-
-
-def record_stopped_approval(db, sel, manifest):
-    preflight = json.loads(PREFLIGHT.read_text())
-    if (
-        preflight.get("provider") != "chatanywhere"
-        or preflight.get("http_status") != 403
-        or preflight.get("inference_requests") != 0
-    ):
-        raise RuntimeError("this_record_action_only_accepts_observed_403_preflight")
-    with db.begin() as conn:
-        actor = conn.execute(
-            sa.select(T["users"].c.id).where(T["users"].c.username == "researcher", T["users"].c.disabled_at.is_(None))
-        ).scalar_one()
-        project = conn.scalar(
-            sa.select(T["projects"].c.id)
-            .where(T["projects"].c.owner_id == actor)
-            .order_by(T["projects"].c.created_at)
-            .limit(1)
-        )
-        run_id = uuid5(NAMESPACE_URL, "scholarship:" + APPROVAL_KEY)
-        conn.execute(
-            insert(T["runs"])
-            .values(
-                id=run_id,
-                owner_id=actor,
-                project_id=project,
-                kind="provider_validation",
-                status="failed",
-                idempotency_key=APPROVAL_KEY,
-                request_sha256=fingerprint(manifest),
-                input_json={"synthetic": True, "maximum_requests": 5, "pdf_uploads": False},
-                config_json={"models": sel.snapshot()},
-                input_scope_json={},
-                next_event_seq=1,
-                event_floor=1,
-                error_json={"code": "chatanywhere_preflight_403"},
-                finished_at=sa.func.now(),
-            )
-            .on_conflict_do_nothing(index_elements=["id"])
-        )
-        existing = conn.execute(
-            sa.text("SELECT manifest_sha256 FROM model_runtime.grants WHERE approval_key=:key"), {"key": APPROVAL_KEY}
-        ).scalar()
-        if existing:
-            if existing != fingerprint(manifest):
-                raise RuntimeError("approved_manifest_changed")
-            conn.execute(
-                sa.text(
-                    "UPDATE model_runtime.grants SET state='stopped',stop_code='chatanywhere_preflight_403',updated_at=now() WHERE approval_key=:key AND state='active'"
-                ),
-                {"key": APPROVAL_KEY},
-            )
-            return
-        from psycopg.types.json import Jsonb
-
-        conn.connection.driver_connection.execute(
-            """INSERT INTO model_runtime.grants
-            (approval_key,owner_id,project_id,run_id,manifest_json,manifest_sha256,max_requests,max_output_tokens,state,expires_at,stop_code,preflight_json)
-            VALUES(%s,%s,%s,%s,%s,%s,5,256,'stopped',%s,'chatanywhere_preflight_403',%s)""",
-            (
-                APPROVAL_KEY,
-                actor,
-                project,
-                run_id,
-                Jsonb(manifest),
-                fingerprint(manifest),
-                datetime.now(timezone.utc) + timedelta(days=1),
-                Jsonb(preflight),
-            ),
-        )
-
-
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--action", choices=["status", "record-stop", "run"], default=ACTION)
-    action = p.parse_args().action
-    sel = selection()
-    manifest = make_manifest(sel, REQUESTS)
-    if action == "record-stop":
-        # Explicit, user-authorized approval maintenance only; never used by run/status.
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--action", choices=["status", "issue", "run"], default=ACTION)
+    action = parser.parse_args().action
+    sel = planned_selection()
+    if action == "issue":
+        if not APPROVAL_CONFIRMED:
+            raise SystemExit("No new approval: the six historical slots remain consumed.")
         from scholarship.infrastructure.initialize import admin_engine
 
-        maintenance = admin_engine()
+        admin = admin_engine()
         try:
-            record_stopped_approval(maintenance, sel, manifest)
-            issued = find_approval(maintenance)
-            REFERENCE.parent.mkdir(parents=True, exist_ok=True)
-            REFERENCE.write_text(json.dumps({"owner_id": str(issued["owner_id"]), "grant_id": str(issued["id"])}))
-        finally:
-            maintenance.dispose()
-    if not REFERENCE.exists():
-        print(json.dumps({"approval_state": "reference_not_present", "inference_requests": 0}))
-        return
-    reference = json.loads(REFERENCE.read_text())
-    db = RuntimeApprovalDatabase(reference["owner_id"])
-    try:
-        grant = find_approval(db)
-        if grant and str(grant["id"]) != reference["grant_id"]:
-            raise RuntimeError("grant_reference_mismatch")
-        if not grant:
-            print(json.dumps({"approval_state": "not_created", "inference_requests": 0}))
-            return
-        if grant["manifest_sha256"] != fingerprint(manifest):
-            raise RuntimeError("approved_manifest_changed")
-        if action == "run" and grant["state"] == "active":
-            executor = LiveExecutor(grant["owner_id"], grant["id"], sel)
-            document_dimensions = None
-            for intent, role, operation, arguments in REQUESTS:
-                # Native dimensions from the first response must match the query.
-                try:
-                    receipt = executor.execute(intent, role, operation, arguments)
-                    if intent == "embed_documents":
-                        document_dimensions = receipt["dimensions"]
-                    if intent == "embed_query" and receipt["dimensions"] != document_dimensions:
-                        executor.stop("embedding_dimension_changed")
-                        break
-                except Exception:
-                    break  # no retry, fallback, or remaining requests
-            with tenant_transaction(grant["owner_id"]) as conn:
-                row = (
-                    conn.execute(
-                        sa.text("SELECT state,used_requests FROM model_runtime.grants WHERE id=:id"),
-                        {"id": grant["id"]},
-                    )
-                    .mappings()
-                    .one()
-                )
-                if row["state"] == "active" and row["used_requests"] == 5:
-                    conn.execute(sa.text("SELECT model_runtime.complete_grant(:id)"), {"id": grant["id"]})
-            grant = find_approval(db)
-        with db.connect() as conn:
-            records = (
-                conn.execute(
-                    sa.text(
-                        "SELECT intent,state,provider,model,receipt_json FROM model_runtime.calls WHERE grant_id=:id ORDER BY created_at"
-                    ),
-                    {"id": grant["id"]},
-                )
-                .mappings()
-                .all()
+            grant = issue_approval(
+                admin,
+                key=CURRENT_APPROVAL_KEY,
+                selection=sel,
+                requests=PLANNED_REQUESTS,
+                total_limit=TOTAL_LIMIT,
+                prior_keys=PRIOR_KEYS,
+                approved=True,
             )
-        safe = {
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "approval_key": APPROVAL_KEY,
-            "state": grant["state"],
-            "max_inference_requests": 5,
-            "used_request_slots": grant["used_requests"],
-            "stop_code": grant["stop_code"],
-            "preflight": grant["preflight_json"],
-            "read_only_account_queries": 1,
-            "preflight_endpoint": "https://chatanywhere.tech/api/anonymous/query/balance",
-            "preflight_method": "POST",
-            "pdf_uploads": 0,
-            "mineru_requests": 0,
-            "recharges": 0,
-            "calls": [dict(r) for r in records],
-            "global_external_services_unchanged": True,
-        }
-        REPORT.parent.mkdir(parents=True, exist_ok=True)
-        REPORT.write_text(json.dumps(safe, ensure_ascii=False, indent=2) + "\n")
-        print(json.dumps({k: v for k, v in safe.items() if k not in {"calls"}}, ensure_ascii=False))
-    finally:
-        db.dispose()
+            REFERENCE.write_text(json.dumps({"owner_id": str(grant["owner_id"]), "grant_id": str(grant["id"])}))
+        finally:
+            admin.dispose()
+    if not REFERENCE.exists():
+        print('{"state":"no_approval_reference"}')
+        return
+    ref = json.loads(REFERENCE.read_text())
+    db = RuntimeApprovalDatabase(ref["owner_id"])
+    with db.connect() as conn:
+        grant = (
+            conn.execute(sa.text("SELECT * FROM model_runtime.grants WHERE id=:id"), {"id": ref["grant_id"]})
+            .mappings()
+            .one()
+        )
+    if action == "run" and grant["state"] == "active":
+        if grant["manifest_sha256"] != fingerprint(make_manifest(sel, PLANNED_REQUESTS)):
+            raise RuntimeError("approved_manifest_changed")
+        try:
+            with GrantedGateway(ref["owner_id"], grant["id"], sel) as gateway:
+                for request in PLANNED_REQUESTS:
+                    gateway.invoke(*request)
+            with tenant_transaction(ref["owner_id"]) as conn:
+                conn.execute(sa.text("SELECT model_runtime.complete_grant(:id)"), {"id": grant["id"]})
+        except Exception as exc:
+            print(json.dumps({"validation_error": type(exc).__name__}))
+    with db.connect() as conn:
+        lineage = history(conn, grant["id"])
+        ids = [r["id"] for r in lineage]
+        calls = [
+            dict(r)
+            for r in conn.execute(
+                sa.text(
+                    "SELECT intent,state,provider,model,receipt_json FROM model_runtime.calls WHERE grant_id=ANY(:ids) ORDER BY created_at"
+                ),
+                {"ids": ids},
+            ).mappings()
+        ]
+    latest = lineage[0]
+    report = {
+        "state": latest["state"],
+        "total_limit": latest["preflight_json"].get("total_limit", latest["max_requests"]),
+        "used_request_slots": sum(r["used_requests"] for r in lineage),
+        "stop_code": latest["stop_code"],
+        "calls": calls,
+        "file_uploads": 0,
+        "mineru_requests": 0,
+        "recharges": 0,
+        "inference_retries": 0,
+        "global_external_services_unchanged": True,
+    }
+    REPORT.parent.mkdir(parents=True, exist_ok=True)
+    REPORT.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+    print(json.dumps({k: v for k, v in report.items() if k != "calls"}))
 
 
 if __name__ == "__main__":

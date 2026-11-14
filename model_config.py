@@ -4,13 +4,58 @@ Credentials belong only in .env. Selecting a preset never authorizes inference.
 """
 
 # USER CONFIGURATION
-ACTIVE_PRESET = "free_api"  # mock / local / free_api
+ACTIVE_PRESET = "free_gemma"  # mock / local / free_api (ChatAnywhere) / free_gemma
 ALLOW_LOCAL_INFERENCE = False
 ALLOW_REAL_REQUESTS = False  # Future opt-in; real dispatch also requires a separately reviewed executor.
 TIMEOUT_SECONDS = 120
 CONCURRENCY = 1
 MAX_OUTPUT_TOKENS = 2048
 MAX_REQUESTS_PER_RUN = 30
+# Explicit transport route for this machine. Set {} on hosts with direct access.
+# Never put credentials here; cloud TLS still verifies the destination certificate.
+LIVE_PROXY_URLS = {"openrouter": "http://127.0.0.1:7897"}
+
+# Provider plugins: an existing protocol can be reused by another approved host.
+# Only environment variable NAMES belong here. Key values stay in .env.
+PROVIDER_DEFINITIONS = {
+    "mock": {
+        "roles": {r: "synthetic" for r in ("chat", "translation", "embedding", "rerank", "parser")},
+        "base_urls": [""],
+    },
+    "chatanywhere": {
+        "roles": {"chat": "openai_chat", "translation": "openai_chat"},
+        "base_urls": ["https://api.chatanywhere.tech/v1", "https://api.chatanywhere.org/v1"],
+        "key_env": "CHATANYWHERE_API_KEY",
+        "model_aliases": {"gpt-4o-mini": ["gpt-4o-mini-2024-07-18"]},
+    },
+    "openrouter": {
+        "roles": {
+            "chat": "openai_chat",
+            "translation": "openai_chat",
+            "embedding": "openai_embedding",
+            "rerank": "rerank",
+        },
+        "base_urls": ["https://openrouter.ai/api/v1"],
+        "key_env": "OPENROUTER_API_KEY",
+        "free_only": True,
+        "chat_options": {
+            "reasoning": {"enabled": False},
+            "provider": {"allow_fallbacks": False, "require_parameters": True},
+        },
+        "embedding_input_types": {"document": "search_document", "query": "search_query"},
+    },
+    "ollama": {
+        "roles": {"chat": "ollama_chat", "translation": "ollama_chat", "embedding": "ollama_embedding"},
+        "base_urls": ["http://127.0.0.1:11434"],
+    },
+    "local_reranker": {"roles": {"rerank": "rerank"}, "base_urls": ["http://127.0.0.1:18083"]},
+    "mineru_local": {"roles": {"parser": "mineru_local"}, "base_urls": ["http://127.0.0.1:18082"]},
+    "mineru_cloud": {
+        "roles": {"parser": "mineru_cloud"},
+        "base_urls": ["https://mineru.net"],
+        "key_env": "MINERU_API_KEY",
+    },
+}
 
 MODELS = {
     "mock_chat": {"provider": "mock", "model": "synthetic-answer-v1"},
@@ -21,6 +66,12 @@ MODELS = {
         "provider": "chatanywhere",
         "model": "gpt-4o-mini",
         "base_url": "https://api.chatanywhere.tech/v1",
+        "json_mode": True,
+    },
+    "openrouter_gemma": {
+        "provider": "openrouter",
+        "model": "google/gemma-4-31b-it:free",
+        "base_url": "https://openrouter.ai/api/v1",
         "json_mode": True,
     },
     "openrouter_embedding": {
@@ -61,6 +112,22 @@ MODELS = {
     "mineru_cloud": {"provider": "mineru_cloud", "model": "vlm", "base_url": "https://mineru.net"},
 }
 
+MODEL_CAPABILITIES = {
+    "mock_chat": ["chat", "translation"],
+    "mock_embedding": ["embedding"],
+    "mock_rerank": ["rerank"],
+    "mock_parser": ["parser"],
+    "chatanywhere_chat": ["chat", "translation"],
+    "openrouter_gemma": ["chat", "translation"],
+    "openrouter_embedding": ["embedding"],
+    "openrouter_rerank": ["rerank"],
+    "ollama_chat": ["chat", "translation"],
+    "ollama_embedding": ["embedding"],
+    "local_rerank": ["rerank"],
+    "mineru_local": ["parser"],
+    "mineru_cloud": ["parser"],
+}
+
 PRESETS = {
     "mock": {
         "chat": "mock_chat",
@@ -79,6 +146,13 @@ PRESETS = {
     "free_api": {
         "chat": "chatanywhere_chat",
         "translation": "chatanywhere_chat",
+        "embedding": "openrouter_embedding",
+        "rerank": "openrouter_rerank",
+        "parser": "mineru_local",
+    },
+    "free_gemma": {
+        "chat": "openrouter_gemma",
+        "translation": "openrouter_gemma",
         "embedding": "openrouter_embedding",
         "rerank": "openrouter_rerank",
         "parser": "mineru_local",

@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from scholarship.adapters.providers import ContractError, ExternalDisabled
 from scholarship.models.configuration import fingerprint, restore_snapshot
 from scholarship.models.adapters import ModelResult, ProviderFailure, ProviderClient
+from scholarship.models.contracts import ROLE_OPERATIONS
 from scholarship.infrastructure.database import tenant_transaction
 
 
@@ -20,15 +21,10 @@ class ModelExecutor:
             or client.role != role
             or client.timeout != selection.timeout_seconds
             or client.max_output != selection.max_output_tokens
+            or (selection.bindings is not None and client.binding != selection.bindings[role])
         ):
             raise ExternalDisabled("provider_snapshot_mismatch")
-        methods = {
-            "chat": {"answer", "generate"},
-            "translation": {"generate"},
-            "embedding": {"embed"},
-            "rerank": {"rank"},
-        }
-        if operation not in methods.get(role, set()):
+        if operation not in ROLE_OPERATIONS.get(role, set()):
             raise ContractError("invalid_model_operation")
 
         def serialize(v):
@@ -89,6 +85,7 @@ class ModelExecutor:
                     if isinstance(exc, ProviderFailure)
                     else "response_contract_or_transport_unknown",
                     "retry_after": exc.retry_after if isinstance(exc, ProviderFailure) else None,
+                    "transport_kind": exc.transport_kind if isinstance(exc, ProviderFailure) else None,
                     "simulated": True,
                 },
             )
@@ -119,6 +116,8 @@ class ModelExecutor:
 
 
 def register_embedding_profile(owner, spec, result):
+    from scholarship.models.catalog import binding_snapshot
+
     if (
         result.provider != spec.provider
         or result.requested_model != spec.model
@@ -140,7 +139,10 @@ def register_embedding_profile(owner, spec, result):
         "overlap_tokens": 80,
         "query_prefix": "",
         "document_prefix": "",
-        "input_type_policy": "search_query/search_document" if spec.provider == "openrouter" else "same_text",
+        "adapter_binding": binding_snapshot(spec, "embedding"),
+        "input_type_policy": binding_snapshot(spec, "embedding")["definition"].get(
+            "embedding_input_types", "same_text"
+        ),
         "lexical_revision": "nfkc-word-cjk-bigram-v1",
         "normalization": "original-unmodified",
     }

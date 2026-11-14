@@ -4,9 +4,8 @@ No credentials, inference, implicit retries, redirects or provider fallback occu
 Real dispatch must be enabled in a separately reviewed execution layer.
 """
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 import json
-import time
 
 import httpx
 
@@ -19,57 +18,21 @@ from scholarship.adapters.providers import (
     validate_answer_response,
 )
 from scholarship.models.configuration import ModelSpec
+from scholarship.models.catalog import provider_definition, identity_allowed, binding_snapshot
+from scholarship.models.protocols import resolve_protocol
 
-MAX_RESPONSE_BYTES = 8 * 1024 * 1024
-
-
-class ProviderFailure(RuntimeError):
-    def __init__(self, code, status=None, *, unknown=False, retry_after=None):
-        super().__init__(code)
-        self.code = code
-        self.status = status
-        self.unknown = unknown
-        self.retry_after = retry_after
-
-
-@dataclass(frozen=True)
-class ModelResult:
-    value: object
-    provider: str
-    requested_model: str
-    reported_model: str | None
-    usage: dict
-    request_id: str | None
-    elapsed_ms: int
-    dimensions: int | None = None
-    simulated: bool = True
-
-
-def optional_count(value):
-    return None if value is None else integer(value)
-
-
-def usage(data, ollama=False):
-    if ollama:
-        return {
-            "input_tokens": optional_count(data.get("prompt_eval_count")),
-            "output_tokens": optional_count(data.get("eval_count")),
-        }
-    u = data.get("usage")
-    if u is None:
-        return {"input_tokens": None, "output_tokens": None}
-    if not isinstance(u, dict):
-        raise ContractError("invalid_usage")
-    return {
-        "input_tokens": optional_count(u.get("prompt_tokens", u.get("total_tokens"))),
-        "output_tokens": optional_count(u.get("completion_tokens")),
-    }
+from scholarship.models.contracts import ModelResult, usage
+from scholarship.models.contracts import ProviderFailure as ProviderFailure
+from scholarship.models.transports import request_json
 
 
 class ProviderClient:
     def __init__(self, spec: ModelSpec, role, *, transport=None, timeout=120, max_output=2048):
         self.spec = spec.validate(role)
         self.role = role
+        self.definition = provider_definition(spec.provider)
+        self.protocol = resolve_protocol(self.definition["roles"][role])
+        self.binding = binding_snapshot(spec, role)
         self.timeout = timeout
         self.max_output = max_output
         if not isinstance(transport, httpx.MockTransport):
@@ -80,54 +43,22 @@ class ProviderClient:
         self.client.close()
 
     def request(self, path, body):
-        started = time.monotonic()
-        headers = (
-            {}
-            if self.spec.provider in {"ollama", "local_reranker", "mineru_local"}
-            else {"Authorization": "Bearer contract-test-key"}
+        return request_json(
+            self.client, self.spec.base_url + path, body, authenticated=bool(self.definition.get("key_env"))
         )
-        try:
-            with self.client.stream("POST", self.spec.base_url + path, json=body, headers=headers) as r:
-                if r.status_code != 200:
-                    code = {
-                        401: "authentication_failed",
-                        403: "permission_denied",
-                        404: "model_or_endpoint_unavailable",
-                        429: "rate_limited",
-                    }.get(r.status_code, "provider_http_error")
-                    delay = r.headers.get("retry-after", "")
-                    raise ProviderFailure(
-                        code,
-                        r.status_code,
-                        unknown=r.status_code >= 500,
-                        retry_after=min(int(delay), 3600) if delay.isdigit() else None,
-                    )
-                raw = bytearray()
-                for block in r.iter_bytes():
-                    raw.extend(block)
-                    if len(raw) > MAX_RESPONSE_BYTES:
-                        raise ContractError("provider_response_too_large")
-                d = json.loads(raw)
-                if not isinstance(d, dict) or d.get("error"):
-                    raise ContractError("invalid_provider_response")
-                return d, int((time.monotonic() - started) * 1000)
-        except httpx.TransportError:
-            raise ProviderFailure("provider_transport_outcome_unknown", unknown=True) from None
-        except (ValueError, UnicodeError) as exc:
-            if isinstance(exc, ContractError):
-                raise
-            raise ContractError("invalid_provider_json") from None
 
     def result(self, value, d, elapsed, dimensions=None):
         for field in ["model", "id"]:
             if d.get(field) is not None and (not isinstance(d[field], str) or len(d[field]) > 256):
                 raise ContractError("invalid_response_identity")
+        if not identity_allowed(self.spec, d.get("model")):
+            raise ContractError("unexpected_reported_model")
         return ModelResult(
             value,
             self.spec.provider,
             self.spec.model,
             d.get("model"),
-            usage(d, self.spec.provider == "ollama"),
+            usage(d, self.protocol.usage_style == "ollama"),
             d.get("id"),
             elapsed,
             dimensions,
@@ -149,43 +80,11 @@ class ProviderClient:
             for m in messages
         ):
             raise ContractError("invalid_messages")
-        ollama = self.spec.provider == "ollama"
-        if ollama:
-            body = {
-                "model": self.spec.model,
-                "messages": messages,
-                "stream": False,
-                "think": False,
-                "options": {"num_ctx": self.spec.context_tokens, "num_predict": self.max_output, "temperature": 0},
-            }
-            if structured and self.spec.json_mode:
-                body["format"] = "json"
-            d, elapsed = self.request("/api/chat", body)
-            if (
-                d.get("done") is not True
-                or d.get("done_reason") not in (None, "stop")
-                or d.get("message", {}).get("tool_calls")
-            ):
-                raise ContractError("incomplete_or_tool_response")
-            content = d.get("message", {}).get("content")
-        else:
-            body = {
-                "model": self.spec.model,
-                "messages": messages,
-                "stream": False,
-                "max_tokens": self.max_output,
-                "temperature": 0,
-            }
-            if structured and self.spec.json_mode:
-                body["response_format"] = {"type": "json_object"}
-            d, elapsed = self.request("/chat/completions", body)
-            try:
-                c = d["choices"][0]
-                if c["finish_reason"] != "stop" or c["message"].get("tool_calls"):
-                    raise ContractError("incomplete_or_tool_response")
-                content = c["message"]["content"]
-            except (KeyError, IndexError, TypeError):
-                raise ContractError("invalid_chat_response") from None
+        wire = self.protocol.prepare(
+            self.spec, self.definition, messages=messages, structured=structured, max_output=self.max_output
+        )
+        d, elapsed = self.request(wire.path, wire.body)
+        content = self.protocol.read(d)
         if not isinstance(content, str) or not content.strip():
             raise ContractError("empty_chat_response")
         return content, d, elapsed
@@ -235,35 +134,19 @@ class ProviderClient:
     def embed(self, texts, *, expected_dimensions=None, input_kind="document"):
         if self.role != "embedding" or input_kind not in {"query", "document"}:
             raise ContractError("wrong_embedding_role")
+        if expected_dimensions is not None and (
+            type(expected_dimensions) is not int or not 1 <= expected_dimensions <= 16384
+        ):
+            raise ContractError("invalid_expected_dimensions")
         if (
             not isinstance(texts, list)
             or not 1 <= len(texts) <= 32
             or any(not isinstance(t, str) or not t.strip() or len(t.encode()) > 8192 for t in texts)
         ):
             raise ContractError("embedding_input_limit")
-        body = {"model": self.spec.model, "input": texts}
-        if self.spec.provider == "openrouter":
-            body["input_type"] = "search_query" if input_kind == "query" else "search_document"
-        if self.spec.provider == "ollama":
-            body["truncate"] = False
-            if self.spec.dimensions:
-                body["dimensions"] = self.spec.dimensions
-            d, elapsed = self.request("/api/embed", body)
-            vectors = d.get("embeddings")
-        else:
-            # Native dimensions are discovered, never truncated or silently padded.
-            d, elapsed = self.request("/embeddings", body)
-            try:
-                rows = d["data"]
-                if (
-                    not isinstance(rows, list)
-                    or len(rows) != len(texts)
-                    or {integer(r["index"]) for r in rows} != set(range(len(texts)))
-                ):
-                    raise ContractError("embedding_index_mismatch")
-                vectors = [r["embedding"] for r in sorted(rows, key=lambda r: r["index"])]
-            except (KeyError, TypeError):
-                raise ContractError("invalid_embedding_response") from None
+        wire = self.protocol.prepare(self.spec, self.definition, texts=texts, input_kind=input_kind)
+        d, elapsed = self.request(wire.path, wire.body)
+        vectors = self.protocol.read(d, count=len(texts))
         if not isinstance(vectors, list) or len(vectors) != len(texts):
             raise ContractError("embedding_count_mismatch")
         result = []
@@ -278,11 +161,7 @@ class ProviderClient:
             result.append(v)
         if dimensions != (expected_dimensions or self.spec.dimensions or dimensions):
             raise ContractError("embedding_profile_dimension_mismatch")
-        if d.get("model") not in (
-            None,
-            self.spec.model,
-            self.spec.model.removesuffix(":free") if self.spec.provider == "openrouter" else self.spec.model,
-        ):
+        if not identity_allowed(self.spec, d.get("model")):
             raise ContractError("unexpected_embedding_model")
         return self.result(result, d, elapsed, dimensions)
 
@@ -297,11 +176,10 @@ class ProviderClient:
             raise ContractError("rerank_input_limit")
         if type(top_n) is not int or not 1 <= top_n <= len(documents):
             raise ContractError("invalid_top_n")
-        d, elapsed = self.request(
-            "/rerank", {"model": self.spec.model, "query": query, "documents": documents, "top_n": top_n}
-        )
+        wire = self.protocol.prepare(self.spec, self.definition, query=query, documents=documents, top_n=top_n)
+        d, elapsed = self.request(wire.path, wire.body)
         try:
-            rows = d["results"]
+            rows = self.protocol.read(d)
             result = []
             seen = set()
             if not isinstance(rows, list) or len(rows) != top_n:
@@ -312,11 +190,7 @@ class ProviderClient:
                     raise ContractError("rerank_index_mismatch")
                 seen.add(i)
                 result.append({"index": i, "score": finite(r["relevance_score"])})
-            if d.get("model") not in (
-                None,
-                self.spec.model,
-                self.spec.model.removesuffix(":free") if self.spec.provider == "openrouter" else self.spec.model,
-            ):
+            if not identity_allowed(self.spec, d.get("model")):
                 raise ContractError("unexpected_rerank_model")
             return self.result(sorted(result, key=lambda r: r["score"], reverse=True), d, elapsed)
         except (KeyError, TypeError):

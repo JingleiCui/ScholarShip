@@ -336,16 +336,22 @@ def build_index(owner, vid, pid, run, *, after_upsert=None, model_selection=None
                 finish_call(owner, step, receipt)
                 vectors = receipt["result"]
             else:
-                receipt = executor_new.execute(
-                    run,
-                    f"embed:{g['id']}:{offset}",
-                    model_selection,
-                    "embedding",
-                    model_client,
-                    {**arguments, "expected_dimensions": dimensions, "input_kind": "document"},
-                    "embed",
-                )
-                vectors = receipt["value"]
+                # The dimension probe already encoded this exact first chunk.
+                cached = [probe["value"][0]] if offset == 0 and batch[0]["canonical_text"] == texts[0] else []
+                remaining = arguments["texts"][len(cached) :]
+                if remaining:
+                    receipt = executor_new.execute(
+                        run,
+                        f"embed:{g['id']}:{offset}",
+                        model_selection,
+                        "embedding",
+                        model_client,
+                        {"texts": remaining, "expected_dimensions": dimensions, "input_kind": "document"},
+                        "embed",
+                    )
+                    vectors = cached + receipt["value"]
+                else:
+                    vectors = cached
             for c, vec in zip(batch, vectors, strict=True):
                 length = sum(n * n for n in vec) ** 0.5
                 expected_vectors[str(c["point_id"])] = [n / length for n in vec]
@@ -419,9 +425,9 @@ def receipt_vector(text):
     return vector(text)
 
 
-def snapshot(owner, project, versions):
+def snapshot(owner, project, versions, *, model_selection=None):
     with tenant_transaction(owner) as conn:
-        p = profile(conn)
+        p = profile(conn) if model_selection is None else None
         result = []
         for vid in sorted(set(versions), key=str):
             v = version_scope(conn, vid)
@@ -432,7 +438,7 @@ def snapshot(owner, project, versions):
                     sa.select(T["index_generations"]).where(
                         T["index_generations"].c.id == v["active_index_id"],
                         T["index_generations"].c.parse_id == v["active_parse_id"],
-                        T["index_generations"].c.profile_id == p["id"],
+                        sa.true() if p is None else T["index_generations"].c.profile_id == p["id"],
                         T["index_generations"].c.status == "ready",
                     )
                 )
@@ -441,6 +447,23 @@ def snapshot(owner, project, versions):
             )
             if not g:
                 raise ContractError("matching_ready_generation_required")
+            if model_selection is not None:
+                from scholarship.models.catalog import binding_snapshot
+
+                configured = model_selection.roles["embedding"]
+                actual = (
+                    conn.execute(sa.select(T["index_profiles"]).where(T["index_profiles"].c.id == g["profile_id"]))
+                    .mappings()
+                    .one()
+                )
+                if (
+                    actual["provider"] != configured.provider
+                    or actual["model_name"] != configured.model
+                    or actual["config_json"].get("simulated") is not True
+                    or actual["config_json"].get("adapter_binding") != binding_snapshot(configured, "embedding")
+                    or (configured.dimensions is not None and actual["dimensions"] != configured.dimensions)
+                ):
+                    raise ContractError("embedding_profile_requires_rebuild")
             result.append({k: str(g[k]) for k in ["id", "version_id", "parse_id", "profile_id", "collection_name"]})
         return result
 
@@ -448,6 +471,23 @@ def snapshot(owner, project, versions):
 def hybrid(owner, project, scope, question, query_vector):
     if not scope:
         return {"candidates": [], "trace": []}
+    from scholarship.adapters.providers import finite
+
+    if len({g["profile_id"] for g in scope}) != 1:
+        raise ContractError("mixed_embedding_profiles")
+    with tenant_transaction(owner) as conn:
+        dimensions = conn.scalar(
+            sa.select(T["index_profiles"].c.dimensions).where(T["index_profiles"].c.id == UUID(scope[0]["profile_id"]))
+        )
+    if (
+        not isinstance(query_vector, list)
+        or len(query_vector) != dimensions
+        or not any(finite(x) for x in query_vector)
+    ):
+        raise ContractError("query_vector_profile_mismatch")
+    # Validate every component, including values after the first non-zero one.
+    for value in query_vector:
+        finite(value)
     trace = []
     candidates = []
     with closing(qdrant_client()) as client:

@@ -29,7 +29,7 @@ def chat_response(content="hello", **extra):
 
 def test_presets_snapshot_no_secrets_and_compatibility():
     selection = load_selection()
-    assert selection.preset == "free_api"
+    assert selection.preset == "free_gemma"
     assert selection.roles["embedding"].dimensions is None
     assert restore_snapshot(selection.snapshot()).snapshot() == selection.snapshot()
     assert configuration_status()["roles"]["embedding"]["dimensions_state"] == "pending_first_valid_receipt"
@@ -41,7 +41,7 @@ def test_presets_snapshot_no_secrets_and_compatibility():
         restore_snapshot(body)
 
 
-@pytest.mark.parametrize("preset", ["mock", "local", "free_api"])
+@pytest.mark.parametrize("preset", ["mock", "local", "free_api", "free_gemma"])
 def test_valid_presets_and_individual_overrides(preset):
     selection = load_selection(preset)
     assert set(selection.roles) == {"chat", "translation", "embedding", "rerank", "parser"}
@@ -83,6 +83,10 @@ def test_chat_generic_parameters_and_unknown_usage():
     assert result.value == "hello" and result.usage == {"input_tokens": None, "output_tokens": None}
     assert result.provider == "chatanywhere" and result.requested_model == "gpt-4o-mini" and result.simulated
     assert "thinking" not in seen[0] and "tools" not in seen[0] and seen[0]["stream"] is False
+    totals = provider(
+        "chat", lambda r: httpx.Response(200, json=chat_response(usage={"total_tokens": 12, "completion_tokens": 4}))
+    ).generate([{"role": "user", "content": "hello"}])
+    assert totals.usage == {"input_tokens": None, "output_tokens": 4, "total_tokens": 12}
 
 
 @pytest.mark.parametrize(
@@ -116,6 +120,7 @@ def test_timeout_retains_unknown():
     with pytest.raises(ProviderFailure) as e:
         provider("chat", handler).generate([{"role": "user", "content": "x"}])
     assert e.value.unknown and "private" not in str(e.value)
+    assert e.value.transport_kind == "read_timeout"
 
 
 @pytest.mark.parametrize("kind", ["truncated", "tool", "empty", "json"])
@@ -258,7 +263,7 @@ def test_execution_receipt_idempotency_and_no_monetary_charge(case):
         return httpx.Response(200, json=chat_response())
 
     c = provider("chat", handler)
-    selection = load_selection()
+    selection = load_selection("free_api")
     executor = ModelExecutor(owner)
     args = {"messages": [{"role": "user", "content": "hello"}]}
     first = executor.execute(run, "chat", selection, "chat", c, args, "generate")
@@ -292,7 +297,7 @@ def test_unknown_not_resent_and_request_quota(case):
         calls.append(r)
         raise httpx.ReadTimeout("timeout")
 
-    selection = replace(load_selection(), max_requests_per_run=1)
+    selection = replace(load_selection("free_api"), max_requests_per_run=1)
     client = provider("chat", handler)
     e = ModelExecutor(owner)
     args = {"messages": [{"role": "user", "content": "x"}]}
@@ -374,7 +379,7 @@ def test_model_configuration_api_and_scope(signed_client, accounts):
 def test_call_records_owner_rls_and_direct_write_denied(case, accounts):
     owner, project = case
     run = enqueue(owner, project, "offline_build", uuid4().hex, {})["id"]
-    selection = load_selection()
+    selection = load_selection("free_api")
     client = provider("chat", lambda r: httpx.Response(200, json=chat_response()))
     ModelExecutor(owner).execute(
         run, "one", selection, "chat", client, {"messages": [{"role": "user", "content": "hello"}]}, "generate"
@@ -410,3 +415,44 @@ def test_local_models_diagnostic_no_install_or_inference():
         [sys.executable, "local_models.py"], cwd=PROJECT_ROOT, capture_output=True, text=True, check=True, timeout=10
     )
     assert json.loads(r.stdout)["inference_requests"] == 0
+
+
+def test_gemma_chat_and_evidence_contract():
+    seen = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        seen.append(body)
+        assert request.url.path == "/api/v1/chat/completions"
+        assert body["model"] == "google/gemma-4-31b-it:free"
+        assert body["reasoning"] == {"enabled": False}
+        assert body["provider"] == {"allow_fallbacks": False, "require_parameters": True}
+        text = "SCHOLARSHIP_OK"
+        if body.get("response_format"):
+            evidence = json.loads(body["messages"][-1]["content"])["evidence"][0]
+            quote = evidence["text"]
+            text = json.dumps(
+                {
+                    "answer": "91 percent",
+                    "insufficient_evidence": False,
+                    "claims": [
+                        {
+                            "text": "91 percent",
+                            "citations": [
+                                {"evidence_id": evidence["id"], "quote": quote, "start": 0, "end": len(quote)}
+                            ],
+                        }
+                    ],
+                }
+            )
+        return httpx.Response(200, json={**chat_response(text), "model": "google/gemma-4-31b-it"})
+
+    client = provider("chat", handler, preset="free_gemma", max_output=256)
+    assert client.generate([{"role": "user", "content": "hello"}]).value == "SCHOLARSHIP_OK"
+    result = client.answer("What accuracy?", [Evidence("alpha", "Alpha accuracy is 91 percent.", 1)])
+    assert result.value["claims"][0]["citations"][0]["quote"] == "Alpha accuracy is 91 percent."
+    assert len(seen) == 2 and "response_format" not in seen[0] and "response_format" in seen[1]
+    assert load_selection("free_gemma").roles["translation"].model == "google/gemma-4-31b-it:free"
+    assert load_selection("free_api").roles["chat"].model == "gpt-4o-mini"
+    with pytest.raises(ValueError):
+        replace(load_selection("free_gemma").roles["chat"], model="google/gemma-4-31b-it").validate("chat")

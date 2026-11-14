@@ -350,26 +350,50 @@ def persist_answer(owner, project, run, question, answer, selected, trace):
         return result
 
 
-def qa_graph(owner, project, run, *, interrupt_after=None):
+def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
     with tenant_transaction(owner) as conn:
         row = (
             conn.execute(sa.select(T["runs"]).where(T["runs"].c.id == run, T["runs"].c.project_id == project))
             .mappings()
             .one()
         )
-        if row["kind"] != "offline_qa":
+        if row["kind"] not in ({"model_qa"} if model_gateway is not None else {"offline_qa"}):
             raise ContractError("qa_run_required")
         question = row["input_json"]["question"]
         scope = row["input_scope_json"]["generations"]
-    embed, rerank, answerer = adapters()
-    executor = OfflineExecutor(owner)
+    embed, rerank, answerer = adapters() if model_gateway is None else (None, None, None)
+    executor = OfflineExecutor(owner) if model_gateway is None else None
+    expected_dimensions = None
+    if model_gateway is not None:
+        if row["config_json"].get("models") != model_gateway.selection.snapshot():
+            raise ContractError("workflow_model_snapshot_mismatch")
+        with tenant_transaction(owner) as conn:
+            expected_dimensions = (
+                conn.scalar(
+                    sa.select(T["index_profiles"].c.dimensions).where(
+                        T["index_profiles"].c.id == UUID(scope[0]["profile_id"])
+                    )
+                )
+                if scope
+                else None
+            )
+
+    def perform(step, intent, legacy, role, arguments, *, maximum_input):
+        if model_gateway is None:
+            return executor.execute(step, intent, legacy, role, arguments, maximum_input=maximum_input)
+        operation = {"embedding": "embed", "rerank": "rank", "chat": "answer"}[role]
+        actual = dict(arguments)
+        if role == "embedding":
+            actual.update(input_kind="query", expected_dimensions=expected_dimensions)
+        receipt = model_gateway.invoke(intent, role, operation, actual)
+        if not receipt["simulated"]:
+            raise ContractError("synthetic_workflow_requires_simulated_receipt")
+        return {"result": receipt["value"], "usage": receipt["usage"], "model": receipt["requested_model"]}
 
     def retrieve(state):
         arguments = {"texts": [question]}
         step = call_step(owner, project, run, "query_embedding", arguments)
-        receipt = executor.execute(
-            step, "query_embedding", embed, "embedding", arguments, maximum_input=len(question.encode())
-        )
+        receipt = perform(step, "query_embedding", embed, "embedding", arguments, maximum_input=len(question.encode()))
         finish_call(owner, step, receipt)
         return {"retrieval": hybrid(owner, project, scope, question, receipt["result"][0])}
 
@@ -384,7 +408,7 @@ def qa_graph(owner, project, run, *, interrupt_after=None):
             "top_n": min(EVIDENCE_LIMIT, len(candidates)),
         }
         step = call_step(owner, project, run, "rerank", arguments)
-        receipt = executor.execute(
+        receipt = perform(
             step,
             "rerank",
             rerank,
@@ -401,7 +425,7 @@ def qa_graph(owner, project, run, *, interrupt_after=None):
         evidence = [Evidence(i["id"], i["text"], i["page"]) for i in selected]
         arguments = {"question": question, "evidence": evidence}
         step = call_step(owner, project, run, "answer", {"question": question, "selected": selected})
-        receipt = executor.execute(
+        receipt = perform(
             step,
             "answer",
             answerer,
@@ -444,3 +468,27 @@ def qa_graph(owner, project, run, *, interrupt_after=None):
             return previous.values["result"]
         result = graph.invoke(None if previous.next else {}, config, durability="sync")
         return result.get("result")
+
+
+def enqueue_model_qa(owner, project, key, versions, question, selection):
+    """Developer contract workflow: synthetic parses/profiles only, no dispatch."""
+    scope = snapshot(owner, project, versions, model_selection=selection)
+    inputs = {
+        "version_ids": [str(v) for v in versions],
+        "question": question,
+        "model_fingerprint": selection.snapshot()["fingerprint"],
+        "scope": scope,
+    }
+    run = enqueue(owner, project, "model_qa", key, inputs, dispatch=False)
+    with tenant_transaction(owner) as conn:
+        row = conn.execute(sa.select(T["runs"]).where(T["runs"].c.id == run["id"]).with_for_update()).mappings().one()
+        config = {"mode": "synthetic", "revision": "model-workflow-v1", "models": selection.snapshot()}
+        if row["config_json"].get("revision") == "model-workflow-v1" and row["config_json"] != config:
+            raise ContractError("workflow_configuration_conflict")
+        conn.execute(
+            T["runs"]
+            .update()
+            .where(T["runs"].c.id == run["id"])
+            .values(config_json=config, input_scope_json={"generations": scope})
+        )
+    return run

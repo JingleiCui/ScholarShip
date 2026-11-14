@@ -8,11 +8,13 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
 from scholarship.adapters.providers import ExternalDisabled, ContractError
-from scholarship.config import settings
 from scholarship.infrastructure.database import tenant_transaction
-from scholarship.models.configuration import fingerprint, CREDENTIALS
+from scholarship.models.configuration import fingerprint
+from scholarship.models.catalog import credential, identity_allowed
+from scholarship.models.transports import network_transport as network_transport
 from scholarship.models.adapters import ProviderClient, ProviderFailure, ModelResult
 from scholarship.models.runtime import ModelExecutor
+from scholarship.models.contracts import ROLE_OPERATIONS
 
 
 def serialize(v):
@@ -53,13 +55,11 @@ def make_manifest(selection, requests):
         intent, role, operation, arguments = item
         spec = selection.roles[role]
         if (
-            role not in {"chat", "embedding", "rerank"}
-            or spec.provider not in {"chatanywhere", "openrouter"}
+            operation not in ROLE_OPERATIONS.get(role, set())
+            or spec.provider == "mock"
             or intent in manifest["requests"]
         ):
             raise ValueError("unapproved_validation_role")
-        if spec.provider == "chatanywhere" and spec.model != "gpt-4o-mini":
-            raise ValueError("unapproved_chat_model")
         captured = []
 
         def capture(r):
@@ -97,15 +97,14 @@ class GrantTransport(httpx.BaseTransport):
         self.owner = owner
         self.call_id = call_id
         self.provider = provider
-        self.inner = inner or httpx.HTTPTransport(retries=0)
+        self.owns_inner = inner is None
+        self.inner = inner if inner is not None else network_transport(provider)
         self.used = False
 
     def handle_request(self, request):
         if self.used:
             raise ExternalDisabled("one_wire_request_per_call")
-        cfg = settings()
-        key_name = CREDENTIALS.get(self.provider)
-        secret = getattr(cfg, key_name).get_secret_value() if key_name else ""
+        secret = credential(self.provider)
         if not secret:
             raise ExternalDisabled("credential_missing_before_dispatch")
         h = wire_hash(request)
@@ -116,7 +115,8 @@ class GrantTransport(httpx.BaseTransport):
         return self.inner.handle_request(request)
 
     def close(self):
-        self.inner.close()
+        if self.owns_inner:
+            self.inner.close()
 
 
 class LiveProviderClient(ProviderClient):
@@ -129,6 +129,8 @@ class LiveProviderClient(ProviderClient):
             max_output=selection.max_output_tokens,
         )
         self.client.close()
+        if selection.bindings is not None and self.binding != selection.bindings[role]:
+            raise ExternalDisabled("provider_binding_changed")
         self.client = httpx.Client(
             transport=GrantTransport(owner, call_id, self.spec.provider, inner=inner),
             timeout=self.timeout,
@@ -140,17 +142,6 @@ class LiveProviderClient(ProviderClient):
         return replace(super().result(*args, **kwargs), simulated=False)
 
 
-def reported_model_allowed(requested, reported):
-    if reported is None:
-        return True  # Not reported: retain unknown, never claim identity proof.
-    aliases = {requested}
-    if requested.endswith(":free"):
-        aliases.add(requested.removesuffix(":free"))
-    if requested == "gpt-4o-mini":
-        aliases.add("gpt-4o-mini-2024-07-18")
-    return reported in aliases
-
-
 class LiveExecutor:
     def __init__(self, owner, grant_id, selection):
         self.owner = owner
@@ -158,6 +149,8 @@ class LiveExecutor:
         self.selection = selection
 
     def execute(self, intent, role, operation, arguments, *, inner=None):
+        if operation not in ROLE_OPERATIONS.get(role, set()):
+            raise ContractError("invalid_model_operation")
         if not 1 <= self.selection.max_output_tokens <= 256:
             raise ExternalDisabled("validation_output_limit")
         spec = self.selection.roles[role]
@@ -178,12 +171,13 @@ class LiveExecutor:
                 return row["receipt_json"]
             if row["state"] != "prepared":
                 raise ProviderFailure("live_call_requires_reconciliation", unknown=row["state"] in {"sent", "unknown"})
-        client = LiveProviderClient(self.selection, role, self.owner, cid, inner=inner)
+        client = None
         try:
+            client = LiveProviderClient(self.selection, role, self.owner, cid, inner=inner)
             result = getattr(client, operation)(**arguments)
             if not isinstance(result, ModelResult) or result.simulated:
                 raise ContractError("live_receipt_required")
-            if not reported_model_allowed(spec.model, result.reported_model):
+            if not identity_allowed(spec, result.reported_model):
                 raise ContractError("unexpected_reported_model")
             receipt = asdict(result)
             receipt["model_identity_reported"] = result.reported_model is not None
@@ -214,12 +208,15 @@ class LiveExecutor:
                     {
                         "error_code": exc.code if isinstance(exc, ProviderFailure) else "live_contract_failure",
                         "status": exc.status if isinstance(exc, ProviderFailure) else None,
+                        "transport_kind": exc.transport_kind if isinstance(exc, ProviderFailure) else None,
+                        "retry_after": exc.retry_after if isinstance(exc, ProviderFailure) else None,
                         "simulated": False,
                     },
                 )
             raise
         finally:
-            client.close()
+            if client is not None:
+                client.close()
 
     def stop(self, reason):
         with tenant_transaction(self.owner) as conn:

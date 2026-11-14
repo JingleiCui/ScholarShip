@@ -8,7 +8,7 @@
 
 2026-11-13：需求、技术、架构、数据设计和环境方案均已确认。**M0 已验收，M1 文献导入与本地预览已实现**，详见[初始化验收报告](docs/initialization-report.md)。文献库和原文预览已可使用；M2 离线业务链路已接通（76 项测试通过），含合成深解析、混合检索、持久化问答与引用定位，见 [本批报告](docs/m2/business-report.md)。外部服务关闭，合成演示不代表科研效果。真实 OCR、翻译、问答及其余模块待后续增量开发。见 [M1 验收报告](docs/m1-report.md)。
 
-受控真实执行器已实现（130 项回归通过），但本次联调在 ChatAnywhere 只读额度查询 HTTP 403 处按约定停止，实际模型推理 **0/5**。这不等于聊天模型不可用；账户条件待确认。见[联调报告](docs/models/live-report.md)。
+模型层已按能力注册、协议适配、网络传输、幂等执行与业务工作流拆分；同协议的新平台只增加配置。真实 PG/Qdrant 的合成端到端与恢复已验证。当前默认 Gemma + Nemotron；云端实测仍未全通，6/6 名额已占用，Gemma 返回 429。见[可插拔设计](docs/models/adapter-design.md)、[配置方法](docs/models/configuration.md)与[验收报告](docs/models/refactor-report.md)。
 
 多模型配置已实现（114 项回归通过）：默认选择 ChatAnywhere 文本模型＋OpenRouter Nemotron 免费向量/重排，本地/合成配置保留。密钥存在性已检测，实际权限、免费额度与推理仍未验证，见[配置说明](docs/models/configuration.md)和[本批报告](docs/models/report.md)。常用选项在根目录 `model_config.py`，真实请求保持关闭。
 

@@ -260,21 +260,155 @@ def test_grant_owner_rls_and_no_runtime_creation(case, database, accounts):
         )
 
 
-def test_recorded_preflight_stop_is_permanent_on_rerun(case, database, tmp_path, monkeypatch):
-    import validate_live_models as cli
+def test_no_approval_cannot_even_open_maintenance_database():
+    from scholarship.models.approvals import issue_approval
+    from scholarship.adapters.providers import ExternalDisabled
 
-    f = tmp_path / "preflight.json"
-    f.write_text(json.dumps({"provider": "chatanywhere", "http_status": 403, "code": 40300, "inference_requests": 0}))
-    monkeypatch.setattr(cli, "PREFLIGHT", f)
-    sel = cli.selection()
-    manifest = make_manifest(sel, REQUESTS)
-    cli.record_stopped_approval(database, sel, manifest)
-    first = cli.find_approval(database)
-    with database.begin() as conn:
-        conn.execute(sa.text("UPDATE model_runtime.grants SET state='active' WHERE id=:id"), {"id": first["id"]})
-    cli.record_stopped_approval(database, sel, manifest)
-    second = cli.find_approval(database)
-    assert first["id"] == second["id"] and second["state"] == "stopped" and second["used_requests"] == 0
-    e = LiveExecutor(second["owner_id"], second["id"], sel)
-    with pytest.raises(DBAPIError):
-        e.execute(*REQUESTS[0], inner=httpx.MockTransport(fake_response))
+    with pytest.raises(ExternalDisabled):
+        issue_approval(None, key="unapproved", selection=None, requests=[], total_limit=6)
+    with pytest.raises(ValueError):
+        make_manifest(
+            replace(load_selection("free_gemma"), max_output_tokens=256),
+            [("bypass", "chat", "request", {"path": "/chat/completions", "body": {"model": "paid"}})],
+        )
+
+
+@pytest.mark.parametrize("last_status", [200, 429])
+def test_cumulative_lineage_preserves_unknown_and_never_refills(case, database, last_status):
+    from scholarship.models.approvals import issue_approval
+
+    sel, gid, executor = granted(case, database)
+    executor.execute(*REQUESTS[0], inner=httpx.MockTransport(fake_response))
+
+    def fail(request):
+        raise httpx.ReadTimeout("private content")
+
+    with pytest.raises(ProviderFailure):
+        executor.execute(*REQUESTS[1], inner=httpx.MockTransport(fail))
+    with database.connect() as conn:
+        key0 = conn.scalar(sa.text("SELECT approval_key FROM model_runtime.grants WHERE id=:id"), {"id": gid})
+    keys = [key0]
+
+    def issue(selection, requests):
+        key = uuid4().hex
+        grant = issue_approval(
+            database, key=key, selection=selection, requests=requests, total_limit=6, prior_keys=keys, approved=True
+        )
+        keys.append(key)
+        return grant
+
+    g1 = issue(sel, REQUESTS[1:])
+    with pytest.raises(ProviderFailure):
+        LiveExecutor(case[0], g1["id"], sel).execute(*REQUESTS[1], inner=httpx.MockTransport(fail))
+    g2 = issue(sel, REQUESTS[1:4])
+    e2 = LiveExecutor(case[0], g2["id"], sel)
+    e2.execute(*REQUESTS[1], inner=httpx.MockTransport(fake_response))
+    with pytest.raises(ProviderFailure):
+        e2.execute(*REQUESTS[2], inner=httpx.MockTransport(fail))
+    gemma = replace(load_selection("free_gemma"), max_output_tokens=256, max_requests_per_run=1)
+    g3 = issue(gemma, [REQUESTS[-1]])
+
+    def answer(request):
+        if last_status != 200:
+            return httpx.Response(last_status, headers={"Retry-After": "60"})
+        data = fake_response(
+            httpx.Request(
+                "POST",
+                "https://api.chatanywhere.tech/v1/chat/completions",
+                headers={"Authorization": "Bearer test-chatanywhere-only"},
+                content=request.content,
+            )
+        ).json()
+        data["model"] = "google/gemma-4-31b-it"
+        return httpx.Response(200, json=data)
+
+    e3 = LiveExecutor(case[0], g3["id"], gemma)
+    if last_status == 200:
+        e3.execute(*REQUESTS[-1], inner=httpx.MockTransport(answer))
+        with tenant_transaction(case[0]) as conn:
+            conn.execute(sa.text("SELECT model_runtime.complete_grant(:id)"), {"id": g3["id"]})
+    else:
+        with pytest.raises(ProviderFailure):
+            e3.execute(*REQUESTS[-1], inner=httpx.MockTransport(answer))
+    again = issue_approval(
+        database,
+        key=keys[-1],
+        selection=gemma,
+        requests=[REQUESTS[-1]],
+        total_limit=6,
+        prior_keys=keys[:-1],
+        approved=True,
+    )
+    assert again["used_requests"] == 1 and again["state"] == ("completed" if last_status == 200 else "stopped")
+    with database.connect() as conn:
+        assert (
+            conn.scalar(
+                sa.text("SELECT sum(used_requests) FROM model_runtime.grants WHERE id IN (:a,:b,:c,:d)"),
+                {"a": gid, "b": g1["id"], "c": g2["id"], "d": g3["id"]},
+            )
+            == 6
+        )
+        receipts = conn.scalars(
+            sa.text("SELECT receipt_json FROM model_runtime.calls WHERE grant_id IN (:a,:b,:c,:d)"),
+            {"a": gid, "b": g1["id"], "c": g2["id"], "d": g3["id"]},
+        ).all()
+        assert "private content" not in json.dumps(receipts)
+        if last_status == 429:
+            assert any(r.get("retry_after") == 60 for r in receipts)
+    with pytest.raises(ValueError):
+        issue_approval(
+            database,
+            key=uuid4().hex,
+            selection=gemma,
+            requests=[REQUESTS[-1]],
+            total_limit=6,
+            prior_keys=keys[:-1],
+            approved=True,
+        )
+    with pytest.raises(ValueError):
+        issue_approval(
+            database,
+            key=uuid4().hex,
+            selection=gemma,
+            requests=[REQUESTS[-1]],
+            total_limit=5,
+            prior_keys=keys[1:3],
+            approved=True,
+        )
+
+
+def test_explicit_proxy_route_disables_environment_and_retries(monkeypatch):
+    import scholarship.models.transports as transport
+
+    captured = []
+    monkeypatch.setattr(
+        transport, "configuration", lambda: {"LIVE_PROXY_URLS": {"openrouter": "http://127.0.0.1:7897"}}
+    )
+    monkeypatch.setattr(transport.httpx, "HTTPTransport", lambda **kw: captured.append(kw) or object())
+    transport.network_transport("openrouter")
+    transport.network_transport("chatanywhere")
+    assert captured == [
+        {"retries": 0, "trust_env": False, "proxy": "http://127.0.0.1:7897"},
+        {"retries": 0, "trust_env": False, "proxy": None},
+    ]
+    for proxy in ("http://secret@127.0.0.1:7897", "https://remote.example:7897", "http://127.0.0.1:7897/?secret=x"):
+        monkeypatch.setattr(transport, "configuration", lambda: {"LIVE_PROXY_URLS": {"openrouter": proxy}})
+        with pytest.raises(ValueError, match="invalid_local_proxy"):
+            transport.network_transport("openrouter")
+
+
+def test_stopped_cli_run_is_read_only(case, database, tmp_path, monkeypatch):
+    import validate_live_models as cli
+    import scholarship.infrastructure.initialize as initialization
+
+    _, gid, executor = granted(case, database, state="stopped")
+    ref = tmp_path / "reference.json"
+    ref.write_text(json.dumps({"owner_id": str(case[0]), "grant_id": str(gid)}))
+    monkeypatch.setattr(cli, "REFERENCE", ref)
+    monkeypatch.setattr(cli, "REPORT", tmp_path / "report.json")
+    monkeypatch.setattr("sys.argv", ["validate_live_models.py", "--action", "run"])
+    monkeypatch.setattr(initialization, "admin_engine", lambda: pytest.fail("runtime must not open admin connection"))
+    cli.main()
+    cli.main()
+    saved = json.loads(cli.REPORT.read_text())
+    assert saved["state"] == "stopped" and saved["used_request_slots"] == 0

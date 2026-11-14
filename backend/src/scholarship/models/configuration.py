@@ -1,35 +1,21 @@
 """Validated secret-free configuration snapshots; no provider calls."""
 
 from dataclasses import asdict, dataclass
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
-import runpy
-from urllib.parse import urlsplit
 
-from scholarship.config import PROJECT_ROOT, settings
+from scholarship.config import settings
+from scholarship.models.catalog import (
+    configuration,
+    validate_binding,
+    provider_definition,
+    credential,
+    binding_snapshot,
+)
 
 ROLES = ("chat", "translation", "embedding", "rerank", "parser")
-PROVIDERS = {
-    "mock": set(ROLES),
-    "chatanywhere": {"chat", "translation"},
-    "openrouter": {"embedding", "rerank"},
-    "ollama": {"chat", "translation", "embedding"},
-    "local_reranker": {"rerank"},
-    "mineru_local": {"parser"},
-    "mineru_cloud": {"parser"},
-}
-CREDENTIALS = {
-    "chatanywhere": "chatanywhere_api_key",
-    "openrouter": "openrouter_api_key",
-    "mineru_cloud": "mineru_api_key",
-}
-FREE_MODELS = {"embedding": "nvidia/nemotron-3.5-embed-8b:free", "rerank": "nvidia/nemotron-3.5-rerank-8b:free"}
-CLOUD_HOSTS = {
-    "chatanywhere": {"api.chatanywhere.tech", "api.chatanywhere.org"},
-    "openrouter": {"openrouter.ai"},
-    "mineru_cloud": {"mineru.net"},
-}
 
 
 def canonical(value):
@@ -50,9 +36,8 @@ class ModelSpec:
     context_tokens: int = 8192
     tier: str | None = None
 
-    def validate(self, role):
-        if self.provider not in PROVIDERS or role not in PROVIDERS[self.provider]:
-            raise ValueError("provider_role_mismatch")
+    def validate(self, role, *, config=None):
+        validate_binding(self, role, config)
         if not isinstance(self.model, str) or not 1 <= len(self.model) <= 160:
             raise ValueError("invalid_model")
         if self.dimensions is not None and (type(self.dimensions) is not int or not 1 <= self.dimensions <= 16384):
@@ -63,28 +48,6 @@ class ModelSpec:
             or not 512 <= self.context_tokens <= 32768
         ):
             raise ValueError("invalid_model_limits")
-        if self.provider == "openrouter" and self.model != FREE_MODELS[role]:
-            raise ValueError("only_reviewed_free_models_allowed")
-        if self.provider == "mock":
-            if self.base_url:
-                raise ValueError("mock_has_no_endpoint")
-            return self
-        try:
-            u = urlsplit(self.base_url)
-            if u.username or u.password or u.query or u.fragment:
-                raise ValueError()
-            if self.provider in CLOUD_HOSTS:
-                if u.scheme != "https" or u.hostname not in CLOUD_HOSTS[self.provider] or u.port not in (None, 443):
-                    raise ValueError()
-                expected = (
-                    "/api/v1" if self.provider == "openrouter" else "/v1" if self.provider == "chatanywhere" else ""
-                )
-                if u.path.rstrip("/") != expected:
-                    raise ValueError()
-            elif u.scheme != "http" or u.hostname != "127.0.0.1" or not u.port or u.path.rstrip("/"):
-                raise ValueError()
-        except ValueError:
-            raise ValueError("untrusted_model_endpoint") from None
         if self.provider == "mineru_local" and self.tier != "basic":
             raise ValueError("unreviewed_local_parser_tier")
         return self
@@ -100,10 +63,11 @@ class ModelSelection:
     max_requests_per_run: int
     allow_local: bool
     allow_cloud: bool
+    bindings: dict | None = None
 
     def snapshot(self):
         body = {
-            "revision": "models-v1",
+            "revision": "models-v2" if self.bindings is not None else "models-v1",
             "preset": self.preset,
             "roles": {k: asdict(v) for k, v in self.roles.items()},
             "timeout_seconds": self.timeout_seconds,
@@ -111,18 +75,20 @@ class ModelSelection:
             "max_output_tokens": self.max_output_tokens,
             "max_requests_per_run": self.max_requests_per_run,
         }
+        if self.bindings is not None:
+            body["bindings"] = deepcopy(self.bindings)
         return {**body, "fingerprint": fingerprint(body)}
 
 
 def load_selection(preset=None, overrides=None, path: Path | None = None):
-    c = runpy.run_path(str(path or PROJECT_ROOT / "model_config.py"))
+    c = configuration(path)
     name = preset or c["ACTIVE_PRESET"]
     if name not in c["PRESETS"]:
         raise ValueError("unknown_preset")
     choices = {**c["PRESETS"][name], **c["ROLE_OVERRIDES"], **(overrides or {})}
     if set(choices) != set(ROLES):
         raise ValueError("invalid_role_set")
-    roles = {k: ModelSpec(**c["MODELS"][v]).validate(k) for k, v in choices.items()}
+    roles = {k: ModelSpec(**c["MODELS"][v]).validate(k, config=c) for k, v in choices.items()}
     bounds = {
         "TIMEOUT_SECONDS": (1, 600),
         "CONCURRENCY": (1, 4),
@@ -143,6 +109,7 @@ def load_selection(preset=None, overrides=None, path: Path | None = None):
         c["MAX_REQUESTS_PER_RUN"],
         c["ALLOW_LOCAL_INFERENCE"],
         c["ALLOW_REAL_REQUESTS"],
+        {role: binding_snapshot(spec, role, c) for role, spec in roles.items()},
     )
 
 
@@ -150,11 +117,14 @@ def restore_snapshot(body):
     safe = {k: v for k, v in body.items() if k != "fingerprint"}
     if (
         body.get("fingerprint") != fingerprint(safe)
-        or safe.get("revision") != "models-v1"
+        or safe.get("revision") not in {"models-v1", "models-v2"}
         or set(safe["roles"]) != set(ROLES)
     ):
         raise ValueError("invalid_model_snapshot")
     roles = {k: ModelSpec(**v).validate(k) for k, v in safe["roles"].items()}
+    bindings = safe.get("bindings")
+    if safe["revision"] == "models-v2" and (not isinstance(bindings, dict) or set(bindings) != set(ROLES)):
+        raise ValueError("invalid_model_bindings")
     # Historic snapshots cannot grant execution permission; current gates always apply.
     current = load_selection()
     return ModelSelection(
@@ -166,6 +136,7 @@ def restore_snapshot(body):
         safe["max_requests_per_run"],
         current.allow_local,
         current.allow_cloud,
+        bindings,
     )
 
 
@@ -174,10 +145,12 @@ def configuration_status(preset=None, overrides=None):
     cfg = settings()
     roles = {}
     for role, spec in selected.roles.items():
-        key = CREDENTIALS.get(spec.provider)
-        configured = bool(getattr(cfg, key).get_secret_value()) if key else True
+        definition = provider_definition(spec.provider)
+        key = definition.get("key_env")
+        configured = bool(credential(spec.provider)) if key else True
         roles[role] = {
             **asdict(spec),
+            "protocol": definition["roles"][role],
             "credential_required": bool(key),
             "credential_present": configured,
             "verification_state": "synthetic_only" if spec.provider == "mock" else "not_verified",
@@ -195,7 +168,7 @@ def configuration_status(preset=None, overrides=None):
             "openrouter": bool(cfg.openrouter_api_key.get_secret_value()),
             "mineru": bool(cfg.mineru_api_key.get_secret_value()),
         },
-        "available_presets": ["mock", "local", "free_api"],
+        "available_presets": list(configuration()["PRESETS"]),
         "roles": roles,
         "snapshot_fingerprint": selected.snapshot()["fingerprint"],
         "cloud_enabled": False,

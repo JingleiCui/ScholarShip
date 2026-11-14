@@ -57,10 +57,16 @@ Run `verify_m2.py` 执行四类适配契约和独立测试库账务检查，不�
 
 研究账号在工作台点击“准备合成文档与索引”，选择文献后运行离线问答，点击引用查看原文。刷新会恢复最近任务；所有回答明确标记合成数据。Run `verify_m2_business.py` 验证新增业务链路，Run `storage_preflight.py` 检查共享文件。真实模型、云端解析和科研效果尚未验收，见[本批报告](m2/business-report.md)。
 
-## 统一模型配置
+## 可插拔模型配置与流程验收
 
-根目录 `model_config.py` 集中配置 mock/local/free_api，私有 `.env` 保存 Key。工作台可为当前项目保存命名配置组，配置变更不启用推理；有索引变更提示时保留原活动索引。Run `verify_models.py` 默认只做脱敏配置诊断；Run `local_models.py` 默认只检查隔离环境，不安装、不推理。依赖准备与启动选项见[配置说明](models/configuration.md)。本批 114 项回归通过，真实 HTTP 执行器和账户联调尚未开放。
+根目录 `model_config.py` 集中配置提供商、命名模型、能力与 mock/local/free_api/free_gemma 配置组；Key 只放私有 `.env`。当前项目选 free_gemma（Gemma 生成 + Nemotron 向量/重排），ChatAnywhere 保留。配置只影响后续任务，不打开推理。更换 embedding 协议、输入策略或维度需要新 profile 和已验证世代；当前活动索引保留。
 
-## 受控真实联调状态
+Run `verify_models.py` 做脱敏配置诊断；Run `verify_model_pipeline.py` 完成隔离库中的多组合端到端与断点恢复，不发送真实模型请求。完整回归为 `validate.py`。本机已迁移到 0008_adapter_profiles，业务表仍为 41 张。详情见[配置说明](models/configuration.md)、[设计](models/adapter-design.md)和[验收](models/refactor-report.md)。
 
-Run `validate_live_models.py` 默认只读状态，不发请求。当前审批已因 ChatAnywhere 额度查询 HTTP 403 停止，0/5；run 也不能复活授权或重置计数。当前普通服务开关保持关闭，见[联调报告](models/live-report.md)。不要因 403 擅自换域名、换 Key 或发起模型请求；先核实账户条件。
+`local_models.py` 默认只检查隔离服务，未安装的本地 OCR/重排服务不会因选择 local 而自动安装或启动。
+
+## 真实联调状态
+
+统一入口 `validate_live_models.py` 默认 status；当前 stopped，累计 **6/6**，run 不发送请求。ChatAnywhere 聊天及 Nemotron 文档向量实测成功（4096 维）；其余连接/回执未知或 Gemma 429，重排未调用，云端完整流程未验收。旧记录与占额不重置，多个一次性续测脚本已合并。
+
+需要新的明确授权后才能增加推理名额；不上传论文、不调用 MinerU 云端、不充值。`diagnose_model_network.py` 仅在主动运行时发送无 Key、无模型输入的网络诊断请求，诊断可达不代表推理可用。常规服务开关继续关闭。详见[联调记录](models/live-report.md)。
