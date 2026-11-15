@@ -423,5 +423,16 @@ def test_storage_preflight_rejects_missing_file(case, database):
 
     owner, project = case
     demo_versions(owner, project)
-    report = verify_storage(database, Path("/nonexistent/scholarship-storage-test"))
+    from scholarship.infrastructure.database import engine
+
+    runtime = engine("runtime")
+    with database.connect() as admin, runtime.connect() as restricted:
+        expected = admin.scalar(sa.text("SELECT count(*) FROM scholar.file_objects WHERE state='ready'"))
+        inventory = restricted.scalar(sa.text("SELECT count(*) FROM scholar.storage_manifest()"))
+        assert inventory == expected and inventory > 0
+        assert restricted.scalar(sa.text("SELECT current_user")) == "scholar_runtime"
+        assert not restricted.scalar(sa.text(
+            "SELECT has_function_privilege('scholar_auth', 'scholar.storage_manifest()', 'EXECUTE')"
+        ))
+    report = verify_storage(runtime, Path("/nonexistent/scholarship-storage-test"))
     assert not report["passed"] and report["missing"] > 0

@@ -44,6 +44,9 @@ def create_app():
 
     app.include_router(research_router, prefix="/api/v1")
 
+    from scholarship.api.studio import router as studio_router
+    app.include_router(studio_router,prefix="/api/v1")
+
     @app.middleware("http")
     async def request_id(request, call_next):
         rid = str(uuid4())

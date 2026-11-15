@@ -17,7 +17,10 @@ app.conf.update(
     worker_prefetch_multiplier=1,
     broker_connection_retry_on_startup=True,
     broker_transport_options={"visibility_timeout": 120},
-    beat_schedule={"outbox": {"task": "scholarship.dispatch", "schedule": 2.0}},
+    beat_schedule={
+        "outbox": {"task": "scholarship.dispatch", "schedule": 2.0},
+        "metadata": {"task": "scholarship.metadata_dispatch", "schedule": 60.0},
+    },
     timezone="UTC",
     enable_utc=True,
     worker_send_task_events=False,

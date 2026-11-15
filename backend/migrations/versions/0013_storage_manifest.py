@@ -1,0 +1,19 @@
+"""Read-only deployment storage integrity manifest through runtime role."""
+
+from pathlib import Path
+from alembic import op
+
+revision = "0013_storage_manifest"
+down_revision = "0012_production_scope"
+branch_labels = None
+depends_on = None
+
+
+def upgrade():
+    op.get_bind().connection.driver_connection.execute(
+        (Path(__file__).parents[1] / "sql/0013_storage_manifest.sql").read_text()
+    )
+
+
+def downgrade():
+    raise RuntimeError("Use a forward migration for storage integrity access.")

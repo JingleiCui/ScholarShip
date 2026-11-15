@@ -4,19 +4,73 @@ const messages: Record<string, string> = {
   ready_native_parse_required: '该文献尚无已完成的深解析；导入 PDF 后的本地预览不能代替 OCR。',
   matching_ready_generation_required: '索引尚未完成校验，请等待索引任务完成。',
   mixed_embedding_profiles: '所选文献使用不同向量配置，请用同一配置重建后再一起提问。',
+  followup_requires_same_source_scope: '续问必须保持相同的文献版本、索引和执行模式；切换文献请开始新问题。',
+  followup_conversation_advanced: '该会话已有新回答，请选择最新回答继续追问。',
+  followup_parent_unavailable: '上文任务尚未完成或已不可用，请开始新问题。',
   question_required: '请输入研究问题。',
 };
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : '请求未完成，请重试。';
 }
 export async function api(path: string, init?: RequestInit) {
-  const csrf = document.cookie.split('; ').find(x => x.startsWith('ss_csrf='))?.split('=')[1] ?? '';
+  const csrf =
+    document.cookie
+      .split('; ')
+      .find((x) => x.startsWith('ss_csrf='))
+      ?.split('=')[1] ?? '';
   const r = await fetch('/api/v1' + path, { ...init, headers: { 'X-CSRF-Token': csrf, ...init?.headers } });
   if (!r.ok) {
     let detail: unknown;
-    try { detail = (await r.json()).detail; } catch { /* Do not display raw proxy responses. */ }
-    const message = r.status === 401 ? '会话已过期，请重新登录。' : r.status === 403 ? '当前账号没有此操作权限，或会话校验已过期。' : typeof detail === 'string' ? messages[detail] ?? (/^[\u3400-\u9fff]/.test(detail) ? detail : `请求未完成（${r.status}）。`) : `请求未完成（${r.status}）。`;
+    try {
+      detail = (await r.json()).detail;
+    } catch {
+      /* Do not display raw proxy responses. */
+    }
+    const message =
+      r.status === 401
+        ? '会话已过期，请重新登录。'
+        : r.status === 403
+          ? '当前账号没有此操作权限，或会话校验已过期。'
+          : typeof detail === 'string'
+            ? (messages[detail] ?? (/^[\u3400-\u9fff]/.test(detail) ? detail : `请求未完成（${r.status}）。`))
+            : `请求未完成（${r.status}）。`;
     throw new Error(message);
   }
   return r.json();
+}
+
+export function runStatus(status: string): string {
+  return (
+    (
+      {
+        queued: '排队中',
+        running: '处理中',
+        succeeded: '已完成',
+        failed: '未完成',
+        waiting_user: '已暂停，待处理',
+        partially_succeeded: '部分完成',
+        cancelled: '已取消',
+      } as Record<string, string>
+    )[status] ?? status
+  );
+}
+export function runErrorMessage(error: { code?: string; contract_code?: string }): string {
+  const code = error.contract_code ?? error.code ?? '';
+  const reasons: Record<string, string> = {
+    chart_font_unavailable: '缺少所需绘图字体，请安装 Noto Sans CJK SC 或选择已安装字体后重试。',
+    incomplete_plaintext_translation_response: '接口遗漏翻译片段，合格部分已保存，本批已暂停。',
+    invalid_plaintext_translation_response: '翻译结果格式或内容不合要求，本批已暂停。',
+    translation_placeholder_integrity_failed: '翻译未保留原文标记，本批已暂停；已有合格片段保留。',
+    production_admission_closed: '云端批次已关闭、到期或额度不足，请查看模型与额度状态。',
+    rate_limited: '免费接口限流，已暂停；未自动重试。',
+    invalid_csv_chart_input: 'CSV 的数据列、缺失值或图形参数有误，请检查输入。',
+    followup_conversation_advanced: '会话已有新回答，请选择最新回答继续追问。',
+    writing_scope_exceeds_run_budget_select_sections: '所选全文超出本次处理范围，请减少来源或分次整理。',
+    no_text_layer_ocr_required: '文档没有可读取的文本层，需要先完成 OCR。',
+    local_crop_rotation_requires_native_parser: '此 PDF 的裁切或旋转需要更完整的解析器。',
+    summary_reduce_context_limit: '来源笔记仍过长，请减少来源或分次整理。',
+    offline_contract_rejected: '接口结果未通过校验，请查看任务限制；已有结果保留。',
+    offline_dependency_failure: '处理未完成，已保留失败记录；请检查文件或服务状态。',
+  };
+  return reasons[code] ?? '处理未完成，已保留任务记录与诊断。';
 }

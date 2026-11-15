@@ -116,6 +116,10 @@ async def upload(
     user: Identity = Depends(mutation_identity),
     idempotency_key: str = Header(min_length=1, max_length=128),
 ):
+    return await store_upload(project_id, file, paper_id, user, idempotency_key)
+
+
+async def store_upload(project_id, file, paper_id, user, idempotency_key, *, source_record=None):
     FILE_ROOT.mkdir(parents=True, exist_ok=True)
     with tenant_transaction(user.user_id) as conn:
         if not conn.scalar(sa.select(T["projects"].c.id).where(T["projects"].c.id == project_id)):
@@ -169,6 +173,19 @@ async def upload(
         sha = digest.hexdigest()
         scope = {"owner_id": user.user_id, "project_id": project_id}
         with tenant_transaction(user.user_id) as conn:
+            if source_record is not None:
+                source_record = (
+                    conn.execute(
+                        sa.select(T["source_records"]).where(
+                            T["source_records"].c.id == source_record["id"],
+                            T["source_records"].c.project_id == project_id,
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
+                if not source_record or source_record["provider"] != "arxiv":
+                    raise HTTPException(404, "source_not_found")
             conn.execute(
                 sa.text("SELECT pg_advisory_xact_lock(hashtextextended(:k,0))"),
                 {"k": str(user.user_id) + str(project_id)},
@@ -225,7 +242,8 @@ async def upload(
                     **scope,
                     file_id=fid,
                     display_name=Path(file.filename or "document.pdf").name,
-                    origin="local_upload",
+                    origin="scholarly_download" if source_record else "local_upload",
+                    source_record_id=source_record["id"] if source_record else None,
                     status="accepted",
                     idempotency_key=idempotency_key,
                 )
@@ -304,6 +322,7 @@ async def upload(
                         "page_count": pages,
                         "source": "pdf_metadata_filename_and_first_page_candidates",
                         "identifier_candidates": identifiers,
+                        "download_source_record_id": str(source_record["id"]) if source_record else None,
                     },
                 )
                 .returning(T["paper_versions"].c.id)

@@ -183,6 +183,7 @@ class QAState(TypedDict, total=False):
     selected: list
     answer: dict
     result: dict
+    structured: dict
 
 
 def validate_selected(owner, project, selected):
@@ -233,22 +234,47 @@ def persist_answer(owner, project, run, question, answer, selected, trace):
             for v in row["input_json"].get("version_ids", [])
         )
         scope = {"owner_id": owner, "project_id": project}
-        conversation = conn.scalar(
-            T["conversations"]
-            .insert()
-            .values(
-                **scope,
-                title="文献问答 · 离线验收" if model_simulated else "文献证据问答",
-                checkpoint_thread_id=f"offline:{run}",
-                context_json={
-                    "synthetic": model_simulated,
-                    "source_synthetic": source_synthetic,
-                    "models": row["config_json"].get("models"),
-                },
-                lock_version=0,
+        conversation = None
+        if not row["input_json"].get("parent_run_id"):
+            conversation = conn.scalar(
+                T["conversations"]
+                .insert()
+                .values(
+                    **scope,
+                    title="文献问答 · 离线验收" if model_simulated else "文献证据问答",
+                    checkpoint_thread_id=f"offline:{run}",
+                    context_json={
+                        "synthetic": model_simulated,
+                        "source_synthetic": source_synthetic,
+                        "models": row["config_json"].get("models"),
+                    },
+                    lock_version=0,
+                )
+                .returning(T["conversations"].c.id)
             )
-            .returning(T["conversations"].c.id)
-        )
+        first_ordinal = 0
+        if row["input_json"].get("parent_run_id"):
+            # Reuse the source-pinned conversation and fence concurrent branches.
+            conversation = UUID(row["input_json"]["conversation_id"])
+            conn.execute(
+                sa.select(T["conversations"].c.id).where(T["conversations"].c.id == conversation).with_for_update()
+            ).scalar_one()
+            last = (
+                conn.execute(
+                    sa.select(T["messages"])
+                    .where(T["messages"].c.conversation_id == conversation)
+                    .order_by(T["messages"].c.ordinal.desc())
+                    .limit(1)
+                )
+                .mappings()
+                .one()
+            )
+            if (
+                last["ordinal"] != row["input_json"]["expected_message_ordinal"]
+                or str(last["run_id"]) != row["input_json"]["parent_run_id"]
+            ):
+                raise ContractError("followup_conversation_advanced")
+            first_ordinal = last["ordinal"] + 1
         conn.execute(T["runs"].update().where(T["runs"].c.id == run).values(conversation_id=conversation))
         conn.execute(
             T["messages"]
@@ -257,7 +283,7 @@ def persist_answer(owner, project, run, question, answer, selected, trace):
                 **scope,
                 conversation_id=conversation,
                 run_id=run,
-                ordinal=0,
+                ordinal=first_ordinal,
                 role="user",
                 content_text=question,
                 verification_state="not_applicable",
@@ -271,7 +297,7 @@ def persist_answer(owner, project, run, question, answer, selected, trace):
                 **scope,
                 conversation_id=conversation,
                 run_id=run,
-                ordinal=1,
+                ordinal=first_ordinal + 1,
                 role="assistant",
                 content_text=answer["answer"],
                 verification_state="insufficient" if answer["insufficient_evidence"] else "partially_supported",
@@ -321,8 +347,8 @@ def persist_answer(owner, project, run, question, answer, selected, trace):
                         },
                         retrieval_json={
                             "generation_id": item["generation_id"],
-                            "chunk_id": item["id"],
-                            "mode": "dense_bm25_rrf_rerank",
+                            "chunk_id": None if item.get("retrieval_mode") else item["id"],
+                            "mode": item.get("retrieval_mode", "dense_bm25_rrf_rerank"),
                         },
                     )
                     .returning(T["evidence_items"].c.id)
@@ -348,6 +374,8 @@ def persist_answer(owner, project, run, question, answer, selected, trace):
             "model_simulated": model_simulated,
             "source_synthetic": source_synthetic,
             "answer": answer["answer"],
+            "answer_method": answer.get("method", "model_evidence_qa"),
+            "model_used": not answer.get("method", "").startswith("deterministic_"),
             "insufficient_evidence": answer["insufficient_evidence"],
             "verification": "exact_citation_spans_only",
             "citations": citations,
@@ -372,7 +400,8 @@ def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
         )
         if row["kind"] not in ({"model_qa", "research_qa"} if model_gateway is not None else {"offline_qa"}):
             raise ContractError("qa_run_required")
-        question = row["input_json"]["question"]
+        original_question = row["input_json"]["question"]
+        question = row["input_json"].get("query_context", original_question)
         scope = row["input_scope_json"]["generations"]
     embed, rerank, answerer = adapters() if model_gateway is None else (None, None, None)
     executor = OfflineExecutor(owner) if model_gateway is None else None
@@ -409,13 +438,46 @@ def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
         }
 
     def retrieve(state):
+        if row["config_json"].get("answer_contract") == "quote-menu-v1":
+            from scholarship.domains.structured_retrieval import author_evidence
+
+            structured = author_evidence(owner, project, scope, original_question)
+            if structured:
+                return {
+                    "retrieval": {"candidates": structured["selected"], "trace": structured["trace"]},
+                    "structured": structured,
+                }
+            if row["config_json"].get("structural_evidence") == "native-table-decimal-v2":
+                from scholarship.domains.structured_retrieval import table_comparison_evidence
+
+                calculated = table_comparison_evidence(owner, project, scope, original_question)
+                if calculated:
+                    return {
+                        "retrieval": {"candidates": calculated["selected"], "trace": calculated["trace"]},
+                        "structured": calculated,
+                    }
         arguments = {"texts": [question]}
         step = call_step(owner, project, run, "query_embedding", arguments)
         receipt = perform(step, "query_embedding", embed, "embedding", arguments, maximum_input=len(question.encode()))
         finish_call(owner, step, receipt)
-        return {"retrieval": hybrid(owner, project, scope, question, receipt["result"][0])}
+        retrieval = hybrid(owner, project, scope, question, receipt["result"][0])
+        if row["config_json"].get("structural_evidence") in {"native-table-v1", "native-table-decimal-v2"}:
+            from scholarship.domains.structured_retrieval import table_evidence
+
+            tables = table_evidence(owner, project, scope, question)
+            if tables:
+                table_blocks = {t["block_id"] for t in tables}
+                retrieval["candidates"] = (
+                    tables + [c for c in retrieval["candidates"] if c["block_id"] not in table_blocks]
+                )[:20]
+                retrieval["trace"].append(
+                    {"method": "native_table_lexical_supplement", "count": len(tables), "not_embedding_points": True}
+                )
+        return {"retrieval": retrieval}
 
     def rank(state):
+        if state.get("structured"):
+            return {"selected": state["structured"]["selected"]}
         candidates = state["retrieval"]["candidates"]
         validate_selected(owner, project, candidates)
         if not candidates:
@@ -438,12 +500,16 @@ def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
         return {"selected": [candidates[r["index"]] for r in receipt["result"]]}
 
     def answer(state):
+        if state.get("structured"):
+            return {"answer": state["structured"]["answer"]}
         selected = state["selected"]
         validate_selected(owner, project, selected)
         if model_gateway is not None and not selected:
             return {"answer": {"answer": "缺少可核验的原文证据。", "claims": [], "insufficient_evidence": True}}
         evidence = [Evidence(i["id"], i["text"], i["page"]) for i in selected]
         arguments = {"question": question, "evidence": evidence}
+        if row["config_json"].get("answer_contract") == "quote-menu-v1":
+            arguments["citation_mode"] = "quote_id"
         step = call_step(owner, project, run, "answer", {"question": question, "selected": selected})
         receipt = perform(
             step,
@@ -459,7 +525,7 @@ def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
     def publish(state):
         return {
             "result": persist_answer(
-                owner, project, run, question, state["answer"], state["selected"], state["retrieval"]["trace"]
+                owner, project, run, original_question, state["answer"], state["selected"], state["retrieval"]["trace"]
             )
         }
 

@@ -19,7 +19,7 @@ REPORT_DIR = ROOT / "var/reports"
 RUN_FROZEN_INSTALL = True
 RUN_DATABASE_INTEGRATION_TESTS = True  # creates and removes its own ss_test_<uuid> DB
 TIMEOUT_SECONDS = 600
-MILESTONE = "M2-live-business-offline-acceptance"
+MILESTONE = "research-studio-and-scoped-cloud-acceptance"
 
 
 def run_check(name, args, cwd=ROOT):
@@ -107,6 +107,14 @@ def main():
                 "verify_m2_business.py",
                 "verify_m2_live_business.py",
                 "verify_user_journey.py",
+                "approve_cloud_business.py",
+                "run_cloud_business.py",
+                "prepare_competition_corpus.py",
+                "recover_translation_receipts.py",
+                "review_official_answers.py",
+                "verify_textbook_structure.py",
+                "verify_studio_local.py",
+                "format_frontend.py",
                 "verify_models.py",
                 "validate_live_models.py",
                 "model_config.py",
@@ -116,6 +124,7 @@ def main():
             ],
         )
     )
+    checks.append(run_check("frontend_test", pnpm_args("test"), ROOT / "frontend"))
     checks.append(run_check("frontend_build", pnpm_args("build"), ROOT / "frontend"))
     if RUN_DATABASE_INTEGRATION_TESTS:
         checks.append(

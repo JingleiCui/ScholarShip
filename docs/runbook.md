@@ -2,6 +2,16 @@
 
 本机项目：`/Users/cuijinglei/PycharmProjects/ScholarShip`。Python 解释器：根目录 `.venv/bin/python`。常用选项在入口脚本顶部修改，命令行覆盖仅为可选方式。
 
+## 当前版本（2026-11-16）
+
+以下旧阶段段落保留历史背景；当前状态以[本批报告](studio/report-2026-11-16.md)为准。迁移已到 0013，41 张业务表未变。云端批次 74/80 完成，所有准入已关闭，未使用的六次不能直接续用。模型选择与 Key 配置本身不授权请求。
+
+六模块在顶部导航中操作，研究空间在页顶切换。默认空间含扫描件真实问答、翻译及带原文来源的写作产物；“比赛本地语料验收”含 23 篇本地解析论文，图谱边需身份复核。历史错误回答有警告；全文翻译、摘要/框架均可回看来源。已有产物阅读不消耗模型额度。
+
+`verify_studio_local.py` 验证受控图表、拓扑图及本地编辑派生，不请求模型；`run_cloud_business.py` 默认只读 status，已完成批次不可再执行。`prepare_competition_corpus.py`、`verify_textbook_structure.py`、`review_official_answers.py`、`recover_translation_receipts.py` 均默认只读状态，配置在顶部。`format_frontend.py` 使用锁定的项目格式器。
+
+部署预检通过 runtime 专用的只读文件清单函数核对所有已登记 ready 文件，不能使用空租户查询假装全部通过，也不再读管理员配置。管理员仅用于显式迁移和已授权的策略维护。
+
 ## 第一次初始化
 
 在 PyCharm 独立打开项目，使用已有 Python 3.12 运行 `bootstrap.py`。它依次准备项目工具链、锁定依赖、私有配置、三个基础容器、业务迁移、官方 checkpoint 迁移和初始账号。已存在的 `.env`、账号密码和项目数据不会重置。首次下载需要网络；日常启动不重新下载依赖。

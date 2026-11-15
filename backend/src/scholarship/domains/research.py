@@ -25,7 +25,9 @@ def project_selection(owner, project):
     return load_selection(choice.get("preset"), choice.get("overrides"))
 
 
-def enqueue_research(owner, project, key, kind, versions, *, question=None, mode="offline_acceptance"):
+def enqueue_research(
+    owner, project, key, kind, versions, *, question=None, mode="offline_acceptance", parent_run_id=None
+):
     if mode not in {"offline_acceptance", "cloud"} or kind not in {"research_build", "research_qa"}:
         raise ContractError("invalid_research_mode_or_kind")
     selection = project_selection(owner, project)
@@ -55,7 +57,7 @@ def enqueue_research(owner, project, key, kind, versions, *, question=None, mode
                 sa.select(T["document_parses"].c.id)
                 .where(
                     T["document_parses"].c.version_id == vid,
-                    T["document_parses"].c.parser_name == "mineru-native",
+                    T["document_parses"].c.parser_name.in_(["mineru-native", "pdfplumber-structure"]),
                     T["document_parses"].c.status == "ready",
                 )
                 .order_by(T["document_parses"].c.revision_no.desc())
@@ -71,7 +73,13 @@ def enqueue_research(owner, project, key, kind, versions, *, question=None, mode
     )
     if kind == "research_qa":
         parses = [{"version_id": g["version_id"], "parse_id": g["parse_id"]} for g in scope]
-    config = {"mode": mode, "revision": "research-business-v1", "models": selection.snapshot()}
+    config = {
+        "mode": mode,
+        "revision": "research-business-v1",
+        "models": selection.snapshot(),
+        "answer_contract": "quote-menu-v1",
+        "structural_evidence": "native-table-decimal-v2",
+    }
     inputs = {
         "version_ids": [str(v) for v in ids],
         "parses": parses,
@@ -79,6 +87,50 @@ def enqueue_research(owner, project, key, kind, versions, *, question=None, mode
         "configuration": config,
         "scope": scope,
     }
+    if parent_run_id:
+        if kind != "research_qa":
+            raise ContractError("followup_qa_only")
+        with tenant_transaction(owner) as conn:
+            parent = (
+                conn.execute(
+                    sa.select(T["runs"]).where(
+                        T["runs"].c.id == parent_run_id,
+                        T["runs"].c.project_id == project,
+                        T["runs"].c.kind == "research_qa",
+                        T["runs"].c.status == "succeeded",
+                    )
+                )
+                .mappings()
+                .first()
+            )
+            if not parent or not parent["conversation_id"]:
+                raise ContractError("followup_parent_unavailable")
+            if parent["input_scope_json"].get("generations") != scope or parent["config_json"].get("mode") != mode:
+                raise ContractError("followup_requires_same_source_scope")
+            last = (
+                conn.execute(
+                    sa.select(T["messages"])
+                    .where(T["messages"].c.conversation_id == parent["conversation_id"])
+                    .order_by(T["messages"].c.ordinal.desc())
+                    .limit(1)
+                )
+                .mappings()
+                .one()
+            )
+            if last["run_id"] != parent_run_id:
+                raise ContractError("followup_conversation_advanced")
+        context = parent["input_json"].get("query_context", parent["input_json"]["question"])
+        while len(context.encode()) > 900:
+            context = context[len(context) // 8 + 1 :]
+        query = "Earlier USER question context (not factual evidence): " + context + "\nCurrent question: " + question
+        if len(query.encode()) > 4096:
+            raise ContractError("followup_context_limit")
+        inputs.update(
+            parent_run_id=str(parent_run_id),
+            conversation_id=str(parent["conversation_id"]),
+            expected_message_ordinal=last["ordinal"],
+            query_context=query,
+        )
     run = enqueue(owner, project, kind, key, inputs, dispatch=False)
     with tenant_transaction(owner) as conn:
         row = conn.execute(sa.select(T["runs"]).where(T["runs"].c.id == run["id"]).with_for_update()).mappings().one()

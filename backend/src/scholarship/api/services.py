@@ -19,6 +19,14 @@ def external_status(user: Identity = Depends(identity)):
             r.state: r.n
             for r in conn.execute(sa.text("SELECT state,count(*) AS n FROM billing.allocations GROUP BY state"))
         }
+        policies = [
+            dict(r)
+            for r in conn.execute(
+                sa.text(
+                    "SELECT role,enabled,request_limit,requests_used,ends_at, ends_at>now() AS unexpired FROM model_runtime.production_policies ORDER BY starts_at DESC LIMIT 20"
+                )
+            ).mappings()
+        ]
     public_pool = None
     if pool:
         public_pool = {
@@ -32,7 +40,8 @@ def external_status(user: Identity = Depends(identity)):
             "period_end": pool["period_end"],
         }
     return {
-        "mode": "offline_contracts_only",
+        "mode": "scoped_cloud_approval" if policies and cfg.external_services_enabled else "offline_contracts_only",
+        "production_policies": policies,
         "live_transport_available": False,
         "bounded_validation_transport_available": True,
         "requested_external_flag": cfg.external_services_enabled,

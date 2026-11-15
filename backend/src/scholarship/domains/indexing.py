@@ -362,7 +362,9 @@ def build_index(
             probe_key,
             {"texts": [texts[0]], "input_kind": "document"},
         )
-        result = ModelResult(**probe)
+        from dataclasses import fields
+
+        result = ModelResult(**{field.name: probe[field.name] for field in fields(ModelResult)})
         call_id = None
         if not simulated:
             with tenant_transaction(owner) as conn:

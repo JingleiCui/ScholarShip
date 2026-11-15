@@ -49,6 +49,69 @@ def transport_factory(selection):
                     },
                 )
             c = json.loads(b["messages"][-1]["content"])
+            if c.get("task") == "source_summary":
+                quote = c["text"][:100]
+                text = json.dumps(
+                    {"text": "[模拟摘要] " + quote, "quote_ids": ["q0"]}
+                    if c.get("quotes")
+                    else {"text": "[模拟摘要] " + quote, "quotes": [quote]},
+                    ensure_ascii=False,
+                )
+                return httpx.Response(
+                    200,
+                    json={
+                        "model": model,
+                        "usage": usage,
+                        "done": True,
+                        "message": {"content": text},
+                        "choices": [{"finish_reason": "stop", "message": {"content": text}}],
+                    },
+                )
+            if c.get("task") in {"translate", "translate_parts"}:
+                text = json.dumps(
+                    {"segments": [{"id": b["id"], "text": "[模拟译文] " + b["text"]} for b in c["segments"]]},
+                    ensure_ascii=False,
+                )
+                return httpx.Response(
+                    200,
+                    json={
+                        "model": model,
+                        "usage": usage,
+                        "done": True,
+                        "message": {"content": text},
+                        "choices": [{"finish_reason": "stop", "message": {"content": text}}],
+                    },
+                )
+            if c.get("task") in {"draft", "summary", "direction"}:
+                text = json.dumps(
+                    {
+                        "sections": [
+                            {
+                                "title": title,
+                                "text": "[模拟草稿，非科研结论] " + c.get("idea", ""),
+                                "source_ids": [d["id"] for d in c["sources"]],
+                            }
+                            for title in (
+                                ["Abstract", "Introduction", "Related Work", "Planned experiments"]
+                                if c["task"] == "draft"
+                                else ["Source-grounded notes"]
+                            )
+                        ],
+                        "limitations": ["synthetic contract only"],
+                        "hypotheses": [],
+                    },
+                    ensure_ascii=False,
+                )
+                return httpx.Response(
+                    200,
+                    json={
+                        "model": model,
+                        "usage": usage,
+                        "done": True,
+                        "message": {"content": text},
+                        "choices": [{"finish_reason": "stop", "message": {"content": text}}],
+                    },
+                )
             evidence = [e for e in c["evidence"] if overlap(c["question"], e["text"]) > 0][:2]
             answer = {
                 "answer": "\n".join(e["text"] for e in evidence) if evidence else "证据不足。",
@@ -61,6 +124,12 @@ def transport_factory(selection):
                     for e in evidence
                 ],
             }
+            if c.get("citation_mode") == "quote_id":
+                for claim in answer["claims"]:
+                    for cite in claim["citations"]:
+                        eid = cite["evidence_id"]
+                        cite.clear()
+                        cite.update(evidence_id=eid, quote_id="q0")
             text = json.dumps(answer, ensure_ascii=False)
             return httpx.Response(
                 200,

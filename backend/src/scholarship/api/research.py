@@ -26,6 +26,7 @@ class ResearchRequest(BaseModel):
     version_ids: list[UUID] = Field(min_length=1, max_length=8)
     mode: Literal["offline_acceptance", "cloud"] = "offline_acceptance"
     question: str | None = Field(default=None, min_length=1, max_length=1000)
+    parent_run_id: UUID | None = None
 
 
 def submit(project_id, body, user, key, kind):
@@ -33,7 +34,14 @@ def submit(project_id, body, user, key, kind):
         raise HTTPException(422, "question_required")
     try:
         return enqueue_research(
-            user.user_id, project_id, key, kind, body.version_ids, question=body.question, mode=body.mode
+            user.user_id,
+            project_id,
+            key,
+            kind,
+            body.version_ids,
+            question=body.question,
+            mode=body.mode,
+            parent_run_id=body.parent_run_id,
         )
     except ExternalDisabled:
         raise HTTPException(409, "云端业务未启用：需单独配置正式额度和预算准入。") from None
@@ -90,7 +98,7 @@ def documents(project_id: UUID, user: Identity = Depends(identity)):
                 sa.select(T["document_parses"].c.id)
                 .where(
                     T["document_parses"].c.version_id == r["id"],
-                    T["document_parses"].c.parser_name == "mineru-native",
+                    T["document_parses"].c.parser_name.in_(["mineru-native", "pdfplumber-structure"]),
                     T["document_parses"].c.status == "ready",
                 )
                 .order_by(T["document_parses"].c.revision_no.desc())
@@ -130,18 +138,35 @@ def documents(project_id: UUID, user: Identity = Depends(identity)):
 @router.get("/projects/{project_id}/runs")
 def history(project_id: UUID, user: Identity = Depends(identity)):
     with tenant_transaction(user.user_id) as conn:
-        rows = conn.execute(
-            sa.select(T["runs"])
-            .where(T["runs"].c.project_id == project_id, T["runs"].c.kind.in_(["research_build", "research_qa"]))
-            .order_by(T["runs"].c.created_at.desc())
-            .limit(20)
-        ).mappings()
+        rows = (
+            conn.execute(
+                sa.select(T["runs"])
+                .where(T["runs"].c.project_id == project_id, T["runs"].c.kind.in_(["research_build", "research_qa"]))
+                .order_by(T["runs"].c.created_at.desc())
+                .limit(20)
+            )
+            .mappings()
+            .all()
+        )
+        reviews = {}
+        if rows:
+            for event in conn.execute(
+                sa.select(T["audit_events"])
+                .where(
+                    T["audit_events"].c.project_id == project_id,
+                    T["audit_events"].c.action == "research_answer_source_review",
+                    T["audit_events"].c.subject_json["run_id"].astext.in_([str(r["id"]) for r in rows]),
+                )
+                .order_by(T["audit_events"].c.created_at.desc())
+            ).mappings():
+                reviews.setdefault(event["subject_json"]["run_id"], event["safe_payload"])
         return [
             {
                 **public_run(r),
                 "question": r["input_json"].get("question"),
                 "mode": r["config_json"].get("mode"),
                 "model_preset": r["config_json"].get("models", {}).get("preset"),
+                "scientific_review": reviews.get(str(r["id"])),
             }
             for r in rows
         ]

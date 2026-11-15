@@ -51,7 +51,9 @@ def models(user: Identity = Depends(identity)):
         status["own_simulated_call_counts"] = [
             dict(r)
             for r in conn.execute(
-                sa.text("SELECT provider,state,count(*) AS count FROM model_runtime.calls WHERE simulated GROUP BY provider,state")
+                sa.text(
+                    "SELECT provider,state,count(*) AS count FROM model_runtime.calls WHERE simulated GROUP BY provider,state"
+                )
             ).mappings()
         ]
     return status
@@ -74,8 +76,37 @@ def project_models(project: UUID, user: Identity = Depends(identity)):
                 {"p": project},
             ).mappings()
         ]
+        for role, spec in selection.roles.items():
+            receipt = (
+                conn.execute(
+                    sa.text(
+                        "SELECT state,receipt_json,created_at FROM model_runtime.calls WHERE project_id=:p AND role=:r AND provider=:v AND model=:m AND NOT simulated ORDER BY created_at DESC LIMIT 1"
+                    ),
+                    {"p": project, "r": role, "v": spec.provider, "m": spec.model},
+                )
+                .mappings()
+                .first()
+            )
+            if receipt:
+                status["roles"][role]["verification_state"] = (
+                    "received_valid_response" if receipt["state"] == "succeeded" else "last_attempt_not_successful"
+                )
+                status["roles"][role]["last_checked_at"] = receipt["created_at"]
+                dimensions = receipt["receipt_json"].get("dimensions")
+                if role == "embedding" and receipt["state"] == "succeeded" and type(dimensions) is int:
+                    status["roles"][role]["dimensions"] = dimensions
+                    status["roles"][role]["dimensions_state"] = "native_receipt_proved"
         return {
             **status,
+            "production_policies": [
+                dict(r)
+                for r in conn.execute(
+                    sa.text(
+                        "SELECT role,provider,model,enabled,request_limit,requests_used,ends_at FROM model_runtime.production_policies WHERE project_id=:p ORDER BY starts_at DESC LIMIT 20"
+                    ),
+                    {"p": project},
+                ).mappings()
+            ],
             "bounded_validations": validations,
             "fingerprint": selection.snapshot()["fingerprint"],
             "requires_reindex": row["preferences"].get("model_configuration", {}).get("requires_reindex", False)

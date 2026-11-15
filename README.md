@@ -6,11 +6,11 @@
 
 ## 当前状态
 
-2026-11-13：需求、技术、架构、数据设计和环境方案均已确认。**M0 已验收，M1 文献导入与本地预览已实现**，详见[初始化验收报告](docs/initialization-report.md)。文献库和原文预览已可使用；M2 离线业务链路已接通（76 项测试通过），含合成深解析、混合检索、持久化问答与引用定位，见 [本批报告](docs/m2/business-report.md)。外部服务关闭，合成演示不代表科研效果。真实 OCR、翻译、问答及其余模块待后续增量开发。见 [M1 验收报告](docs/m1-report.md)。
+2026-11-16：六模块已有可操作的本地工作室。已完成唯一授权 15 页扫描件的真实 158 点 / 4,096 维混合索引、五个固定官方单篇问题的原文复核、全文翻译、摘要与论文框架。云端批次使用 74/80 次后已关闭，剩余六次封存；当前不会因选择模型或填写 Key 自动请求。历史错误、失败及 unknown 均保留。
 
-模型层已拆分为能力目录、协议、传输、幂等执行和工作流端口。最新真实联调已完成标准论文两段短文本的 RAG 样例，以及唯一授权扫描件的 15 页 OCR；完整回归 156 项通过。**项目尚未满足比赛六模块总验收**，正式 OCR 入库、全文问答与其余模块仍需开发。见[真实报告](docs/models/live-official-report.md)、[比赛差距](docs/competition/audit-2026-11-14.md)及[下一增量评审](docs/m2/live-business-review.md)。
+23 篇实际论文已本地结构解析，用于候选引用图谱；541 页教材完成本地文本层解析。CSV 可导出图像、原始数据、配置和可重跑脚本；拓扑文本可生成 Mermaid 和源码。检索追踪、反馈推荐、后续研究核验已有接口及合成契约验证，但真实外部检索与跨论文科研质量仍待验收。**尚未达到比赛全部验收要求**，也未完成公网演示、视频和技术 PDF。详见[本批验收](docs/studio/report-2026-11-16.md)及[比赛差距清单](docs/competition/audit-2026-11-16.md)。
 
-多模型配置已实现（114 项回归通过）：默认选择 ChatAnywhere 文本模型＋OpenRouter Nemotron 免费向量/重排，本地/合成配置保留。密钥存在性已检测，实际权限、免费额度与推理仍未验证，见[配置说明](docs/models/configuration.md)和[本批报告](docs/models/report.md)。常用选项在根目录 `model_config.py`，真实请求保持关闭。
+统一配置位于 `model_config.py`；能力目录、协议、传输、执行准入与业务工作流分离，保留 mock/local/free_api/free_gemma。新任务冻结配置，向量模型或维度变化必须新建 profile、重建后切换；旧索引和历史任务保留。见[模型设计](docs/models/adapter-design.md)。
 
 PyCharm 已绑定本项目 `.venv/bin/python`（3.12.16）。日常选择 **ScholarShip All** 或直接运行 `dev.py`；页面为 http://127.0.0.1:15173 ，API 文档为 http://127.0.0.1:18080/docs 。数据库等基础容器需已启动。
 
@@ -23,7 +23,7 @@ PyCharm 已绑定本项目 `.venv/bin/python`（3.12.16）。日常选择 **Scho
 | 项目架构 | 已确认 | [架构设计](docs/architecture.md)、[评审结论](docs/architecture-review.md) |
 | 数据库与向量库设计 | 已确认 | [关系库设计](docs/data-design.md)、[向量库设计](docs/vector-design.md)、[数据字典](docs/data-dictionary.md)、[评审结论](docs/data-design-review.md) |
 | 环境与脚手架 | 已初始化、已验收 | [环境与脚手架方案](docs/environment-plan.md)、[初始化评审单](docs/environment-review.md) |
-| 业务开发与比赛提交 | 待逐批确认与开发 | [验收矩阵](docs/acceptance.md)作为后续开发依据 |
+| 业务开发与比赛提交 | 六模块开发与分项验收，提交物待完成 | [验收矩阵](docs/acceptance.md)作为后续开发依据 |
 
 每个阶段先提供可评审产物，经用户确认后推进。架构评审通过不代表数据设计、初始化或购买云服务已确认。
 

@@ -132,20 +132,77 @@ class ProductionGateway(AbstractContextManager):
             if result.simulated or not transport.used:
                 raise ContractError("production_receipt_without_dispatch")
             receipt = asdict(result)
+            usage = receipt["usage"]
+            if usage.get("total_tokens") is None:
+                if usage.get("input_tokens") is not None and usage.get("output_tokens") is not None:
+                    usage["total_tokens"] = usage["input_tokens"] + usage["output_tokens"]
+                    usage["total_tokens_basis"] = "input_plus_output"
+                elif role in {"embedding", "rerank"} and usage.get("input_tokens") is not None:
+                    usage["total_tokens"] = usage["input_tokens"]
+                    usage["total_tokens_basis"] = "non_generating_input_only"
+            raw = client.last_response or {}
+            cost = (raw.get("usage") or {}).get("cost")
+            if cost is not None:
+                from decimal import Decimal, InvalidOperation
+
+                try:
+                    if Decimal(str(cost)) != 0:
+                        raise ContractError("unexpected_paid_usage")
+                except InvalidOperation:
+                    raise ContractError("invalid_reported_cost") from None
+            receipt["cost_verification"] = "reported_zero" if cost is not None else "not_reported_free_policy_only"
             ModelExecutor(self.owner).finish(cid, "succeeded", receipt)
             self.settle(cid, receipt)
             return receipt
         except Exception as exc:
             if transport.used:
                 with tenant_transaction(self.owner) as conn:
+                    conn.execute(sa.text("SELECT model_runtime.suspend_production(:id)"), {"id": cid})
+                with tenant_transaction(self.owner) as conn:
                     state = conn.scalar(sa.text("SELECT state FROM model_runtime.calls WHERE id=:id"), {"id": cid})
                 if state == "sent":
                     final = "rejected" if isinstance(exc, ProviderFailure) and not exc.unknown else "unknown"
+                    import json
+                    import re
+
+                    diagnostic_file_id = None
+                    response = client.last_response or {}
+                    choices = response.get("choices")
+                    if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+                        message = choices[0].get("message", {})
+                        content = message.get("content") if isinstance(message, dict) else None
+                        if isinstance(content, str):
+                            secret = credential(spec.provider)
+                            if secret:
+                                content = content.replace(secret, "<credential-redacted>")
+                            content = re.sub(r"sk-[A-Za-z0-9_-]{12,}", "<credential-redacted>", content[:20000])
+                            from scholarship.domains.deep_parse import persist_file
+
+                            with tenant_transaction(self.owner) as conn:
+                                diagnostic_file_id = persist_file(
+                                    conn,
+                                    self.owner,
+                                    json.dumps(
+                                        {
+                                            "model_call_id": str(cid),
+                                            "content": content,
+                                            "finish_reason": client.failure_diagnostic()["finish_reason"],
+                                        },
+                                        ensure_ascii=False,
+                                    ).encode(),
+                                    "json",
+                                    "application/json",
+                                )
                     ModelExecutor(self.owner).finish(
                         cid,
                         final,
                         {
                             "simulated": False,
+                            "contract_code": str(exc)
+                            if isinstance(exc, ContractError) and re.fullmatch(r"[a-z_]{1,100}", str(exc))
+                            else None,
+                            "finish_reason": client.failure_diagnostic()["finish_reason"],
+                            "diagnostic_file_id": str(diagnostic_file_id) if diagnostic_file_id else None,
                             "error_code": exc.code
                             if isinstance(exc, ProviderFailure)
                             else "production_response_unknown",

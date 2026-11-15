@@ -27,7 +27,9 @@ def execute_offline(owner, project, run_id):
                 .where(
                     T["runs"].c.id == run_id,
                     T["runs"].c.project_id == project,
-                    T["runs"].c.kind.in_(["offline_build", "offline_qa", "research_build", "research_qa"]),
+                    T["runs"].c.kind.in_(
+                        ["offline_build", "offline_qa", "research_build", "research_qa", "research_studio"]
+                    ),
                 )
                 .with_for_update()
             )
@@ -122,7 +124,11 @@ def execute_offline(owner, project, run_id):
     error = None
     status = "succeeded"
     try:
-        if r["kind"].startswith("research_"):
+        if r["kind"] == "research_studio":
+            from scholarship.domains.studio.workflow import execute
+
+            result = execute(owner, project, run_id)
+        elif r["kind"].startswith("research_"):
             result = execute_research(owner, project, run_id)
         else:
             result = (
@@ -136,9 +142,28 @@ def execute_offline(owner, project, run_id):
     except UnknownOutcome:
         status = "waiting_user"
         error = {"code": "offline_call_unknown_reconcile_required"}
-    except ContractError:
+    except ContractError as exc:
+        if r["config_json"].get("mode") == "cloud":
+            with tenant_transaction(owner) as conn:
+                calls = (
+                    conn.execute(
+                        sa.text(
+                            "SELECT id FROM model_runtime.calls WHERE run_id=:r AND NOT simulated ORDER BY created_at DESC LIMIT 1"
+                        ),
+                        {"r": run_id},
+                    )
+                    .scalars()
+                    .all()
+                )
+                for cid in calls:
+                    conn.execute(sa.text("SELECT model_runtime.suspend_production(:id)"), {"id": cid})
         status = "failed"
-        error = {"code": "offline_contract_rejected"}
+        import re
+
+        error = {
+            "code": "offline_contract_rejected",
+            "contract_code": str(exc) if re.fullmatch(r"[a-z_]{1,100}", str(exc)) else None,
+        }
     except Exception as exc:
         status = "queued" if attempts + 1 < 3 else "failed"
         error = {"code": "offline_dependency_failure", "type": type(exc).__name__}

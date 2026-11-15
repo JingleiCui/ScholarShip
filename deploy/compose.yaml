@@ -100,7 +100,7 @@ services:
       SESSION_SECRET: ""
     command: [python, -m, celery, -A, "scholarship.workers.celery_app:app", beat, --loglevel=WARNING, --schedule, /app/var/celerybeat-container]
     volumes: ["${SCHOLAR_SHARED_DATA_DIR:-./var}:/app/var"]
-    mem_limit: 192m
+    mem_limit: 384m
     depends_on:
       api: {condition: service_healthy}
     restart: unless-stopped

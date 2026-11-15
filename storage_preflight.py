@@ -3,7 +3,7 @@
 from pathlib import Path
 import hashlib
 import sqlalchemy as sa
-from scholarship.infrastructure.initialize import admin_engine
+from scholarship.infrastructure.database import engine
 
 # USER CONFIGURATION: shared by local mode and Docker Compose.
 SHARED_DATA_DIR = Path(__file__).resolve().parent / "var"
@@ -15,7 +15,7 @@ def verify_storage(db, data_dir=SHARED_DATA_DIR, check_hashes=CHECK_HASHES):
     checked = missing = invalid = 0
     with db.connect() as conn:
         rows = conn.execute(
-            sa.text("SELECT storage_key,byte_size,sha256 FROM scholar.file_objects WHERE state='ready'")
+            sa.text("SELECT storage_key,byte_size,sha256 FROM scholar.storage_manifest()")
         )
         for key, size, sha in rows:
             checked += 1
@@ -37,7 +37,7 @@ def verify_storage(db, data_dir=SHARED_DATA_DIR, check_hashes=CHECK_HASHES):
 
 
 def main():
-    db = admin_engine()
+    db = engine("runtime")
     try:
         report = verify_storage(db)
         print(report)

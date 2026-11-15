@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 CATALOG_PATH = Path(__file__).with_name("schema_catalog.json")
-REVISION = "0010_profile_input_policy"
+REVISION = "0013_storage_manifest"
 
 
 def constraint_name(kind: str, table: str, detail: str) -> str:

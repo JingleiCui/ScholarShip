@@ -2,7 +2,7 @@ FROM node:24.22.3-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b
 WORKDIR /web
 RUN npm install --global pnpm@11.28.11 --ignore-scripts --no-audit --no-fund
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile --network-concurrency=4 --fetch-timeout=120000
 COPY frontend/ ./
 RUN pnpm build
 FROM caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0

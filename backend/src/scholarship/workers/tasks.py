@@ -56,6 +56,7 @@ def dispatch():
                 "offline_qa": "scholarship.execute_offline",
                 "research_build": "scholarship.execute_offline",
                 "research_qa": "scholarship.execute_offline",
+                "research_studio": "scholarship.execute_offline",
                 "system_probe": "scholarship.execute_probe",
             }[row["command"]],
             args=[str(row["owner_id"]), str(row["project_id"]), str(row["run_id"])],
@@ -174,3 +175,18 @@ def execute_probe(owner, project, run_id):
                 "error": error,
             },
         )
+
+
+@app.task(name="scholarship.metadata_dispatch")
+def metadata_dispatch():
+    with engine().begin() as conn:
+        rows = conn.execute(sa.text("SELECT * FROM scholar.due_metadata_subscriptions(5)")).mappings().all()
+    for row in rows:
+        metadata_subscription.delay(str(row["owner_id"]), str(row["project_id"]), str(row["id"]))
+
+
+@app.task(name="scholarship.metadata_subscription")
+def metadata_subscription(owner, project, subscription):
+    from scholarship.domains.studio.discovery import run_subscription
+
+    return run_subscription(UUID(owner), UUID(project), UUID(subscription))
