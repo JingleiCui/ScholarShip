@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { api as request, errorMessage } from "./researchApi";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import * as pdfjs from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+import type { Target } from "./SourceReader";
+const SourceReader = lazy(() => import("./SourceReader"));
 type Paper = {
   id: string;
   title: string;
@@ -9,6 +12,9 @@ type Paper = {
   metadata_json: { page_count: number };
 };
 type Parse = {
+  parser_name:string;
+  revision_no:number;
+  mode:string;
   version_id: string;
   id: string;
   status: string;
@@ -17,21 +23,7 @@ type Parse = {
   error_json?: unknown;
   result_json?: unknown;
 };
-async function request(path: string, init?: RequestInit) {
-  const csrf =
-    document.cookie
-      .split("; ")
-      .find((x) => x.startsWith("ss_csrf="))
-      ?.split("=")[1] ?? "";
-  const r = await fetch("/api/v1" + path, {
-    ...init,
-    headers: { "X-CSRF-Token": csrf, ...init?.headers },
-  });
-  if (!r.ok)
-    throw new Error(`请求失败 ${r.status}：${(await r.text()).slice(0, 180)}`);
-  return r.json();
-}
-export default function Library({ project }: { project: string }) {
+export default function Library({ project, onResearch }: { project: string; onResearch?: () => void }) {
   const [papers, setPapers] = useState<Paper[]>([]),
     [selected, setSelected] = useState<Paper | null>(null),
     [parses, setParses] = useState<Parse[]>([]),
@@ -43,6 +35,10 @@ export default function Library({ project }: { project: string }) {
     [reviews, setReviews] = useState<
       { id: string; candidate_json: { papers: { title: string }[] } }[]
     >([]);
+  const [parseChoice,setParseChoice] = useState("");
+  const [notice,setNotice] = useState("");
+  const [readerTarget,setReaderTarget] = useState<Target|null>(null);
+  const currentParse = parses.find(p=>p.id===parseChoice) ?? parses.find(p=>p.parser_name==="mineru-native" && p.status==="ready") ?? parses[0];
   const rendering = useRef<pdfjs.RenderTask | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null),
     pdf = useRef<pdfjs.PDFDocumentProxy | null>(null);
@@ -59,6 +55,7 @@ export default function Library({ project }: { project: string }) {
     setParses([]);
     setReviews([]);
     setError("");
+    setNotice("");setParseChoice("");setReaderTarget(null);
     if (project)
       void Promise.all([
         request(`/projects/${project}/papers`),
@@ -71,7 +68,7 @@ export default function Library({ project }: { project: string }) {
           }
         })
         .catch((e) => {
-          if (!cancelled) setError(String(e));
+          if (!cancelled) setError(errorMessage(e));
         });
     return () => {
       cancelled = true;
@@ -88,7 +85,7 @@ export default function Library({ project }: { project: string }) {
         );
         if (!cancelled) setParses(rows);
       } catch (e) {
-        if (!cancelled) setError(String(e));
+        if (!cancelled) setError(errorMessage(e));
       }
     }
     void poll();
@@ -111,12 +108,12 @@ export default function Library({ project }: { project: string }) {
           pdf.current = d;
           setPage(1);
           void render(d, 1).catch((e) => {
-            if (!cancelled) setError(String(e));
+            if (!cancelled) setError(errorMessage(e));
           });
         } else void loading.destroy();
       })
       .catch((e) => {
-        if (!cancelled) setError(String(e));
+        if (!cancelled) setError(errorMessage(e));
       });
     return () => {
       cancelled = true;
@@ -146,11 +143,11 @@ export default function Library({ project }: { project: string }) {
   }
   useEffect(() => {
     if (pdf.current)
-      void render(pdf.current, page).catch((e) => setError(String(e)));
+      void render(pdf.current, page).catch((e) => setError(errorMessage(e)));
   }, [page]);
   useEffect(() => {
     let cancelled = false;
-    const p = parses[0];
+    const p = currentParse;
     setText("正在加载对应页的文本…");
     if (p && p.version_id === selected?.version_id)
       void request(`/parses/${p.id}/pages/${page}`)
@@ -170,7 +167,7 @@ export default function Library({ project }: { project: string }) {
     return () => {
       cancelled = true;
     };
-  }, [page, parses, selected]);
+  }, [page, currentParse?.id, currentParse?.status, currentParse?.completed_pages, selected?.version_id]);
   async function upload(file: File) {
     setBusy(true);
     setError("");
@@ -184,17 +181,21 @@ export default function Library({ project }: { project: string }) {
         body: data,
       });
       await refresh();
+      setNotice(result.reused ? "检测到内容完全相同的 PDF，已复用原版本；没有创建重复文献。" : "PDF 已导入本地，正在逐页生成预览。新文件尚未深解析或建立问答索引。");
+      const importedPapers:Paper[] = await request(`/projects/${project}/papers`);
+      const imported = importedPapers.find(p=>p.version_id===result.version_id);
+      if (imported && imported.version_id !== selected?.version_id) {setSelected(imported);setPage(1);setParses([]);setParseChoice("");}
       if (result.review_id)
         setError("发现同标题候选，已保留两个载体，等待去重核验。");
     } catch (e) {
-      setError(String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
   }
   return (
     <section className="task-panel library" style={{ marginBottom: 24 }}>
-      <h2>文献库 · 本地预览</h2>
+      <h2>文献库 · 原文与解析版本</h2>
       {selected && (
         <label>
           <input
@@ -205,7 +206,7 @@ export default function Library({ project }: { project: string }) {
           将下次导入明确作为当前作品的新文件版本
         </label>
       )}
-      <p>原件按账号隔离；当前为页级文本预览，尚未深解析或建立问答索引。</p>
+      <p>原件按账号隔离。导入只生成本地预览；已完成的 OCR 可在解析修订中选择。尚无深解析的文献不能直接用于证据问答。</p>
       {project ? (
         <label className="primary">
           {busy ? "正在导入…" : "导入 PDF"}
@@ -217,6 +218,7 @@ export default function Library({ project }: { project: string }) {
             style={{ display: "block", marginTop: 12 }}
             onChange={(e) => {
               const f = e.target.files?.[0];
+              e.currentTarget.value = "";
               if (f) void upload(f);
             }}
           />
@@ -224,6 +226,7 @@ export default function Library({ project }: { project: string }) {
       ) : (
         <p>请先登录研究空间。</p>
       )}
+      {notice && <p role="status">{notice}</p>}
       {error && (
         <p role="alert" className="error">
           {error}
@@ -243,7 +246,7 @@ export default function Library({ project }: { project: string }) {
                   body: JSON.stringify({ decision: d }),
                 })
                   .then(() => refresh())
-                  .catch((e) => setError(String(e)))
+                  .catch((e) => setError(errorMessage(e)))
               }
             >
               {d === "keep_both" ? "保留两份独立记录" : "拒绝本次新增记录"}
@@ -258,7 +261,7 @@ export default function Library({ project }: { project: string }) {
           <button
             className="module-card"
             key={p.version_id}
-            onClick={() => setSelected(p)}
+            onClick={() => {setSelected(p);setParses([]);setParseChoice("");setReaderTarget(null);setError("");setNotice("");}}
           >
             {p.title}
             <small style={{ display: "block" }}>
@@ -267,23 +270,27 @@ export default function Library({ project }: { project: string }) {
           </button>
         ))}
       </div>
+      {readerTarget && <Suspense fallback={<p>正在加载结构化原文…</p>}><SourceReader key={`${readerTarget.parse_id}:${readerTarget.page}`} target={readerTarget} close={()=>setReaderTarget(null)} /></Suspense>}
       {selected && (
         <>
           <h3>{selected.title}</h3>
+          {parses.length>0 && <label>解析修订 <select aria-label="解析修订" value={currentParse?.id ?? ""} onChange={e=>setParseChoice(e.target.value)}>{parses.map(p=><option key={p.id} value={p.id}>修订 {p.revision_no} · {p.parser_name==="mineru-native" ? "OCR 深解析" : "本地预览"} · {p.completed_pages}/{p.expected_pages} 页</option>)}</select></label>}
+          {currentParse?.parser_name==="mineru-native" && <button onClick={()=>setReaderTarget({version_id:selected.version_id,parse_id:currentParse.id,page})}>阅读结构化原文</button>}
+          {onResearch && <button onClick={onResearch}>前往证据问答</button>}
           <p>
-            {parses[0]
-              ? `${parses[0].status} · ${parses[0].completed_pages}/${parses[0].expected_pages} 页`
+            {currentParse
+              ? `${currentParse.status} · ${currentParse.completed_pages}/${currentParse.expected_pages} 页`
               : "等待解析"}{" "}
             · 阅读顺序未核验
           </p>
-          {(parses[0]?.status === "failed" ||
-            (parses[0]?.status === "partial" &&
-              parses[0].completed_pages < parses[0].expected_pages)) && (
+          {(currentParse?.status === "failed" ||
+            (currentParse?.status === "partial" &&
+              currentParse.completed_pages < currentParse.expected_pages)) && (
             <button
               onClick={() =>
-                void request(`/parses/${parses[0].id}/resume`, {
+                void request(`/parses/${currentParse.id}/resume`, {
                   method: "POST",
-                }).catch((e) => setError(String(e)))
+                }).catch((e) => setError(errorMessage(e)))
               }
             >
               继续未完成页
@@ -293,7 +300,7 @@ export default function Library({ project }: { project: string }) {
             onClick={() =>
               void request(`/paper-versions/${selected.version_id}/parses`, {
                 method: "POST",
-              }).catch((e) => setError(String(e)))
+              }).catch((e) => setError(errorMessage(e)))
             }
           >
             新增解析修订
@@ -302,7 +309,7 @@ export default function Library({ project }: { project: string }) {
             <summary>解析诊断</summary>
             <pre style={{ whiteSpace: "pre-wrap" }}>
               {JSON.stringify(
-                parses[0]?.error_json ?? parses[0]?.result_json,
+                currentParse?.error_json ?? currentParse?.result_json,
                 null,
                 2,
               )}

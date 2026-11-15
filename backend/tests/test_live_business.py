@@ -557,3 +557,51 @@ def test_switch_back_embedding_builds_new_generation_and_old_resume_cannot_rollb
             .all()
         )
         assert configs[0] == configs[1]
+
+
+def test_user_journey_readiness_matches_model_switch_and_blocks_before_queue(case, signed_client):
+    owner, project = case
+    vid, _ = imported(case, signed_client)
+
+    def doc():
+        response = signed_client.get(f"/api/v1/research/projects/{project}/documents")
+        assert response.status_code == 200
+        return next(d for d in response.json() if d["id"] == str(vid))
+
+    assert not doc()["can_query_offline"]
+    run = enqueue_research(owner, project, uuid4().hex, "research_build", [vid])
+    execute_offline(str(owner), str(project), str(run["id"]))
+    assert doc()["can_query_offline"] and not doc()["can_query_cloud"]
+    with tenant_transaction(owner) as conn:
+        original = conn.scalar(sa.select(T["paper_versions"].c.active_index_id).where(T["paper_versions"].c.id == vid))
+        before = conn.scalar(sa.select(sa.func.count()).select_from(T["runs"]).where(T["runs"].c.project_id == project))
+        conn.execute(
+            T["projects"]
+            .update()
+            .where(T["projects"].c.id == project)
+            .values(preferences={"model_configuration": {"preset": "mock", "overrides": {}}})
+        )
+    assert not doc()["can_query_offline"]
+    response = signed_client.post(
+        f"/api/v1/research/projects/{project}/questions",
+        json={"version_ids": [str(vid)], "question": "NVIDIA P100?"},
+        headers={"Idempotency-Key": uuid4().hex},
+    )
+    assert response.status_code == 409 and response.json()["detail"] == "embedding_profile_requires_rebuild"
+    with tenant_transaction(owner) as conn:
+        assert (
+            conn.scalar(sa.select(sa.func.count()).select_from(T["runs"]).where(T["runs"].c.project_id == project))
+            == before
+        )
+        assert (
+            conn.scalar(sa.select(T["paper_versions"].c.active_index_id).where(T["paper_versions"].c.id == vid))
+            == original
+        )
+    run = enqueue_research(owner, project, uuid4().hex, "research_build", [vid])
+    execute_offline(str(owner), str(project), str(run["id"]))
+    assert doc()["can_query_offline"] and not doc()["can_query_cloud"]
+
+
+def test_document_readiness_does_not_leak_other_project(signed_client, accounts):
+    other = accounts["reviewer"]["project"]["id"]
+    assert signed_client.get(f"/api/v1/research/projects/{other}/documents").status_code == 404

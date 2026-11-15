@@ -107,7 +107,11 @@ function Sail({ small = false }: { small?: boolean }) {
   );
 }
 function App() {
-  const [active, setActive] = useState(-1),
+  const [active, setActive] = useState(() => {
+    const value = new URLSearchParams(window.location.hash.slice(1)).get("module");
+    const index = value === null ? -1 : Number(value);
+    return Number.isInteger(index) && index >= -1 && index < modules.length ? index : -1;
+  }),
     [health, setHealth] = useState<Health | null>(null),
     [user, setUser] = useState<User | null>(null),
     [projects, setProjects] = useState<Project[]>([]),
@@ -121,6 +125,10 @@ function App() {
     [events, setEvents] = useState<Event[]>([]),
     [streamState, setStreamState] = useState("");
   const stream = useRef<EventSource | null>(null);
+  useEffect(() => {
+    const hash = active === -1 ? "" : `#module=${active}`;
+    window.history.replaceState(null,"",window.location.pathname + window.location.search + hash);
+  },[active]);
   async function refresh() {
     try {
       setHealth(await api<Health>("/health/ready"));
@@ -301,13 +309,14 @@ function App() {
           </div>
         </header>
         <div className="content">
+          {active >= 3 && <section className="task-panel" role="status"><h2>{modules[active].title} · 待开发</h2><p>该模块尚未实现，当前不能提交或执行研究任务。可先使用文献管理、原文阅读和离线证据问答。</p><button onClick={()=>setActive(2)}>前往证据问答</button></section>}
           {active === -1 && <ServiceStatus userId={user?.id} />}
           {active === -1 && <ModelConfiguration key={`models:${user?.id}:${project}`} project={project} role={user?.role} />}
           {(active === -1 || active === 2) && <Research key={`research:${user?.id}:${project}`} project={project} role={user?.role} />}
           {(active === -1 || active === 2) && <OfflineResearch key={`offline:${user?.id}:${project}`} project={project} userId={user?.id} role={user?.role} />}
           {(active === 0 || active === 1) && (
             <React.Suspense fallback={<p>正在加载文献阅读器…</p>}>
-              <Library project={project} />
+              <Library project={project} onResearch={()=>setActive(2)} />
             </React.Suspense>
           )}
           <section className="hero">

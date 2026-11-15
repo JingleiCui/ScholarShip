@@ -510,6 +510,20 @@ def receipt_vector(text):
     return vector(text)
 
 
+def profile_matches(actual, selection, *, simulated):
+    from scholarship.models.catalog import binding_snapshot
+
+    configured = selection.roles["embedding"]
+    return (
+        actual["provider"] == configured.provider
+        and actual["model_name"] == configured.model
+        and actual["config_json"].get("simulated") is simulated
+        and actual["config_json"].get("base_url") == configured.base_url
+        and actual["config_json"].get("adapter_binding") == binding_snapshot(configured, "embedding")
+        and (configured.dimensions is None or actual["dimensions"] == configured.dimensions)
+    )
+
+
 def snapshot(owner, project, versions, *, model_selection=None, simulated=True):
     with tenant_transaction(owner) as conn:
         p = profile(conn) if model_selection is None else None
@@ -533,21 +547,12 @@ def snapshot(owner, project, versions, *, model_selection=None, simulated=True):
             if not g:
                 raise ContractError("matching_ready_generation_required")
             if model_selection is not None:
-                from scholarship.models.catalog import binding_snapshot
-
-                configured = model_selection.roles["embedding"]
                 actual = (
                     conn.execute(sa.select(T["index_profiles"]).where(T["index_profiles"].c.id == g["profile_id"]))
                     .mappings()
                     .one()
                 )
-                if (
-                    actual["provider"] != configured.provider
-                    or actual["model_name"] != configured.model
-                    or actual["config_json"].get("simulated") is not simulated
-                    or actual["config_json"].get("adapter_binding") != binding_snapshot(configured, "embedding")
-                    or (configured.dimensions is not None and actual["dimensions"] != configured.dimensions)
-                ):
+                if not profile_matches(actual, model_selection, simulated=simulated):
                     raise ContractError("embedding_profile_requires_rebuild")
             result.append({k: str(g[k]) for k in ["id", "version_id", "parse_id", "profile_id", "collection_name"]})
         return result

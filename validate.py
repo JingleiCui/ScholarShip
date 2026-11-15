@@ -106,6 +106,7 @@ def main():
                 "verify_m2.py",
                 "verify_m2_business.py",
                 "verify_m2_live_business.py",
+                "verify_user_journey.py",
                 "verify_models.py",
                 "validate_live_models.py",
                 "model_config.py",

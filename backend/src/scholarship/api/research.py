@@ -9,7 +9,8 @@ import sqlalchemy as sa
 from scholarship.api.auth import Identity, identity
 from scholarship.api.offline import demo_actor, evidence
 from scholarship.adapters.providers import ContractError, ExternalDisabled
-from scholarship.domains.research import enqueue_research
+from scholarship.domains.research import enqueue_research, project_selection
+from scholarship.domains.indexing import profile_matches
 from scholarship.domains.deep_parse import version_scope
 from scholarship.domains.runs import public_run
 from scholarship.infrastructure.database import tenant_transaction
@@ -62,6 +63,7 @@ def ask(
 
 @router.get("/projects/{project_id}/documents")
 def documents(project_id: UUID, user: Identity = Depends(identity)):
+    selection = project_selection(user.user_id, project_id)
     with tenant_transaction(user.user_id) as conn:
         rows = (
             conn.execute(
@@ -95,16 +97,28 @@ def documents(project_id: UUID, user: Identity = Depends(identity)):
                 .limit(1)
             )
             model_simulated = None
+            readiness = {"can_query_offline": False, "can_query_cloud": False}
             if r["active_index_id"]:
-                config = conn.scalar(
-                    sa.select(T["index_profiles"].c.config_json)
-                    .join(T["index_generations"], T["index_generations"].c.profile_id == T["index_profiles"].c.id)
-                    .where(T["index_generations"].c.id == r["active_index_id"])
+                active_profile = (
+                    conn.execute(
+                        sa.select(T["index_profiles"], T["index_generations"].c.status.label("generation_status"))
+                        .join(T["index_generations"], T["index_generations"].c.profile_id == T["index_profiles"].c.id)
+                        .where(T["index_generations"].c.id == r["active_index_id"])
+                    )
+                    .mappings()
+                    .first()
                 )
-                model_simulated = config.get("simulated") if config else None
+                if active_profile:
+                    model_simulated = active_profile["config_json"].get("simulated")
+                    if active_profile["generation_status"] == "ready":
+                        readiness = {
+                            "can_query_offline": profile_matches(active_profile, selection, simulated=True),
+                            "can_query_cloud": profile_matches(active_profile, selection, simulated=False),
+                        }
             result.append(
                 {
                     **dict(r),
+                    **readiness,
                     "native_parse_id": native,
                     "model_simulated": model_simulated,
                     "native_index_stale": bool(native and r["active_index_id"] and native != r["active_parse_id"]),
