@@ -16,3 +16,14 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 .DS_Store
+# Local/private export and signing material
+*.log
+*.sqlite
+*.sqlite3
+*.pem
+*.key
+*.p12
+*.pfx
+/materials/
+/private/
+/backups/
