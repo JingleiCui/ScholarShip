@@ -27,3 +27,5 @@
 
 - The completed real translation contains 167 segments and retains literal formula/code/HTML locally; successful parts have receipt provenance, older failures remain failed. Real summary/draft outputs have local editorial derivatives, source-block anchors and scan-front-matter bibliography explicitly marked self-reported, not externally verified. These are drafts, not independently verified scientific claims.
 - The 541-page textbook was parsed locally as text-layer structure (541 pages, four empty-text pages, no OCR or model calls). This is not an OCR or semantic table/formula quality acceptance. See docs/studio/report-2026-11-16.md and docs/competition/audit-2026-11-16.md for final scope.
+
+- Brand update authorized 2026-11-16: ScholarShip / 学者之舟, tagline 学海无涯，AI作舟. Use blue-white top navigation and vertical content flow; no persistent left/right navigation rails. UI redesign must expose implemented workflows only; generated concept data is not live application data. See docs/studio/topnav-redesign-2026-11-16.md.

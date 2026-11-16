@@ -247,39 +247,30 @@ function App() {
   };
   return (
     <div className="shell">
-      <aside className="sidebar">
+      <div className="site-nav">
         <a className="brand" href="#" onClick={() => setActive(-1)}>
           <Sail small />
           <div>
-            ScholarShip<small>学 者 之 船</small>
+            ScholarShip<small>学者之舟</small>
           </div>
         </a>
-        <div className="workspace-label">RESEARCH WORKSPACE</div>
-        <nav>
+
+        <nav aria-label="主导航">
           <button className={active === -1 ? 'selected' : ''} onClick={() => setActive(-1)}>
-            <span>⌂</span>工作台
+            首页
           </button>
           {modules.map((m, i) => (
             <button key={m.en} className={active === i ? 'selected' : ''} onClick={() => setActive(i)}>
               <span>{m.icon}</span>
-              {m.title}
+              {['文献库', '阅读', '发现', '图谱', '写作', '绘图'][i]}
             </button>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <div className="compass">◉</div>
-          <p>学海无涯，AI 作舟。</p>
-          <small>每一条结论，都有来处。</small>
-          <div className="stage">
-            <span />
-            研究工作室 · 分项验收
-          </div>
-        </div>
-      </aside>
+      </div>
       <main>
         <header>
           <div className="breadcrumb">
-            我的工作空间 <span>/</span> {active < 0 ? '工作台' : modules[active].title}
+            学海无涯，AI作舟 <span>/</span> {active < 0 ? '工作台' : modules[active].title}
           </div>
           <div className="header-actions">
             {user && (
@@ -302,6 +293,17 @@ function App() {
           </div>
         </header>
         <div className="content">
+          {active === -1 && (
+            <section className="home-intro">
+              <div>
+                <h1>今天，继续探索。</h1>
+                <p>学海无涯，AI作舟</p>
+              </div>
+              <button className="primary" onClick={() => setActive(2)}>
+                向文献提问
+              </button>
+            </section>
+          )}
           {active >= 1 && (
             <React.Suspense fallback={<p>正在加载研究工具…</p>}>
               <Studio
@@ -312,14 +314,10 @@ function App() {
               />
             </React.Suspense>
           )}
-          {active === -1 && <ServiceStatus userId={user?.id} />}
-          {active === -1 && (
-            <ModelConfiguration key={`models:${user?.id}:${project}`} project={project} role={user?.role} />
-          )}
-          {(active === -1 || active === 2) && (
+          {active === 2 && (
             <Research key={`research:${user?.id}:${project}`} project={project} role={user?.role} />
           )}
-          {(active === -1 || active === 2) && (
+          {active === 2 && (
             <OfflineResearch
               key={`offline:${user?.id}:${project}`}
               project={project}
@@ -327,84 +325,13 @@ function App() {
               role={user?.role}
             />
           )}
-          {(active === 0 || active === 1) && (
+          {(active === -1 || active === 0 || active === 1) && (
             <React.Suspense fallback={<p>正在加载文献阅读器…</p>}>
               <Library project={project} onResearch={() => setActive(2)} />
             </React.Suspense>
           )}
           {active === -1 && (
             <>
-              <section className="hero">
-                <div>
-                  <div className="eyebrow">
-                    <span />
-                    EVIDENCE FIRST. EXPLORE FURTHER.
-                  </div>
-                  <h1>
-                    让每一次探索，
-                    <br />
-                    都有据可循<span>。</span>
-                  </h1>
-                  <p>
-                    从文献到洞察，从想法到成果。
-                    <br />
-                    在一个可追溯的工作空间里，推进你的研究。
-                  </p>
-                  <div className="hero-foot">
-                    <span className="step-number">01</span>
-                    <span>真实来源与模拟结果分别标记，逐项核验研究质量</span>
-                    <span className="long-arrow">⟶</span>
-                  </div>
-                </div>
-                <div className="hero-art">
-                  <div className="orbit orbit-one" />
-                  <div className="orbit orbit-two" />
-                  <div className="star s1">＋</div>
-                  <div className="star s2">＋</div>
-                  <div className="boat">
-                    <Sail />
-                  </div>
-                  <div className="wave w1" />
-                  <div className="wave w2" />
-                  <span className="art-caption">A VOYAGE INTO KNOWLEDGE</span>
-                </div>
-              </section>
-              <section className="environment">
-                <div className="section-top">
-                  <h2>
-                    环境状态 <span>LIVE</span>
-                  </h2>
-                  <button className="text-button" onClick={() => void refresh()}>
-                    刷新状态 ↻
-                  </button>
-                </div>
-                <div className="status-grid">
-                  <div className="service">
-                    <span className={`status-dot ${health?.ready ? 'ok' : ''}`} />
-                    <div>
-                      <strong>研究服务</strong>
-                      <small>{health?.ready ? '依赖与迁移就绪' : '正在检查或依赖未就绪'}</small>
-                    </div>
-                    <span className="service-mark">API</span>
-                  </div>
-                  {Object.entries(serviceNames).map(([key, name]) => (
-                    <div className="service" key={key}>
-                      <span className={`status-dot ${health?.services[key]?.ready ? 'ok' : ''}`} />
-                      <div>
-                        <strong>{name}</strong>
-                        <small>
-                          {health?.services[key]?.ready
-                            ? health.services[key].version?.split(' ')[0]
-                            : '未就绪'}
-                        </small>
-                      </div>
-                      <span className="service-mark">
-                        {key === 'postgresql' ? 'DB' : key === 'qdrant' ? 'VEC' : 'MQ'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </section>
               <section className="research">
                 <div className="section-top">
                   <div>
@@ -439,92 +366,137 @@ function App() {
                   ))}
                 </div>
               </section>
-              <section className="bottom-grid">
-                <div className="task-panel">
+              <details className="system-details">
+                <summary>模型配置与运行状态</summary>
+                <ServiceStatus userId={user?.id} />
+                <ModelConfiguration
+                  key={`models:${user?.id}:${project}`}
+                  project={project}
+                  role={user?.role}
+                />
+                <section className="environment">
                   <div className="section-top">
                     <h2>
-                      任务中心 <span>LOCAL PROBE</span>
+                      环境状态 <span>LIVE</span>
                     </h2>
-                    <span className="outline-tag">不产生模型费用</span>
-                  </div>
-                  <p>检查任务投递、LangGraph 持久化与实时事件回传。</p>
-                  <div className="probe-controls">
-                    {!user && <span className="signin-hint">登录后可运行基础设施探针</span>}
-                    <button
-                      className="primary"
-                      disabled={busy || !health?.ready || (!!user && !project)}
-                      onClick={() => (user ? void probe() : setLoginOpen(true))}
-                    >
-                      {busy ? '正在执行…' : user ? '运行探针 ↗' : '登录并体验 ↗'}
+                    <button className="text-button" onClick={() => void refresh()}>
+                      刷新状态 ↻
                     </button>
                   </div>
-                  {run ? (
-                    <div className="run-detail">
-                      <div className="run-heading">
-                        <strong>
-                          {run.status === 'succeeded'
-                            ? '✓ 探针已完成'
-                            : run.status === 'failed'
-                              ? '探针失败'
-                              : '◌ 任务处理中'}
-                        </strong>
-                        <code>{run.id.slice(0, 8)}</code>
-                      </div>
-                      <ol>
-                        {events.map((e) => (
-                          <li key={e.seq}>
-                            <span>{String(e.seq).padStart(2, '0')}</span>
-                            {e.message}
-                          </li>
-                        ))}
-                      </ol>
-                      <small>{streamState}</small>
-                    </div>
-                  ) : (
-                    <div className="empty-task">
-                      <span>⌁</span>
+                  <div className="status-grid">
+                    <div className="service">
+                      <span className={`status-dot ${health?.ready ? 'ok' : ''}`} />
                       <div>
-                        还没有运行记录
-                        <small>开启第一次环境验证，确认研究工作流的起点。</small>
+                        <strong>研究服务</strong>
+                        <small>{health?.ready ? '依赖与迁移就绪' : '正在检查或依赖未就绪'}</small>
                       </div>
+                      <span className="service-mark">API</span>
                     </div>
-                  )}
-                  {error && !loginOpen && (
-                    <div role="alert" className="error">
-                      {error}
+                    {Object.entries(serviceNames).map(([key, name]) => (
+                      <div className="service" key={key}>
+                        <span className={`status-dot ${health?.services[key]?.ready ? 'ok' : ''}`} />
+                        <div>
+                          <strong>{name}</strong>
+                          <small>
+                            {health?.services[key]?.ready
+                              ? health.services[key].version?.split(' ')[0]
+                              : '未就绪'}
+                          </small>
+                        </div>
+                        <span className="service-mark">
+                          {key === 'postgresql' ? 'DB' : key === 'qdrant' ? 'VEC' : 'MQ'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <section className="bottom-grid">
+                  <div className="task-panel">
+                    <div className="section-top">
+                      <h2>
+                        任务中心 <span>LOCAL PROBE</span>
+                      </h2>
+                      <span className="outline-tag">不产生模型费用</span>
                     </div>
-                  )}
-                </div>
-                <div className="principles">
-                  <span className="eyebrow">BUILT FOR TRUST</span>
-                  <h2>从起点，就认真对待证据。</h2>
-                  <div>
-                    <span>01</span>
-                    <p>
-                      <strong>来源可查</strong>
-                      <small>原文、页码与证据锚点，构成每条结论的依据。</small>
-                    </p>
+                    <p>检查任务投递、LangGraph 持久化与实时事件回传。</p>
+                    <div className="probe-controls">
+                      {!user && <span className="signin-hint">登录后可运行基础设施探针</span>}
+                      <button
+                        className="primary"
+                        disabled={busy || !health?.ready || (!!user && !project)}
+                        onClick={() => (user ? void probe() : setLoginOpen(true))}
+                      >
+                        {busy ? '正在执行…' : user ? '运行探针 ↗' : '登录并体验 ↗'}
+                      </button>
+                    </div>
+                    {run ? (
+                      <div className="run-detail">
+                        <div className="run-heading">
+                          <strong>
+                            {run.status === 'succeeded'
+                              ? '✓ 探针已完成'
+                              : run.status === 'failed'
+                                ? '探针失败'
+                                : '◌ 任务处理中'}
+                          </strong>
+                          <code>{run.id.slice(0, 8)}</code>
+                        </div>
+                        <ol>
+                          {events.map((e) => (
+                            <li key={e.seq}>
+                              <span>{String(e.seq).padStart(2, '0')}</span>
+                              {e.message}
+                            </li>
+                          ))}
+                        </ol>
+                        <small>{streamState}</small>
+                      </div>
+                    ) : (
+                      <div className="empty-task">
+                        <span>⌁</span>
+                        <div>
+                          还没有运行记录
+                          <small>开启第一次环境验证，确认研究工作流的起点。</small>
+                        </div>
+                      </div>
+                    )}
+                    {error && !loginOpen && (
+                      <div role="alert" className="error">
+                        {error}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <span>02</span>
-                    <p>
-                      <strong>过程可追</strong>
-                      <small>任务、数据与产物版本，保留研究演进的轨迹。</small>
-                    </p>
+                  <div className="principles">
+                    <span className="eyebrow">BUILT FOR TRUST</span>
+                    <h2>从起点，就认真对待证据。</h2>
+                    <div>
+                      <span>01</span>
+                      <p>
+                        <strong>来源可查</strong>
+                        <small>原文、页码与证据锚点，构成每条结论的依据。</small>
+                      </p>
+                    </div>
+                    <div>
+                      <span>02</span>
+                      <p>
+                        <strong>过程可追</strong>
+                        <small>任务、数据与产物版本，保留研究演进的轨迹。</small>
+                      </p>
+                    </div>
+                    <div>
+                      <span>03</span>
+                      <p>
+                        <strong>成本可控</strong>
+                        <small>外部服务默认关闭，首期 AI 预算目标 ¥100。</small>
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span>03</span>
-                    <p>
-                      <strong>成本可控</strong>
-                      <small>外部服务默认关闭，首期 AI 预算目标 ¥100。</small>
-                    </p>
-                  </div>
-                </div>
-              </section>
+                </section>
+              </details>
             </>
           )}
           <footer>
-            <span>ScholarShip · 学者之船</span>
+            <span>ScholarShip · 学者之舟</span>
             <span>
               2026 研究生组参赛项目 <i>·</i> 研究工作室 · 开发与分项验收
             </span>

@@ -261,10 +261,10 @@ export default function Library({ project, onResearch }: { project: string; onRe
           ))}
         </div>
       ))}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 20 }}>
+      <div className="paper-grid">
         {papers.map((p) => (
           <button
-            className="module-card"
+            className="module-card paper-card"
             key={p.version_id}
             onClick={() => {
               setSelected(p);
@@ -275,7 +275,13 @@ export default function Library({ project, onResearch }: { project: string; onRe
               setNotice('');
             }}
           >
-            {p.title}
+            <div className="paper-cover" aria-hidden="true">
+              <span>PDF</span>
+              <strong>{p.title}</strong>
+              <div className="paper-lines" />
+              <div className="paper-lines short" />
+            </div>
+            <strong className="paper-title">{p.title}</strong>
             <small style={{ display: 'block' }}>
               {p.metadata_json.page_count} 页 · {p.version_id.slice(0, 8)}
             </small>

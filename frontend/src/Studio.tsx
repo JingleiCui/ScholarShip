@@ -197,7 +197,7 @@ export default function Studio({
   const canWrite = role === 'researcher';
   if (!project) return <p>请先登录研究空间。</p>;
   return (
-    <section className="task-panel" style={{ marginBottom: 24 }}>
+    <section className={`task-panel studio-page studio-page-${module}`} style={{ marginBottom: 24 }}>
       <h2>
         {
           (
@@ -579,68 +579,74 @@ export default function Studio({
             CSV、图、统计摘要和独立 Python 脚本一起打包；仅执行受控模板。三维雷达图必须指定 CSV
             中真实的第三维列。
           </p>
-          <label>
-            CSV 文件{' '}
-            <input type="file" accept=".csv,text/csv" onChange={(e) => setCsv(e.target.files?.[0] ?? null)} />
-          </label>
-          <label>
-            图形{' '}
-            <select value={chartKind} onChange={(e) => setChartKind(e.target.value)}>
-              {Object.entries({
-                table: '表格',
-                line: '折线图',
-                bar: '柱状图',
-                scatter: '散点图',
-                radar: '二维雷达图',
-                radar3d: '三维雷达图',
-              }).map(([k, label]) => (
-                <option key={k} value={k}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            X / 名称列 <input value={x} onChange={(e) => setX(e.target.value)} />
-          </label>
-          <label>
-            数值列（逗号分隔） <input value={ys} onChange={(e) => setYs(e.target.value)} />
-          </label>
-          <label>
-            第三维列（3D 必填） <input value={z} onChange={(e) => setZ(e.target.value)} />
-          </label>
-          <label>
-            单位 JSON（不指定会明确标注） <input value={units} onChange={(e) => setUnits(e.target.value)} />
-          </label>
-          <button
-            disabled={!csv || busy || !canWrite}
-            onClick={() =>
-              void action(async () => {
-                const form = new FormData();
-                form.append('file', csv!);
-                form.append(
-                  'config',
-                  JSON.stringify({
-                    kind: chartKind,
-                    x,
-                    y: ys.split(',').map((s) => s.trim()),
-                    z: z || null,
-                    units: JSON.parse(units),
-                    missing: 'reject',
-                    title: csv!.name,
-                  }),
-                );
-                await api(`/studio/projects/${project}/charts`, {
-                  method: 'POST',
-                  headers: { 'Idempotency-Key': crypto.randomUUID() },
-                  body: form,
-                });
-                setNote('图表任务已保存。');
-              })
-            }
-          >
-            生成可复现图表
-          </button>
+          <div className="chart-controls">
+            <label>
+              CSV 文件{' '}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => setCsv(e.target.files?.[0] ?? null)}
+              />
+            </label>
+            <label>
+              图形{' '}
+              <select value={chartKind} onChange={(e) => setChartKind(e.target.value)}>
+                {Object.entries({
+                  table: '表格',
+                  line: '折线图',
+                  bar: '柱状图',
+                  scatter: '散点图',
+                  radar: '二维雷达图',
+                  radar3d: '三维雷达图',
+                }).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              X / 名称列 <input value={x} onChange={(e) => setX(e.target.value)} />
+            </label>
+            <label>
+              数值列（逗号分隔） <input value={ys} onChange={(e) => setYs(e.target.value)} />
+            </label>
+            <label>
+              第三维列（3D 必填） <input value={z} onChange={(e) => setZ(e.target.value)} />
+            </label>
+            <label>
+              单位 JSON（不指定会明确标注） <input value={units} onChange={(e) => setUnits(e.target.value)} />
+            </label>
+            <button
+              disabled={!csv || busy || !canWrite}
+              onClick={() =>
+                void action(async () => {
+                  const form = new FormData();
+                  form.append('file', csv!);
+                  form.append(
+                    'config',
+                    JSON.stringify({
+                      kind: chartKind,
+                      x,
+                      y: ys.split(',').map((s) => s.trim()),
+                      z: z || null,
+                      units: JSON.parse(units),
+                      missing: 'reject',
+                      title: csv!.name,
+                    }),
+                  );
+                  await api(`/studio/projects/${project}/charts`, {
+                    method: 'POST',
+                    headers: { 'Idempotency-Key': crypto.randomUUID() },
+                    body: form,
+                  });
+                  setNote('图表任务已保存。');
+                })
+              }
+            >
+              生成可复现图表
+            </button>
+          </div>
           <h3>架构拓扑</h3>
           <label>
             流程描述（用 → 或 -&gt; 连接步骤，每条流程一行）
@@ -653,27 +659,30 @@ export default function Studio({
             按描述生成架构图
           </button>
           <p>按明确步骤连线，不自动猜测未描述的节点。也可在下方精确编辑拓扑。</p>
-          <label>
-            节点名称（每行一个） <textarea value={nodes} onChange={(e) => setNodes(e.target.value)} />
-          </label>
-          <label>
-            有向边（每行：起点序号,终点序号，从 0 开始）{' '}
-            <textarea value={edges} onChange={(e) => setEdges(e.target.value)} />
-          </label>
-          <button
-            disabled={busy || !canWrite}
-            onClick={() =>
-              void task('diagram', {
-                nodes: nodes.split('\n').filter(Boolean),
-                edges: edges
-                  .split('\n')
-                  .filter(Boolean)
-                  .map((row) => row.split(',').map(Number)),
-              })
-            }
-          >
-            生成架构图与源码包
-          </button>
+          <details>
+            <summary>精确编辑节点与连线</summary>
+            <label>
+              节点名称（每行一个） <textarea value={nodes} onChange={(e) => setNodes(e.target.value)} />
+            </label>
+            <label>
+              有向边（每行：起点序号,终点序号，从 0 开始）{' '}
+              <textarea value={edges} onChange={(e) => setEdges(e.target.value)} />
+            </label>
+            <button
+              disabled={busy || !canWrite}
+              onClick={() =>
+                void task('diagram', {
+                  nodes: nodes.split('\n').filter(Boolean),
+                  edges: edges
+                    .split('\n')
+                    .filter(Boolean)
+                    .map((row) => row.split(',').map(Number)),
+                })
+              }
+            >
+              生成架构图与源码包
+            </button>
+          </details>
         </>
       )}
       {module !== 2 && <h3>任务与产物</h3>}

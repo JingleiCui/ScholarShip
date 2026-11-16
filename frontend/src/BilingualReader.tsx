@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import ScientificText from './ScientificText';
 export type Segment = {
   id: string;
@@ -9,6 +9,7 @@ export type Segment = {
   placeholders_json: { model_simulated?: boolean };
 };
 export default function BilingualReader({ segments }: { segments: Segment[] }) {
+  const [parallel, setParallel] = useState(false);
   const blocks = useMemo(() => {
     const result: Segment[] = [];
     for (const s of segments) {
@@ -53,9 +54,40 @@ export default function BilingualReader({ segments }: { segments: Segment[] }) {
     };
     target.scrollTop = driven.current.top;
   }
+  if (!parallel)
+    return (
+      <section className="bilingual-flow">
+        <div className="section-top">
+          <h3>原文与译文 · 逐块阅读</h3>
+          <button onClick={() => setParallel(true)}>切换双栏同步</button>
+        </div>
+        <p>
+          {segments.some((s) => s.placeholders_json.model_simulated)
+            ? '模拟译文，仅验证对应关系。'
+            : '模型译文待人工校对。'}
+          公式和代码保留原文。
+        </p>
+        {blocks.map((s) => (
+          <article key={s.id} className="bilingual-block">
+            <small>PDF 第 {s.page_no} 页</small>
+            <div className="source-block">
+              <span>原文</span>
+              <ScientificText text={s.canonical_text} />
+            </div>
+            <div className="translation-block">
+              <span>译文</span>
+              <ScientificText text={s.translated_text} />
+            </div>
+          </article>
+        ))}
+      </section>
+    );
   return (
     <section>
-      <h3>原文与译文 · 按内容块双向同步</h3>
+      <div className="section-top">
+        <h3>原文与译文 · 按内容块双向同步</h3>
+        <button onClick={() => setParallel(false)}>切换逐块阅读</button>
+      </div>
       <p>
         {segments.some((s) => s.placeholders_json.model_simulated)
           ? '当前为模拟译文，仅验证对应关系和公式保护。'
@@ -72,7 +104,7 @@ export default function BilingualReader({ segments }: { segments: Segment[] }) {
               height: 600,
               overflow: 'auto',
               position: 'relative',
-              border: '1px solid #cbd6cf',
+              border: '1px solid #e4ebf5',
               padding: 12,
             }}
             aria-label={side === 'left' ? '英文原文' : '译文'}
