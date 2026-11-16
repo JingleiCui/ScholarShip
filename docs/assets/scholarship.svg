@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="220" viewBox="0 0 920 220" role="img" aria-labelledby="title desc">
+  <title id="title">ScholarShip · 学者之舟</title>
+  <desc id="desc">学海无涯，AI作舟</desc>
+  <rect width="920" height="220" rx="20" fill="#f6f9ff"/>
+  <g transform="translate(72 58) scale(1.8)"><path d="M27 6v31H8L27 6Z" fill="#3978f6"/><path d="M31 13v24h16L31 13Z" fill="#91b7ff"/><path d="M6 41h44l-9 9H16L6 41Z" fill="#3978f6"/></g>
+  <text x="205" y="104" fill="#19345c" font-family="Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="46" font-weight="700" letter-spacing="-1">ScholarShip</text>
+  <text x="502" y="103" fill="#19345c" font-family="'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="30" font-weight="600">学者之舟</text>
+  <text x="207" y="151" fill="#617695" font-family="'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="21">学海无涯，AI作舟</text>
+</svg>

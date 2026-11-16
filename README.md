@@ -1,31 +1,83 @@
-# ScholarShip · 学者之舟
+<p align="center">
+  <img src="docs/assets/scholarship.svg" alt="ScholarShip · 学者之舟 — 学海无涯，AI作舟" width="920" />
+</p>
 
-> 学海无涯，AI作舟。
+<p align="center"><strong>从文献到洞察，让研究有据可循。</strong></p>
 
-面向研究生科研阅读的 AI 工作空间：管理文献、追溯回答依据、逐块双语阅读，并将来源连接到图谱、草稿和可重跑图表。中文名化用“学海无涯苦作舟”，以 AI 辅助探索，保留人的判断与核验。
+<p align="center">
+  文献管理 · 证据问答 · 双语阅读 · 引用图谱 · 写作与绘图
+</p>
 
-![实际本机界面](docs/assets/workspace.jpg)
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#功能">功能</a> ·
+  <a href="docs/guides/models.md">模型配置</a> ·
+  <a href="docs/guides/deployment.md">部署</a> ·
+  <a href="docs/README.md">文档</a> ·
+  <a href="https://github.com/JingleiCui/ScholarShip/issues">反馈问题</a>
+</p>
 
-这是实际运行界面，数据属于本地工作空间；仓库不附带论文、密钥或预生成科研数据库。首次克隆不会自动出现截图中的资料。设计概念图与实际页面分别保存，不能作为功能验收证据。
+ScholarShip 是一个可自托管的 AI 科研工作空间。将论文、教材、阅读笔记、问答证据和写作产物放在同一条研究流程中：导入资料，阅读与提问，查看原文，再把结论整理成草稿或图表。
 
-## 功能与当前边界
+回答不仅有内容，还应有出处。ScholarShip 将引用绑定到具体的文献版本、解析修订和原文位置；更换模型或重新解析资料后，历史记录仍保留自己的来源。
 
-| 模块 | 已实现的行为 | 质量或覆盖限制 |
-|---|---|---|
-| 文献管理 | PDF 导入、哈希去重、候选人工决定、版本、本地逐页预览、结构修订 | 扫描副本语义去重与复杂结构需继续核验 |
-| 证据问答 | 限定来源的混合检索、重排、冻结证据位置、确定性作者/表格计算、历史错答审阅 | 固定单篇五问已原文复核；官方跨论文题集尚未真实验收 |
-| 阅读翻译 | PDF 定位、引用往返、逐块上下对照/双栏同步、字面量保护与片段缓存 | 已观察到语义误译，模型译文需人工校对 |
-| 检索推荐 | arXiv/Crossref 适配、开放 PDF 入库、订阅调度、反馈与代码链接状态 | 真实外部检索旅程与长期推荐效果未完整验收 |
-| 图谱与方向 | 局域有向图、可重算 PageRank、候选引用标记、后续元数据证据记录 | 候选身份需核验；没有检索到不能证明问题未解决 |
-| 写作绘图 | 带来源的摘要/框架及版本、CSV 受控绘图、数据/脚本导出、Mermaid 拓扑 | 草稿未逐论断盲审；计划不代表已完成实验 |
+![ScholarShip 实际工作台](docs/assets/workspace.jpg)
 
-2026-11-16：215 项后端测试、3 项前端测试通过；之后的界面改版已通过前端构建及 3 项前端测试。两次检查范围不同，不能把旧后端报告当作未来改动的结果。见[本批报告](docs/studio/report-2026-11-16.md)、[界面报告](docs/studio/topnav-redesign-2026-11-16.md)、[比赛逐项差距](docs/competition/audit-2026-11-16.md)。
+<sub>实际运行界面。文献来自本地工作空间，仓库不附带论文、账号数据或预生成的研究结果。</sub>
 
-唯一授权扫描件的 15 页真实索引、固定五问、翻译、摘要与框架批次已执行，使用 74/80 次后关闭；旧错误和 unknown 保留。此验收受语料/模型/期限限制，不能作为通用准确率。23 篇论文和 541 页教材有本地文本层解析记录，教材不等于 OCR 验收。**比赛完整验收、公网演示、视频与技术 PDF 尚未完成。**
+## 功能
+
+### 文献与版本
+
+- 导入 PDF，查看本地逐页预览与结构化原文。
+- 通过文件哈希复用相同内容，对疑似重复记录进行人工确认。
+- 保留论文的不同载体、版本和解析修订，让旧引用仍能回到旧来源。
+- 接入 MinerU 原生解析产物；文本型 PDF 也可使用本地结构解析。
+
+### 证据问答
+
+- 选择文献范围，使用 Qdrant 向量与 BM25 混合检索，再通过重排筛选证据。
+- 回答关联原文片段、页码与位置，可直接打开 PDF 核对。
+- 对作者顺序和表格数值比较使用确定性工具，保留计算依据。
+- 保存会话、模型快照和历史审阅记录；范围变化时不混用旧上下文。
+
+### 阅读与翻译
+
+- 阅读原始 PDF，按标题导航，在正文引用与参考文献之间往返。
+- 全文或选段翻译，默认逐块上下对照，也可切换双栏同步阅读。
+- 公式、代码等字面量在本地保留；片段缓存减少重复处理。
+- 译文与原文位置关联，便于对照检查。
+
+### 发现与连接
+
+- 通过 arXiv / Crossref 搜索公开元数据，将可获取的开放 PDF 导入文献库。
+- 使用订阅调度和反馈记录追踪研究兴趣，分别展示代码链接与核验状态。
+- 从所选文献构建局域引用图，计算 PageRank，并区分已核验引用与候选关系。
+- 为研究方向保存后续检索词、时间、范围与证据，避免把“没有找到”写成“尚未解决”。
+
+### 写作与可复现绘图
+
+- 基于所选文献生成来源摘要与论文框架，保存草稿版本和来源清单。
+- 从 CSV 生成表格、折线、柱状、散点、二维雷达或三维雷达图。
+- 图像、输入数据、配置和 Python 脚本一起导出，单位、缺失值与归一化规则可检查。
+- 将步骤描述或明确的节点、连线转换为 Mermaid 架构图，并导出源码。
+
+### 自己选择模型
+
+- 统一配置生成、翻译、向量、重排与解析能力，按用途选择服务。
+- 保留合成测试、本地模型及云端 API 的独立配置组。
+- 新任务冻结模型与协议绑定；向量模型切换通过新索引世代验证后生效。
+- 模型选择、外部访问权限和用量准入相互独立，不因填写 Key 自动发起请求。
+
+> 项目仍在积极开发。云端服务默认关闭，本地模型服务需另行安装。模型译文和写作草稿需要人工核对；跨论文问答、真实检索推荐与长文档处理的质量覆盖仍在完善。完整边界见[能力与验证范围](docs/guides/capabilities.md)。
 
 ## 快速开始
 
-已验证的本地环境为 **macOS Apple Silicon、Python 3.12、Docker Desktop**。自动工具链脚本目前下载 macOS arm64 的 Node；不要宣称 Windows/Linux 一键安装已验证。Docker 应用镜像在本机集成测试通过，公网与 Linux amd64 待验证。
+本地开发已验证环境：**macOS Apple Silicon、Python 3.12、Docker Desktop**。
+
+1. 启动 Docker Desktop，确认本机安装了 Python 3.12。
+2. 克隆仓库，检查 `bootstrap.py` 顶部的 `BOOTSTRAP_PYTHON` 是否指向本机解释器。
+3. 初始化并启动：
 
 ```bash
 git clone https://github.com/JingleiCui/ScholarShip.git
@@ -34,60 +86,75 @@ python3.12 bootstrap.py
 .venv/bin/python dev.py
 ```
 
-执行前启动 Docker Desktop，并检查 `bootstrap.py` 顶部 `BOOTSTRAP_PYTHON` 是否为自己的 Python 3.12 路径（默认 `/opt/homebrew/bin/python3.12`）。脚本仅安装项目专用工具链、基础容器、迁移和初始账号，不做全局升级。默认端口需要空闲。
+打开 **[http://127.0.0.1:15173](http://127.0.0.1:15173)**。API 文档位于 [http://127.0.0.1:18080/docs](http://127.0.0.1:18080/docs)。
 
-- 页面：http://127.0.0.1:15173 ，接口文档：http://127.0.0.1:18080/docs 。
-- 首次 `bootstrap.py` 自动生成私有 `.env` 和随机凭据；**不要先把空的 `.env.example` 复制成 `.env`**，已有 `.env` 不会被初始化覆盖。
-- 账号为 `researcher` / `reviewer`，密码分别在 `.env` 的 `INITIAL_USER_PASSWORD` / `INITIAL_REVIEWER_PASSWORD`，请自行在编辑器查看。
-- 停止项目：`.venv/bin/python stop.py`。保留基础容器与数据，不停止其他项目服务。
-- 模型 Key 对本地文献管理、受控图表和合成契约演示不是必需的。模型配置/Key 本身不授权外部请求。
+首次初始化会自动生成私有 `.env` 和随机账号密码，不需要预先复制空模板。使用 `researcher` 登录，密码见 `.env` 的 `INITIAL_USER_PASSWORD`。导入一份自己的 PDF，即可开始本地文献管理与阅读。
 
-完整安装、容器切换、恢复与故障排查见[运行手册](docs/runbook.md)。若没有原比赛资料，只验证自己提供的文档；依赖特定私有样本/历史回执的验收脚本不能直接当作新环境通用检查。
+无需模型 Key 即可使用本地文献管理、受控图表与合成契约流程。真实问答、翻译和模型生成需要进一步配置服务与调用策略。
 
-## 模型配置
+[详细安装](docs/guides/getting-started.md) · [模型配置](docs/guides/models.md) · [Docker Compose](docs/guides/deployment.md) · [运行与故障排查](docs/runbook.md)
 
-根目录 [`model_config.py`](model_config.py) 集中定义模型、提供商、协议、超时及配置组；Key 只填写私有 `.env`，模板为 [`.env.example`](.env.example)。
+## 工作原理
 
-| 配置组 | 生成/翻译 | 向量与重排 | 状态 |
-|---|---|---|---|
-| mock | 合成响应 | 合成向量/排序 | 用于契约流程验证，不是科研结论 |
-| local | Ollama | Ollama + 本地 rerank | 配置保留，本机服务未完整安装验收 |
-| free_api | ChatAnywhere gpt-4o-mini | OpenRouter Nemotron 免费型号 | 已批准样例批次曾调用成功，当前准入关闭 |
-| free_gemma | OpenRouter Gemma | OpenRouter Nemotron 免费型号 | 配置保留，已有 429 记录，不保证当前可用 |
-
-MinerU 云端解析为可切换选项；本地 MinerU 不会因选中配置就自动安装。免费型号可限流或下线，不静默转付费路线。移机前检查 `LIVE_PROXY_URLS` 和 `DOWNLOAD_DNS_OVERRIDES`，它们包含原开发机的路由配置，其他主机可能应清空。新任务冻结模型配置，更换向量模型/维度需独立 profile、重建与验证后切换。详见[统一模型设计](docs/models/adapter-design.md)。
-
-`EXTERNAL_SERVICES_ENABLED=false` 与 `ALLOW_REAL_REQUESTS=False` 默认关闭。历史验收批次不是新部署的授权，新克隆不会生成生产配额；正常云端使用需要另行配置明确的服务权限、来源与额度策略。
-
-## 技术与目录
-
-React / TypeScript / Vite · FastAPI / Python 3.12 · LangGraph · PostgreSQL / SQLAlchemy / Alembic · Qdrant · Celery / Redis / Beat · PDF.js / KaTeX / Cytoscape.js · Pandas / Matplotlib / NetworkX / Mermaid。
-
-```text
-frontend/       页面与组件
-backend/        API、领域工作流、模型适配、任务、迁移与测试
-model_config.py 统一模型与协议绑定配置
-local_services/ 可选的本地服务
-deploy/         Dockerfile、Compose、反向代理
-docs/           需求、设计、分阶段验收与参赛交付清单
-*.py            可直接在 IDE 运行的项目专用入口，参数位于顶部
+```mermaid
+flowchart LR
+    PDF[原始文献] --> Parse[版本化解析]
+    Parse --> Blocks[页面与原文块]
+    Blocks --> Read[阅读与翻译]
+    Blocks --> Index[混合检索与重排]
+    Index --> QA[带证据的回答]
+    Blocks --> Graph[引用图谱]
+    QA --> Draft[来源摘要与草稿]
+    CSV[CSV 数据] --> Plot[受控绘图与脚本]
 ```
 
-## 验证
+PostgreSQL 保存业务状态、任务与来源关系；Qdrant 提供向量和混合检索；Celery、Redis 与 Beat 负责后台执行和调度。供应商目录、协议转换、HTTP 传输与业务工作流分别组织，通过统一端口连接。
+
+| 层次 | 技术 |
+|---|---|
+| 前端 | React、TypeScript、Vite |
+| 文献展示 | PDF.js、KaTeX、Cytoscape.js、Mermaid |
+| API 与工作流 | Python 3.12、FastAPI、LangGraph |
+| 数据与检索 | PostgreSQL、SQLAlchemy、Alembic、Qdrant |
+| 后台任务 | Celery、Redis、Celery Beat |
+| 分析与绘图 | Pandas、NumPy、Matplotlib、NetworkX |
+
+详见[架构设计](docs/architecture.md)、[工作流与产物设计](docs/studio/design.md)、[模型适配设计](docs/models/adapter-design.md)。
+
+## 开发
 
 ```bash
+# 检查运行依赖
 .venv/bin/python doctor.py
+
+# 检查代码、前端构建和后端集成
 .venv/bin/python validate.py
+
+# 停止本项目的本地启动器，保留基础容器与数据
+.venv/bin/python stop.py
 ```
 
-`validate.py` 创建独立临时数据库/队列/向量集合，检查依赖、Ruff、前端测试/构建、后端集成和当前凭据误提交；需要本项目基础容器运行。报告在忽略的 `var/reports/`。重启恢复检查见运行手册；本机模式与容器模式互斥，不能同时启动。
+验证需要基础容器运行，会创建独立的临时数据库、队列和向量集合。运行报告输出到 `var/reports/`，不进入 Git。
 
-原件、账号、模型 Key、日志、缓存与运行报告不进 Git。不要上传 `.env`、数据库备份或原比赛论文。安全说明见 [SECURITY.md](SECURITY.md)。
+```text
+frontend/          页面、阅读器与交互组件
+backend/           API、领域逻辑、模型适配、任务与迁移
+local_services/    可选的本地模型服务
+model_config.py    模型、协议与运行参数
+bootstrap.py       项目工具链、配置和基础环境初始化
+dev.py             本地应用启动器
+deploy/            容器构建与反向代理配置
+docs/              安装、配置、架构与开发文档
+```
 
-## 比赛与来源说明
+[开发与贡献](CONTRIBUTING.md) · [AI 辅助开发说明](docs/development/ai-assisted-development.md)
 
-- [比赛官方页面](https://www.boxuegu.com/matchTrack/detail/?id=10040)，赛题 id=10040；本项目按用户确认的 2026-11-18 目标推进。官网/本地规则的差异与时间问题保留在[需求基线](docs/requirements.md)。
-- [参赛交付检查单](docs/submission/README.md)：源码上传、技术 PDF、视频和公网评审分别核验。
-- [文档导航](docs/README.md) · [AI 辅助开发披露](docs/submission/ai-contribution.md) · [第三方来源说明](THIRD_PARTY_NOTICES.md)。
-- 仓库维护者：[JingleiCui](https://github.com/JingleiCui)。真实参赛者姓名、学校、团队和参赛编号尚未填写，不从账号推断。
-- 本仓库尚未指定整体代码开源许可证。公开可访问与授予复用许可是两回事；第三方依赖依各自许可证使用。正式提交前由作者确定授权方式，不能把当前仓库宣称为已采用 MIT。
+## 数据与安全
+
+原始文献、密钥、账号数据和运行产物保存在自己的环境中，不随源码分发。启用外部服务后，相应文本会发送给所选供应商；本地服务与云端服务应按实际数据需求选择。
+
+不要将 `.env`、数据库备份、会话 Cookie 或私有文献提交到仓库。问题报告与安全联系说明见 [SECURITY.md](SECURITY.md)。
+
+## 许可证与第三方组件
+
+项目整体许可证尚未指定。依赖与参考来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，各第三方组件遵循自身许可证。
