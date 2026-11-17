@@ -1,8 +1,8 @@
 # PostgreSQL 数据设计评审稿
 
-日期：2026-11-13。状态：**用户已确认**，见[评审结论](data-design-review.md)。当前只交付设计文件，没有建库、迁移、导入账号或复制原始论文。
+日期：2026-11-13。状态：**用户已确认**，见评审结论。当前只交付设计文件，没有建库、迁移、导入账号或复制原始论文。
 
-配套文件：[数据字典](data-dictionary.md)、[机器可核对目录](data/postgresql-catalog.json)、[Qdrant 设计](vector-design.md)、[评审单](data-design-review.md)。数据字典列出字段、类型、可空性、唯一键、外键、CHECK 与索引；实际 SQL/Alembic 在下一阶段实现并在 PostgreSQL 上验证。
+配套文件：[数据字典](data-dictionary.md)、[机器可核对目录](data/postgresql-catalog.json)、[Qdrant 设计](vector-design.md)、评审单。数据字典列出字段、类型、可空性、唯一键、外键、CHECK 与索引；实际 SQL/Alembic 在下一阶段实现并在 PostgreSQL 上验证。
 
 ## 1. 存储职责与核心关系
 

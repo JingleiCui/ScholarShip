@@ -107,6 +107,31 @@ class ProviderClient:
         text, d, elapsed = self._chat(messages, structured=structured)
         return self.result(text, d, elapsed)
 
+    def describe_figure(self, image_base64, mime, caption=""):
+        import base64
+        from scholarship.models.figure_contract import image_data, messages, validate_description, response_schema
+
+        # The image route is explicit. Text-only and local protocols cannot silently accept it.
+        if self.role != "chat" or self.binding.get("protocol") != "openai_chat":
+            raise ContractError("figure_vision_protocol_required")
+        try:
+            if not isinstance(image_base64, str) or len(image_base64) > 5600000:
+                raise ValueError()
+            raw = base64.b64decode(image_base64, validate=True)
+        except (ValueError, TypeError):
+            raise ContractError("invalid_figure_image") from None
+        wire = self.protocol.prepare(
+            self.spec,
+            self.definition,
+            messages=messages(image_data(raw, mime), caption),
+            schema=response_schema(),
+            structured=True,
+            max_output=self.max_output,
+        )
+        data, elapsed = self.request(wire.path, wire.body)
+        value = validate_description(self.protocol.read(data))
+        return self.result(value, data, elapsed)
+
     def answer(self, question, evidence, *, citation_mode="verbatim"):
         if not isinstance(question, str) or not question.strip() or len(question.encode()) > 4096:
             raise ContractError("invalid_question")

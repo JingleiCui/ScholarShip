@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from scholarship.adapters.providers import integer, ContractError
 
 ROLE_OPERATIONS = {
-    "chat": {"answer", "generate"},
+    "chat": {"answer", "generate", "describe_figure"},
     "translation": {"generate"},
     "embedding": {"embed"},
     "rerank": {"rank"},

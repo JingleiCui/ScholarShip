@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parent
 CHECK_ONLY = False
 FILES = [
     "src/main.tsx",
+    "src/FigureReader.tsx",
     "src/ReferenceWorkbench.tsx",
     "src/DirectionReview.tsx",
     "src/TaskEvents.tsx",

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File,
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 import sqlalchemy as sa
+from scholarship.models.figure_contract import FigureDescription
 from scholarship.api.auth import Identity, identity
 from scholarship.api.offline import demo_actor
 from scholarship.adapters.providers import ContractError, ExternalDisabled
@@ -37,6 +38,7 @@ class EvidenceSpan(TextSelection):
 class ToolRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     operation: Literal[
+        "figure",
         "direction_review",
         "translate",
         "draft",
@@ -68,6 +70,8 @@ class ToolRequest(BaseModel):
 
     @model_validator(mode="after")
     def source_required(self):
+        if self.operation == "figure" and (len(self.block_ids) != 1 or self.mode != "cloud"):
+            raise ValueError("one_figure_and_cloud_mode_required")
         if self.operation == "direction_review" and (
             not self.original_evidence
             or not self.followup_evidence
@@ -449,3 +453,148 @@ def locate_block(block_id: UUID, user: Identity = Depends(identity)):
             "pdf_bbox": row["source_locator"].get("pdf_bbox"),
             "text": row["canonical_text"],
         }
+
+
+@router.post("/figures/{block_id}/tasks", status_code=202)
+def figure_task(
+    block_id: UUID, user: Identity = Depends(demo_actor), idempotency_key: str = Header(min_length=1, max_length=128)
+):
+    from scholarship.domains.studio.figures import source
+
+    try:
+        with tenant_transaction(user.user_id) as conn:
+            row = source(conn, block_id)
+        return submit(
+            user.user_id, row["project_id"], idempotency_key, "figure", {"block_ids": [str(block_id)]}, "cloud"
+        )
+    except ExternalDisabled:
+        raise HTTPException(409, "cloud_vision_admission_required") from None
+    except ContractError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/figures/{block_id}/results")
+def figure_results(block_id: UUID, user: Identity = Depends(identity)):
+    from scholarship.domains.studio.figures import source
+
+    try:
+        with tenant_transaction(user.user_id) as conn:
+            row = source(conn, block_id)
+            runs = (
+                conn.execute(
+                    sa.select(T["runs"])
+                    .where(
+                        T["runs"].c.project_id == row["project_id"],
+                        T["runs"].c.config_json["operation"].astext.in_(["figure", "figure_correct"]),
+                        T["runs"].c.input_json["arguments"]["block_ids"].contains([str(block_id)]),
+                    )
+                    .order_by(T["runs"].c.created_at.desc())
+                    .limit(10)
+                )
+                .mappings()
+                .all()
+            )
+            output = []
+            for r in runs:
+                result = r["result_json"]
+                review = None
+                if result and result.get("artifact_version_id"):
+                    review = conn.scalar(
+                        sa.select(T["audit_events"].c.safe_payload)
+                        .where(
+                            T["audit_events"].c.action == "figure_content_review",
+                            T["audit_events"].c.subject_json["artifact_version_id"].astext
+                            == result["artifact_version_id"],
+                        )
+                        .order_by(T["audit_events"].c.created_at.desc(), T["audit_events"].c.id.desc())
+                        .limit(1)
+                    )
+                output.append({"id": str(r["id"]), "status": r["status"], "result": result, "review": review})
+            return output
+    except ContractError as exc:
+        raise HTTPException(404, str(exc)) from None
+
+
+class FigureReview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    assessment: Literal["accepted", "rejected"]
+    reason: str = Field(min_length=3, max_length=2000)
+
+
+@router.post("/figure-artifacts/{artifact_id}/reviews")
+def review_figure(artifact_id: UUID, body: FigureReview, user: Identity = Depends(demo_actor)):
+    if len(body.reason.strip()) < 3:
+        raise HTTPException(422, "review_reason_required")
+    with tenant_transaction(user.user_id) as conn:
+        row = (
+            conn.execute(
+                sa.select(T["artifact_versions"], T["artifacts"].c.project_id)
+                .join(T["artifacts"], T["artifacts"].c.id == T["artifact_versions"].c.artifact_id)
+                .where(T["artifact_versions"].c.id == artifact_id, T["artifacts"].c.kind == "figure")
+            )
+            .mappings()
+            .first()
+        )
+        if not row:
+            raise HTTPException(404, "figure_artifact_not_found")
+        version_scope_id = UUID(row["metadata_json"]["source"]["version_id"])
+        from scholarship.domains.deep_parse import version_scope
+
+        version_scope(conn, version_scope_id)
+        conn.execute(
+            T["audit_events"]
+            .insert()
+            .values(
+                owner_id=user.user_id,
+                project_id=row["project_id"],
+                action="figure_content_review",
+                subject_json={"artifact_version_id": str(artifact_id)},
+                safe_payload={"assessment": body.assessment, "reason": body.reason},
+            )
+        )
+    return body.model_dump()
+
+
+class FigureCorrection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    description: FigureDescription
+    reason: str = Field(min_length=3, max_length=2000)
+
+
+@router.post("/figure-artifacts/{artifact_id}/corrections", status_code=202)
+def correct_figure(
+    artifact_id: UUID,
+    body: FigureCorrection,
+    user: Identity = Depends(demo_actor),
+    idempotency_key: str = Header(min_length=1, max_length=128),
+):
+    if len(body.reason.strip()) < 3:
+        raise HTTPException(422, "review_reason_required")
+    with tenant_transaction(user.user_id) as conn:
+        row = (
+            conn.execute(
+                sa.select(T["artifact_versions"], T["artifacts"].c.project_id)
+                .join(T["artifacts"], T["artifacts"].c.id == T["artifact_versions"].c.artifact_id)
+                .where(T["artifact_versions"].c.id == artifact_id, T["artifacts"].c.kind == "figure")
+            )
+            .mappings()
+            .first()
+        )
+        if not row:
+            raise HTTPException(404, "figure_artifact_not_found")
+        from scholarship.domains.studio.figures import source
+
+        origin = source(conn, UUID(row["metadata_json"]["source"]["block_id"]))
+    return submit(
+        user.user_id,
+        row["project_id"],
+        idempotency_key,
+        "figure_correct",
+        {
+            "artifact_version_id": str(artifact_id),
+            "block_ids": [str(origin["id"])],
+            "description": body.description.model_dump(mode="json"),
+            "reason": body.reason,
+        },
+        "local",
+    )

@@ -14,8 +14,6 @@
 
 ![ScholarShip 实际界面浏览](docs/assets/demo.gif)
 
-<sub>本机实际页面浏览节选：文献库、阅读、图谱、写作与绘图。为便于浏览，画面间隔经过压缩；未发起新的模型请求。历史问答结果与源文定位见下方效果示例。界面语言为中文。</sub>
-
 <p align="center"><a href="#quickstart">快速开始</a> · <a href="docs/guides/user-manual.md">使用手册</a> · <a href="docs/engineering/code-walkthrough.md">代码导读</a> · <a href="docs/guides/models.md">模型配置</a></p>
 
 ## ✨ 特性
@@ -33,9 +31,12 @@
 
 重点不只是“接上一个模型”：PostgreSQL 保存权威业务状态，派生索引可重建；引用固定到文献与解析版本；向量模型切换先建立新索引，再切换活动世代。可从[架构说明](docs/engineering/architecture-current.md)和[代码导读](docs/engineering/code-walkthrough.md)了解实现与取舍。
 
-> 当前为持续开发中的个人项目。云端调用需要配置服务及准入策略；local 组合的通用业务执行器尚未接通。跨论文问答、长文档解析与翻译质量仍需扩充验证。详细边界见[能力说明](docs/guides/capabilities.md)，不将模拟测试视为科研准确率。
 
 ## 🏗️ 架构
+
+![ScholarShip system architecture](docs/assets/diagrams/system-layered.svg)
+
+![ScholarShip business architecture](docs/assets/diagrams/business-layered.svg)
 
 ```mermaid
 flowchart TB
@@ -50,14 +51,14 @@ flowchart TB
     Worker --> RAG[LangGraph · 检索与证据问答]
     RAG --> Qdrant[(Qdrant · 向量与 BM25)]
     RAG --> Models[统一模型端口 · 协议适配器]
-    Models --> Providers[配置的本地或云端服务]
+    Models --> Providers[配置的云端服务]
     Worker --> Artifacts[翻译 · 图谱 · 草稿 · 图表]
     Artifacts --> PG
     Worker --> Events[持久化任务事件]
     Events --> UI
 ```
 
-SSE 展示任务步骤，不是模型逐 Token 输出。服务是否可调用由实际执行器、配置和策略共同决定；架构中的接口边界不代表所有本地服务已经就绪。
+SSE 展示持久化任务步骤。模型调用通过统一接口执行，任务保存配置快照与来源范围。
 
 <a id="quickstart"></a>
 ## 🚀 Quickstart
@@ -90,7 +91,6 @@ python3.12 bootstrap.py
 | 本地文献与绘图 | 导入、文本层解析、PDF 阅读、受控图表 | 无模型 Key |
 | mock | 验证检索、问答与翻译业务流转 | 合成结果，不用于研究结论 |
 | 云端模型 | 真实生成、向量化、重排与翻译 | [配置服务与生产准入](docs/guides/models.md) |
-| local | 本地模型接入开发 | 服务安装与正式执行器仍待完成 |
 
 ### 4. 运行与首次使用
 
@@ -125,7 +125,6 @@ ScholarShip/
 │   ├── infrastructure/           # 数据库、存储与基础服务
 │   └── workers/                  # 后台任务与调度
 ├── backend/tests/                # 契约测试与集成测试
-├── local_services/               # 可选本地服务的接入准备
 ├── deploy/                       # 容器构建和反向代理
 ├── docs/                         # 使用、架构、模型与开发说明
 ├── model_config.py               # 统一模型与运行参数
@@ -147,10 +146,9 @@ ScholarShip/
 ```bash
 .venv/bin/python doctor.py
 .venv/bin/python validate.py
-.venv/bin/python local_models_doctor.py
 ```
 
-`validate.py` 需要基础容器运行，使用独立临时数据库、队列与向量集合。报告保存在 `var/reports/`，不随代码分发。详见[检查记录](docs/qa/completion-2026-11-17.md)。
+`validate.py` 需要基础容器运行，使用独立临时数据库、队列与向量集合。报告保存在 `var/reports/`，不随代码分发。
 
 ## 文档与参与
 

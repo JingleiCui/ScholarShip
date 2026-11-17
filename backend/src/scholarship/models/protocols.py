@@ -17,10 +17,15 @@ class OpenAIChat:
     roles = {"chat", "translation"}
     usage_style = "openai"
 
-    def prepare(self, spec, definition, *, messages, structured, max_output):
+    def prepare(self, spec, definition, *, messages, structured, max_output, schema=None):
         body = {"model": spec.model, "messages": messages, "stream": False, "max_tokens": max_output, "temperature": 0}
         body.update(deepcopy(definition.get("chat_options", {})))
-        if structured and spec.json_mode:
+        if schema is not None:
+            body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "figure_description", "strict": True, "schema": schema},
+            }
+        elif structured and spec.json_mode:
             body["response_format"] = {"type": "json_object"}
         return WireRequest("/chat/completions", body)
 

@@ -4,6 +4,7 @@ Credentials belong only in .env. Selecting a preset never authorizes inference.
 """
 
 # USER CONFIGURATION
+FIGURE_MODEL = "openrouter_vision"  # Independent visual model for new figure tasks; no automatic calls.
 ACTIVE_PRESET = "free_gemma"  # mock / local / free_api (ChatAnywhere) / free_gemma
 ALLOW_LOCAL_INFERENCE = False
 ALLOW_REAL_REQUESTS = False  # Future opt-in; real dispatch also requires a separately reviewed executor.
@@ -77,6 +78,12 @@ MODELS = {
         "base_url": "https://openrouter.ai/api/v1",
         "json_mode": True,
     },
+    "openrouter_vision": {
+        "provider": "openrouter",
+        "model": "nvidia/nemotron-3.5-super-vl:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "json_mode": True,
+    },
     "openrouter_embedding": {
         "provider": "openrouter",
         "model": "nvidia/nemotron-3.5-embed-8b:free",
@@ -122,6 +129,7 @@ MODEL_CAPABILITIES = {
     "mock_parser": ["parser"],
     "chatanywhere_chat": ["chat", "translation"],
     "openrouter_gemma": ["chat", "translation"],
+    "openrouter_vision": ["chat"],
     "openrouter_embedding": ["embedding"],
     "openrouter_rerank": ["rerank"],
     "ollama_chat": ["chat", "translation"],
@@ -151,15 +159,18 @@ PRESETS = {
         "translation": "chatanywhere_chat",
         "embedding": "openrouter_embedding",
         "rerank": "openrouter_rerank",
-        "parser": "mineru_local",
+        "parser": "mineru_cloud",
     },
     "free_gemma": {
         "chat": "openrouter_gemma",
         "translation": "openrouter_gemma",
         "embedding": "openrouter_embedding",
         "rerank": "openrouter_rerank",
-        "parser": "mineru_local",
+        "parser": "mineru_cloud",
     },
 }
 # Override individual roles without editing a preset, e.g. {"parser": "mineru_cloud"}.
 ROLE_OVERRIDES = {}
+
+# Models eligible for image-input contract; account access is verified separately.
+VISION_MODEL_BINDINGS = [("chatanywhere", "gpt-4o-mini"), ("openrouter", "nvidia/nemotron-3.5-super-vl:free")]

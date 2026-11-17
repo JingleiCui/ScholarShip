@@ -1,4 +1,9 @@
 const messages: Record<string, string> = {
+  cloud_vision_model_required: '请先在项目模型配置中选择支持图片输入的云端聊天模型。',
+  cloud_vision_admission_required: '图内识别的云端权限尚未启用，请配置对应数据范围与额度。',
+  ready_figure_image_required: '需要已完成深解析并保留图片原件的图块。',
+  figure_image_size_limit: '图片超过 4 MB 限制，请先准备合适分辨率的图片解析修订。',
+
   index_scope_exceeds_run_limit_split_documents:
     '当前文献范围超过单任务请求上限。请逐篇建索引；超长文献需先调整项目的单任务限制并核对总额度。',
   model_request_quota_exhausted: '本任务请求次数已达到上限，已暂停后续执行；已有回执保留。',

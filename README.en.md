@@ -33,9 +33,12 @@
 
 PostgreSQL is the source of truth; search indexes are derived and rebuildable. Citations remain tied to document and parse versions. Changing embedding models requires a new index generation before switching the active pointer. See the [architecture](docs/engineering/architecture-current.md) and [code walkthrough](docs/engineering/code-walkthrough.md) for implementation details.
 
-> This is an actively developed personal project. Cloud inference requires configured services and admission policies. General local-model business dispatch is not implemented yet. Cross-paper QA, long-document parsing and translation quality need broader evaluation. See [capabilities and limits](docs/guides/capabilities.md); synthetic tests are not research-accuracy measurements.
 
 ## 🏗️ Architecture
+
+![ScholarShip system architecture](docs/assets/diagrams/system-layered.svg)
+
+![ScholarShip business architecture](docs/assets/diagrams/business-layered.svg)
 
 ```mermaid
 flowchart TB
@@ -50,14 +53,14 @@ flowchart TB
     Worker --> RAG[LangGraph · retrieval and evidence QA]
     RAG --> Qdrant[(Qdrant · dense and BM25 search)]
     RAG --> Models[Model ports · protocol adapters]
-    Models --> Providers[Configured local or cloud services]
+    Models --> Providers[Configured cloud services]
     Worker --> Artifacts[Translations · graphs · drafts · charts]
     Artifacts --> PG
     Worker --> Events[Persisted task events]
     Events --> UI
 ```
 
-SSE reports task steps, not model token streaming. Adapter boundaries describe the design; they do not imply that every local service is ready to run.
+SSE reports persisted task steps. Model calls use a shared interface, with configuration snapshots and source scope pinned to each task.
 
 <a id="quickstart"></a>
 ## 🚀 Quickstart
@@ -90,7 +93,6 @@ Bootstrap creates a private `.env` and random login passwords. Do not overwrite 
 | Local library and charts | Import, text-layer parsing, PDF reading and controlled charts | No model key |
 | mock | Exercise retrieval, QA and translation workflows | Synthetic outputs, not research conclusions |
 | Cloud providers | Real generation, embeddings, reranking and translation | [Service configuration and production admission](docs/guides/models.md) |
-| local preset | Local-model integration development | Service setup and general business dispatch remain incomplete |
 
 ### 4. Run
 
@@ -125,7 +127,6 @@ ScholarShip/
 │   ├── infrastructure/           # Database, storage and service integration
 │   └── workers/                  # Background jobs and scheduling
 ├── backend/tests/                # Contract and integration tests
-├── local_services/               # Optional local-service integration preparation
 ├── deploy/                       # Containers and reverse proxy
 ├── docs/                         # Usage, architecture and development guides
 ├── model_config.py               # Unified model and runtime configuration
@@ -144,7 +145,7 @@ This historical screenshot shows training hardware and timing on page 7 of the T
 
 | Layer | Existing evidence | Scope |
 |---|---|---|
-| Engineering regression | 225 backend tests, 3 frontend tests and a production build | Local workspace results from 2026-11-17, not remote CI status |
+| Engineering regression | 233 backend tests, 3 frontend tests and a production build | Local workspace results from 2026-11-17, not remote CI status |
 | User workflow | Seven local steps using real PDFs | Synthetic QA and translation responses |
 | Real model samples | Five single-paper questions, scanned-paper indexing and translation artifacts | Historical bounded runs; semantic review remains necessary |
 
@@ -153,10 +154,9 @@ Run checks locally:
 ```bash
 .venv/bin/python doctor.py
 .venv/bin/python validate.py
-.venv/bin/python local_models_doctor.py
 ```
 
-Validation requires the infrastructure containers and uses isolated temporary databases, queues and vector collections. Reports live in `var/reports/` and are excluded from Git. See the [validation record](docs/qa/completion-2026-11-17.md).
+Validation requires the infrastructure containers and uses isolated temporary databases, queues and vector collections. Reports live in `var/reports/` and are excluded from Git.
 
 ## Documentation and contributing
 

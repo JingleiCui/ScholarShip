@@ -1,9 +1,6 @@
 # ScholarShip 文档
 
-当前目标：完善个人科研助手项目，用于 GitHub 展示与技术面试。开发者已于 2026-11-17 确认不再参赛；历史赛题仅作为需求与测试素材来源，提交比赛不再是交付事项。项目首页提供[中文](../README.md)与[英文](../README.en.md)版本。
-
-
-先看[完整使用手册](guides/user-manual.md)，再按[代码导读](engineering/code-walkthrough.md)追踪一次问答。当前完成情况以[2026-11-17 复核](qa/completion-2026-11-17.md)为准。
+从[使用手册](guides/user-manual.md)开始，或沿着[代码导读](engineering/code-walkthrough.md)了解实现。项目首页：[中文](../README.md) · [English](../README.en.md)。
 
 ## 使用与部署
 
@@ -26,5 +23,3 @@
 | [贡献指南](../CONTRIBUTING.md) | 本地检查与提交要求 |
 | [AI 辅助开发](development/ai-assisted-development.md) | 工具使用、贡献和审查责任 |
 | [安全](../SECURITY.md) / [第三方说明](../THIRD_PARTY_NOTICES.md) | 配置保护和来源授权 |
-
-仓库保留带日期的设计、决策和验证记录，用于追溯实现历史。历史计划不代表当前能力，最终行为以源码与实际检查为准。`docs/design/` 包含已放弃的视觉方案，运行界面见根目录 README。

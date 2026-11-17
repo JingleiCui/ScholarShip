@@ -20,6 +20,8 @@ from scholarship.models.fixtures import transport_factory
 from scholarship.domains.studio.artifacts import publish, write_member
 
 OPERATIONS = {
+    "figure_correct",
+    "figure",
     "direction_review",
     "translate",
     "draft",
@@ -56,13 +58,47 @@ def submit(owner, project, key, operation, inputs, mode="offline_acceptance"):
     if operation not in OPERATIONS or mode not in {"local", "offline_acceptance", "cloud"}:
         raise ContractError("invalid_studio_operation")
     selection = project_selection(owner, project)
-    if operation in {"chart", "diagram", "local_parse", "direction_check", "direction_review", "review_artifact"}:
+    if operation in {
+        "chart",
+        "diagram",
+        "local_parse",
+        "direction_check",
+        "direction_review",
+        "review_artifact",
+        "figure_correct",
+    }:
         mode = "local"
     elif mode == "local":
         raise ContractError("model_execution_mode_required")
+    if operation == "figure":
+        from scholarship.models.catalog import configuration
+        from scholarship.models.configuration import load_selection
+        from dataclasses import replace
+
+        alias = configuration().get("FIGURE_MODEL")
+        if alias:
+            visual = load_selection(selection.preset, overrides={"chat": alias})
+            selection = replace(
+                selection,
+                roles={**selection.roles, "chat": visual.roles["chat"]},
+                bindings={**selection.bindings, "chat": visual.bindings["chat"]},
+            )
+        spec = selection.roles["chat"]
+        if mode != "cloud" or (spec.provider, spec.model) not in configuration().get("VISION_MODEL_BINDINGS", []):
+            raise ContractError("cloud_vision_model_required")
+        if len(inputs.get("block_ids", [])) != 1:
+            raise ContractError("one_figure_required")
+        from scholarship.domains.studio.figures import source
+
+        with tenant_transaction(owner) as conn:
+            row = source(conn, UUID(inputs["block_ids"][0]))
+            if row["project_id"] != project:
+                raise ContractError("figure_project_mismatch")
     if mode == "cloud":
         require_cloud(selection)
     config = {"revision": "research-studio-v1", "operation": operation, "mode": mode, "models": selection.snapshot()}
+    if operation == "figure":
+        config["figure_policy"] = "vision-graph-schema-v2"
     if operation == "translate":
         config["translation_prompt_revision"] = "local-literals-plaintext-v4"
         config["translation_policy"] = {"max_parts": 12, "max_text_chars": 1800}
@@ -109,6 +145,10 @@ def execute(owner, project, run):
             return job["result_json"]
     operation = job["config_json"]["operation"]
     inputs = job["input_json"]["arguments"]
+    if operation == "figure_correct":
+        from scholarship.domains.studio.figures import correct
+
+        return correct(owner, project, run, inputs)
     if operation == "local_parse":
         from scholarship.domains.studio.local_parse import parse_local
 
@@ -197,6 +237,10 @@ def execute(owner, project, run):
         else SimulatedGateway(owner, run, selection, transport_factory(selection))
     )
     with gateway:
+        if operation == "figure":
+            from scholarship.domains.studio.figures import describe
+
+            return describe(owner, project, run, inputs, gateway)
         if operation == "translate":
             from scholarship.domains.studio.translation import translate
 

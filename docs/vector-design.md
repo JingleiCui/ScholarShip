@@ -1,6 +1,6 @@
 # Qdrant 与检索数据设计评审稿
 
-日期：2026-11-13。状态：**用户已确认**，见[评审结论](data-design-review.md)。当前没有创建 collection、计算向量或调用模型。配套结构：[关系库设计](data-design.md)、[数据字典](data-dictionary.md)、[索引配置样例](data/qdrant-profile.json)。
+日期：2026-11-13。状态：**用户已确认**，见评审结论。当前没有创建 collection、计算向量或调用模型。配套结构：[关系库设计](data-design.md)、[数据字典](data-dictionary.md)、[索引配置样例](data/qdrant-profile.json)。
 
 ## 1. 初始 profile 与集合边界
 

@@ -5,7 +5,6 @@
 | 配置组 | 生成与翻译 | 向量/重排 | 使用前提 |
 |---|---|---|---|
 | mock | 合成响应 | 合成哈希向量与排序 | 用于验证流程，不产生科研结论 |
-| local | Ollama | Ollama / 本地重排 | 另行安装与启动服务；配置存在不代表服务就绪 |
 | free_api | ChatAnywhere | OpenRouter | 账号权限、模型可用性与生产准入 |
 | free_gemma | OpenRouter Gemma | OpenRouter | 同上；存在历史限流记录，不保证持续可用 |
 
@@ -28,3 +27,7 @@
 移机前检查 `LIVE_PROXY_URLS` 和 `DOWNLOAD_DNS_OVERRIDES`：目前保留原开发机代理与下载解析配置；其他环境可能应清空。凭据不得放入地址或代理 URL。
 
 实现说明见[协议适配设计](../models/adapter-design.md)和[工作室设计](../studio/design.md)。
+
+## 图内识别
+
+在原文阅读器展开已保存图片的 figure 图块，可提交图内识别任务。`FIGURE_MODEL` 单独指定图片模型，不影响项目问答型号；`VISION_MODEL_BINDINGS` 声明允许使用的视觉型号，接口不会在失败时自动更换模型。调用发送单张图片和图注，返回节点文字、归一化坐标、连线方向与不确定项；结果另存为带来源的 JSON 产物，不修改 OCR 原文，也不自动纳入可信检索。图片上限 4 MB，现有生产策略、额度与失败记录继续生效。账户实际图片权限需单独验证。

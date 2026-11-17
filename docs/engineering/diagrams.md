@@ -2,7 +2,9 @@
 
 ## 先看系统如何分工
 
-![系统架构](../assets/diagrams/architecture.svg)
+![系统架构](../assets/diagrams/system-layered.svg)
+
+![业务架构](../assets/diagrams/business-layered.svg)
 
 前端负责操作与原文呈现，API 验证身份、来源范围和输入。PG 保存业务事实；outbox 把执行意图交给投递器和 Redis，再由 worker 处理。图中的箭头表示主依赖，后台也会持续写回 PG 状态。图上没有画出所有返回线，避免把请求图变成无法阅读的网。
 

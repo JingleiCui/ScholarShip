@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import FigureReader from './FigureReader';
 import ReferenceWorkbench from './ReferenceWorkbench';
 import ScientificText from './ScientificText';
 import { api, errorMessage } from './researchApi';
@@ -305,6 +306,7 @@ export default function SourceReader({ target, close }: { target: Target; close:
                   style={{ maxWidth: '100%' }}
                 />
               )}
+              {b.kind === 'figure' && b.asset_file_id && <FigureReader blockId={b.id} />}
             </article>
           ))}
         </div>
