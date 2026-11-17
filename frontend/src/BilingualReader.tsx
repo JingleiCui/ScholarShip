@@ -6,7 +6,7 @@ export type Segment = {
   canonical_text: string;
   translated_text: string;
   page_no: number;
-  placeholders_json: { model_simulated?: boolean };
+  placeholders_json: { model_simulated?: boolean; human_edited?: boolean };
 };
 export default function BilingualReader({ segments }: { segments: Segment[] }) {
   const [parallel, setParallel] = useState(false);
@@ -65,6 +65,7 @@ export default function BilingualReader({ segments }: { segments: Segment[] }) {
           {segments.some((s) => s.placeholders_json.model_simulated)
             ? '模拟译文，仅验证对应关系。'
             : '模型译文待人工校对。'}
+          {segments.some((s) => s.placeholders_json.human_edited) ? '包含人工修订，原始版本保留。' : ''}
           公式和代码保留原文。
         </p>
         {blocks.map((s) => (
@@ -107,7 +108,7 @@ export default function BilingualReader({ segments }: { segments: Segment[] }) {
               border: '1px solid #e4ebf5',
               padding: 12,
             }}
-            aria-label={side === 'left' ? '英文原文' : '译文'}
+            aria-label={side === 'left' ? '原文' : '译文'}
           >
             {blocks.map((s) => (
               <article

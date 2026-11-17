@@ -21,6 +21,9 @@ def publish(
         .mappings()
         .first()
     )
+    if job and job["cancel_requested_at"]:
+        from scholarship.domains.cancellation import RunCancelled
+        raise RunCancelled()
     if not job:
         raise HTTPException(404, "run_not_found")
     old = (

@@ -98,6 +98,7 @@ def translate(owner, project, run, inputs, gateway):
             "parse": inputs.get("parse_id"),
             "language": inputs.get("language", "zh-CN"),
             "blocks": sorted(inputs.get("block_ids", [])),
+            "selection": inputs.get("source_selection"),
             "models": gateway.selection.snapshot(),
             "simulated": gateway.simulated,
         }

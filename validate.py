@@ -114,6 +114,7 @@ def main():
                 "review_official_answers.py",
                 "verify_textbook_structure.py",
                 "verify_studio_local.py",
+                "verify_completion.py",
                 "format_frontend.py",
                 "verify_models.py",
                 "validate_live_models.py",

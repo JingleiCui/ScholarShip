@@ -73,16 +73,25 @@ def graph(owner, project, papers):
                 parses[pid] = v["paper_id"]
         edges = []
         if parses:
-            for ref in conn.execute(
+            from scholarship.domains.studio.reference_reviews import apply_reviews
+
+            refs = conn.execute(
                 sa.select(T["bibliographic_refs"]).where(T["bibliographic_refs"].c.parse_id.in_(list(parses)))
-            ).mappings():
+            ).mappings()
+            for ref in apply_reviews(conn, refs):
                 targets = set()
                 if ref["resolution_state"] == "verified" and ref["resolved_paper_id"] in chosen:
                     targets.add(ref["resolved_paper_id"])
-                for doi in re.findall(r"10\.\d{4,9}/[^\s<>]+", ref["raw_reference"]):
+                for doi in (
+                    []
+                    if ref["resolution_state"] == "verified"
+                    else re.findall(r"10\.\d{4,9}/[^\s<>]+", ref["raw_reference"])
+                ):
                     targets |= identities.get(canonical_identifier("doi", doi.rstrip(".,;)")), set())
-                for aid in re.findall(
-                    r"(?:arXiv:|arxiv\.org/abs/)(\d{4}\.\d{4,5}(?:v\d+)?)", ref["raw_reference"], re.I
+                for aid in (
+                    []
+                    if ref["resolution_state"] == "verified"
+                    else re.findall(r"(?:arXiv:|arxiv\.org/abs/)(\d{4}\.\d{4,5}(?:v\d+)?)", ref["raw_reference"], re.I)
                 ):
                     targets |= identities.get(canonical_identifier("arxiv", aid), set())
                 if len(targets) == 1:

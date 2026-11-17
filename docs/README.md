@@ -1,5 +1,10 @@
 # ScholarShip 文档
 
+当前目标：完善个人科研助手项目，用于 GitHub 展示与技术面试。开发者已于 2026-11-17 确认不再参赛；历史赛题仅作为需求与测试素材来源，提交比赛不再是交付事项。项目首页提供[中文](../README.md)与[英文](../README.en.md)版本。
+
+
+先看[完整使用手册](guides/user-manual.md)，再按[代码导读](engineering/code-walkthrough.md)追踪一次问答。当前完成情况以[2026-11-17 复核](qa/completion-2026-11-17.md)为准。
+
 ## 使用与部署
 
 | 主题 | 说明 |
@@ -14,7 +19,7 @@
 
 | 主题 | 说明 |
 |---|---|
-| [项目架构](architecture.md) | 领域职责、文件与证据流转 |
+| [当前架构](engineering/architecture-current.md) / [图解](engineering/diagrams.md) | 领域职责、文件与证据流转 |
 | [关系数据](data-design.md) / [向量检索](vector-design.md) | 数据模型、版本与索引世代 |
 | [模型协议](models/adapter-design.md) | 能力目录、协议、传输与工作流边界 |
 | [研究工作流](studio/design.md) | 翻译、摘要、产物和受控工具 |

@@ -36,7 +36,17 @@ def emit(conn, run_id, event_type, payload):
 def public_run(row):
     return {
         k: row[k]
-        for k in ("id", "project_id", "kind", "status", "result_json", "error_json", "created_at", "finished_at")
+        for k in (
+            "id",
+            "project_id",
+            "kind",
+            "status",
+            "result_json",
+            "error_json",
+            "created_at",
+            "finished_at",
+            "cancel_requested_at",
+        )
     }
 
 

@@ -228,8 +228,32 @@ def prepare(
             rows = [b for b in rows if str(b["id"]) in chosen]
             if {str(b["id"]) for b in rows} != chosen:
                 raise ContractError("translation_block_scope_mismatch")
+        selection_span = inputs.get("source_selection")
+        offset = 0
+        if selection_span:
+            rows = [b for b in rows if str(b["id"]) == str(selection_span.get("block_id"))]
+            if len(rows) != 1:
+                raise ContractError("translation_selection_scope_mismatch")
+            text = rows[0]["canonical_text"]
+            start, end = selection_span.get("start"), selection_span.get("end")
+            if (
+                type(start) is not int
+                or type(end) is not int
+                or not 0 <= start < end <= len(text)
+                or end - start > 4000
+                or text[start:end] != selection_span.get("text")
+            ):
+                raise ContractError("translation_selection_text_mismatch")
+            if any(m.start() < start < m.end() or m.start() < end < m.end() for m in LITERALS.finditer(text)):
+                raise ContractError("translation_selection_splits_protected_literal")
+            rows = [{**rows[0], "canonical_text": text[start:end]}]
+            offset = start
         original_groups = batches(rows)
         groups = html_safe_groups(original_groups, rows)
+        for group in groups:
+            for b in group:
+                b["source_start"] += offset
+                b["source_end"] += offset
         config = {
             "parse_id": str(pid),
             "language": language,
@@ -238,9 +262,11 @@ def prepare(
             "blocks": [str(b["id"]) for b in rows],
             "simulated": simulated,
         }
+        if selection_span:
+            config["source_selection"] = selection_span
         if prompt_revision != "local-literals-plaintext-v3":
             config["part_policy"] = {"max_parts": max_parts, "max_text_chars": max_text_chars}
-        old_cache = legacy_recovery(conn, pid, config, original_groups)
+        old_cache = {} if selection_span else legacy_recovery(conn, pid, config, original_groups)
         reused = {
             b["id"]: old_cache[b["id"]]
             for g in groups
@@ -553,6 +579,9 @@ def translate_parts(owner, project, run, inputs, gateway):
 
     save_ready()
     for n, packet in enumerate(plan["packets"]):
+        from scholarship.domains.cancellation import check_cancelled
+
+        check_cancelled(owner, run)
         receipt = gateway.invoke(
             f"translate-plain:{tid}:{digest(canonical([p['cache_key'] for p in packet]))[:24]}",
             "translation",
@@ -564,6 +593,19 @@ def translate_parts(owner, project, run, inputs, gateway):
             store_parts(conn, owner, project, run, pid, config, packet, out)
         values.update(out)
         save_ready()
+        from scholarship.domains.runs import emit
+
+        with tenant_transaction(owner) as conn:
+            emit(
+                conn,
+                run,
+                "progress",
+                {
+                    "message": f"翻译批次 {n + 1}/{len(plan['packets'])} 已校验并保存。",
+                    "completed": n + 1,
+                    "total": len(plan["packets"]),
+                },
+            )
         if set(out) != {p["id"] for p in packet}:
             raise ContractError("incomplete_plaintext_translation_response")
     with tenant_transaction(owner) as conn:

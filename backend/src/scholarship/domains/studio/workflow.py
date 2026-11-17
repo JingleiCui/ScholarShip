@@ -20,6 +20,7 @@ from scholarship.models.fixtures import transport_factory
 from scholarship.domains.studio.artifacts import publish, write_member
 
 OPERATIONS = {
+    "direction_review",
     "translate",
     "draft",
     "summary",
@@ -55,7 +56,7 @@ def submit(owner, project, key, operation, inputs, mode="offline_acceptance"):
     if operation not in OPERATIONS or mode not in {"local", "offline_acceptance", "cloud"}:
         raise ContractError("invalid_studio_operation")
     selection = project_selection(owner, project)
-    if operation in {"chart", "diagram", "local_parse", "direction_check", "review_artifact"}:
+    if operation in {"chart", "diagram", "local_parse", "direction_check", "direction_review", "review_artifact"}:
         mode = "local"
     elif mode == "local":
         raise ContractError("model_execution_mode_required")
@@ -111,7 +112,7 @@ def execute(owner, project, run):
     if operation == "local_parse":
         from scholarship.domains.studio.local_parse import parse_local
 
-        return parse_local(owner, project, UUID(inputs["version_id"]))
+        return parse_local(owner, project, UUID(inputs["version_id"]), run=run)
     if operation != "translate":
         with tenant_transaction(owner) as conn:
             cached = (
@@ -177,6 +178,10 @@ def execute(owner, project, run):
         }
     if operation == "diagram":
         return diagram(owner, project, run, inputs)
+    if operation == "direction_review":
+        from scholarship.domains.studio.direction_review import review
+
+        return review(owner, project, run, inputs)
     if operation == "direction_check":
         from scholarship.domains.studio.direction_checks import check
 

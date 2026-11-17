@@ -16,7 +16,7 @@ REVISION = "pdfplumber-lines-columns-v3"
 MAX_PAGES = 1000
 
 
-def parse_local(owner, project, version_id):
+def parse_local(owner, project, version_id, *, run=None):
     with tenant_transaction(owner) as conn:
         v = version_scope(conn, version_id)
         if v["project_id"] != project:
@@ -31,6 +31,9 @@ def parse_local(owner, project, version_id):
         if not 1 <= len(pdf.pages) <= MAX_PAGES:
             raise ContractError("local_parse_page_limit")
         for number, page in enumerate(pdf.pages, 1):
+            if run is not None:
+                from scholarship.domains.cancellation import check_cancelled
+                check_cancelled(owner, run)
             if page.rotation or page.cropbox != page.mediabox:
                 raise ContractError("local_crop_rotation_requires_native_parser")
             words = page.extract_words(extra_attrs=["size", "fontname"], x_tolerance=2, y_tolerance=3)
@@ -137,6 +140,8 @@ def parse_local(owner, project, version_id):
             page.close()  # release cached layout before parsing the next textbook page
     if total_chars < 30:
         raise ContractError("no_text_layer_ocr_required")
+    if run is not None:
+        check_cancelled(owner, run)
     config = digest(canonical({"source": source_hash, "mapper": REVISION}))
     with tenant_transaction(owner) as conn:
         conn.execute(

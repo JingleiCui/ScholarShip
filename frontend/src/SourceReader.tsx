@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import ReferenceWorkbench from './ReferenceWorkbench';
 import ScientificText from './ScientificText';
 import { api, errorMessage } from './researchApi';
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -22,7 +23,15 @@ type Block = {
   asset_file_id: string | null;
   source_locator: { pdf_bbox?: number[] };
 };
-type Reference = { id: string; marker: string; raw_reference: string; page_no: number; pdf_bbox?: number[] };
+type Reference = {
+  resolution_state?: string;
+  resolved_paper_id?: string;
+  id: string;
+  marker: string;
+  raw_reference: string;
+  page_no: number;
+  pdf_bbox?: number[];
+};
 type Heading = {
   id: string;
   canonical_text: string;
@@ -251,6 +260,7 @@ export default function SourceReader({ target, close }: { target: Target; close:
           </button>
         )}
       </div>
+      <ReferenceWorkbench key={target.parse_id} parse={target.parse_id} references={references} />
       <details>
         <summary>文档标题目录</summary>
         {outline.map((h) => (

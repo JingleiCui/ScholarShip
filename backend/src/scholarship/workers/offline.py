@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from threading import Event, Thread
 from uuid import UUID, uuid4
 import sqlalchemy as sa
+from scholarship.domains.cancellation import RunCancelled, check_cancelled
 from scholarship.adapters.providers import ContractError, UnknownOutcome, ExternalDisabled
 from scholarship.models.contracts import ProviderFailure
 from scholarship.domains.research import execute_research
@@ -124,6 +125,7 @@ def execute_offline(owner, project, run_id):
     error = None
     status = "succeeded"
     try:
+        check_cancelled(owner, run_id)
         if r["kind"] == "research_studio":
             from scholarship.domains.studio.workflow import execute
 
@@ -136,6 +138,10 @@ def execute_offline(owner, project, run_id):
             )
         if result is None:
             raise RuntimeError("graph_incomplete")
+    except RunCancelled:
+        status = "cancelled"
+        result = None
+        error = {"code": "cancelled_at_safe_boundary"}
     except (ProviderFailure, ExternalDisabled) as exc:
         status = "waiting_user"
         error = {"code": exc.code if isinstance(exc, ProviderFailure) else "production_admission_closed"}
@@ -195,7 +201,7 @@ def execute_offline(owner, project, run_id):
                 error_json=error,
                 lease_token=None,
                 lease_until=None,
-                finished_at=sa.func.now() if status in {"succeeded", "failed"} else None,
+                finished_at=sa.func.now() if status in {"succeeded", "failed", "cancelled"} else None,
             )
         )
         emit(

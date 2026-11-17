@@ -1,6 +1,7 @@
 """Business-facing invocation ports with explicit ownership and execution mode."""
 
 from contextlib import AbstractContextManager
+from scholarship.domains.cancellation import check_cancelled
 from typing import Protocol
 
 from scholarship.models.adapters import ProviderClient
@@ -42,9 +43,18 @@ class SimulatedGateway(AbstractContextManager):
         return self.clients[role]
 
     def invoke(self, intent, role, operation, arguments):
-        return ModelExecutor(self.owner).execute(
-            self.run, intent, self.selection, role, self.client(role), arguments, operation
-        )
+        check_cancelled(self.owner, self.run)
+        try:
+            return ModelExecutor(self.owner).execute(
+                self.run, intent, self.selection, role, self.client(role), arguments, operation
+            )
+        except sa.exc.DBAPIError as exc:
+            message = getattr(getattr(exc.orig, "diag", None), "message_primary", "")
+            if message == "model request quota exhausted":
+                from scholarship.models.contracts import ProviderFailure
+
+                raise ProviderFailure("model_request_quota_exhausted") from None
+            raise
 
     def __exit__(self, *exc):
         for client in self.clients.values():

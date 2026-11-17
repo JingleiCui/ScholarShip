@@ -45,7 +45,19 @@ def create_app():
     app.include_router(research_router, prefix="/api/v1")
 
     from scholarship.api.studio import router as studio_router
-    app.include_router(studio_router,prefix="/api/v1")
+
+    app.include_router(studio_router, prefix="/api/v1")
+    from scholarship.api.library_tools import router as library_tools_router
+    from scholarship.api.task_control import router as cancellation_router
+
+    app.include_router(library_tools_router, prefix="/api/v1")
+    app.include_router(cancellation_router, prefix="/api/v1")
+    from scholarship.api.reading_tools import router as reading_tools_router
+
+    app.include_router(reading_tools_router, prefix="/api/v1")
+    from scholarship.api.reference_tools import router as reference_tools_router
+
+    app.include_router(reference_tools_router, prefix="/api/v1")
 
     @app.middleware("http")
     async def request_id(request, call_next):

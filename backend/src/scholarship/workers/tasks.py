@@ -9,6 +9,7 @@ from langgraph.graph import StateGraph, START, END
 import sqlalchemy as sa
 
 from scholarship.config import settings
+from scholarship.domains.cancellation import RunCancelled, check_cancelled
 from scholarship.domains.runs import emit
 from scholarship.infrastructure.database import engine, tenant_transaction
 from scholarship.infrastructure.health import dependency_health
@@ -137,9 +138,13 @@ def execute_probe(owner, project, run_id):
         )
         emit(conn, run_id, "running", {"message": "后台已领取任务，正在执行本地 LangGraph 探针。", "attempt": attempt})
     try:
+        check_cancelled(owner, run_id)
         result = graph_probe(run_id)
+        check_cancelled(owner, run_id)
         status = "succeeded" if result["ready"] else "failed"
         error = None if status == "succeeded" else {"code": "dependency_unavailable"}
+    except RunCancelled:
+        result, status, error = None, "cancelled", {"code": "cancelled_at_safe_boundary"}
     except Exception as exc:
         result, status, error = None, "failed", {"code": "probe_failed", "type": type(exc).__name__}
     with tenant_transaction(owner) as conn:
@@ -150,7 +155,13 @@ def execute_probe(owner, project, run_id):
         conn.execute(
             steps.update()
             .where(steps.c.id == step_id, steps.c.lease_token == token)
-            .values(status=status, output_json=result, error_json=error, lease_until=None, updated_at=sa.func.now())
+            .values(
+                status="failed" if status == "cancelled" else status,
+                output_json=result,
+                error_json=error,
+                lease_until=None,
+                updated_at=sa.func.now(),
+            )
         )
         conn.execute(
             runs.update()

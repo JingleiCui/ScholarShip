@@ -1,3 +1,7 @@
+import TaskEvents from './TaskEvents';
+import DirectionReview from './DirectionReview';
+import TranslationReview from './TranslationReview';
+import CancelTask from './CancelTask';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { api, errorMessage, runErrorMessage, runStatus } from './researchApi';
 import type { GraphData } from './CitationGraph';
@@ -28,6 +32,10 @@ type Run = {
     review_notice?: string;
     candidates?: { title: string; url: string; assessment: string }[];
     checked_at?: string;
+    assessment?: string;
+    question?: string;
+    reason?: string;
+    evidence?: (Target & { role: string })[];
     summary_spans?: {
       anchors: {
         block_spans?: {
@@ -111,7 +119,7 @@ export default function Studio({
         const needsSources = [1, 3, 4].includes(module);
         const operationFilters: Record<number, string> = {
           1: 'local_parse,translate,summary,review_artifact',
-          3: 'direction,direction_check',
+          3: 'direction,direction_check,direction_review',
           4: 'draft,summary,review_artifact',
           5: 'chart,diagram',
         };
@@ -159,9 +167,37 @@ export default function Studio({
       await api(`/studio/projects/${project}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
-        body: JSON.stringify({ operation, mode, parse_ids: selected, idea, ...extra }),
+        body: JSON.stringify({ operation, mode, parse_ids: selected, idea, language, ...extra }),
       });
       setNote('任务已保存，可在下方查看进度和下载产物。');
+    });
+  }
+  const [language, setLanguage] = useState('zh-CN'),
+    [translationId, setTranslationId] = useState('');
+  const [translationVersions, setTranslationVersions] = useState<
+    { id: string; revision_no: number; target_language: string; prompt_revision: string; status: string }[]
+  >([]);
+  useEffect(() => {
+    let stopped = false;
+    setTranslationVersions([]);
+    if (module === 1 && selected.length === 1) {
+      void api(`/studio/parses/${selected[0]}/translations`)
+        .then((rows) => {
+          if (!stopped) setTranslationVersions(rows);
+        })
+        .catch((e) => {
+          if (!stopped) setError(errorMessage(e));
+        });
+    }
+    return () => {
+      stopped = true;
+    };
+  }, [selected, module, translationId, runs]);
+  async function openTranslation(id: string) {
+    await action(async () => {
+      const rows = await api(`/studio/translations/${id}/segments`);
+      setSegments(rows);
+      setTranslationId(id);
     });
   }
   const [sourcePage, setSourcePage] = useState(1),
@@ -181,6 +217,12 @@ export default function Studio({
       stop = true;
     };
   }, [selected, sourcePage, module]);
+  const [textSelection, setTextSelection] = useState<{
+    block_id: string;
+    start: number;
+    end: number;
+    text: string;
+  } | null>(null);
   const [followupQuery, setFollowupQuery] = useState('');
   const [description, setDescription] = useState('输入 → 解析 → 检索 → 生成 → 证据核验');
   const operationNames: Record<string, string> = {
@@ -191,6 +233,7 @@ export default function Studio({
     draft: '写作框架',
     direction: '研究方向草稿',
     direction_check: '后续研究检索',
+    direction_review: '后续全文证据对照',
     chart: '数据图表',
     diagram: '架构图',
   };
@@ -284,6 +327,13 @@ export default function Studio({
       )}
       {module === 1 && (
         <>
+          <label>
+            目标语言
+            <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+              <option value="zh-CN">中文</option>
+              <option value="en">English</option>
+            </select>
+          </label>
           <p>整篇或选段翻译按原文块保存；公式、代码和引用标记受保护。模拟模式不会产生真正的中文翻译。</p>
           <button
             disabled={busy || !canWrite || selected.length !== 1}
@@ -312,6 +362,27 @@ export default function Studio({
                   }
                 />
                 {b.canonical_text.slice(0, 180)}
+                <textarea
+                  aria-label="选词或选句翻译"
+                  readOnly
+                  value={b.canonical_text}
+                  rows={3}
+                  onSelect={(e) => {
+                    const el = e.currentTarget;
+                    const start = Array.from(el.value.slice(0, el.selectionStart)).length;
+                    const end = Array.from(el.value.slice(0, el.selectionEnd)).length;
+                    setTextSelection(
+                      end > start
+                        ? {
+                            block_id: b.id,
+                            start,
+                            end,
+                            text: el.value.slice(el.selectionStart, el.selectionEnd),
+                          }
+                        : null,
+                    );
+                  }}
+                />
               </label>
             ))}
             <button
@@ -320,10 +391,54 @@ export default function Studio({
             >
               翻译勾选段落
             </button>
+            <p>在上面的原文框中选择单词或句子，再点击翻译。公式与代码需完整选择。</p>
+            <button
+              disabled={busy || !canWrite || !textSelection || selected.length !== 1}
+              onClick={() =>
+                void task('translate', {
+                  parse_id: selected[0],
+                  block_ids: [],
+                  source_selection: textSelection,
+                })
+              }
+            >
+              翻译选中文字
+            </button>
           </details>
           <button disabled={busy || !canWrite || !selected.length} onClick={() => void task('summary')}>
             生成有来源摘要
           </button>
+          {translationVersions.length > 0 && (
+            <label>
+              已保存的翻译修订
+              <select
+                value={translationId}
+                onChange={(e) => {
+                  if (e.target.value) void openTranslation(e.target.value);
+                }}
+              >
+                <option value="">选择修订，刷新后仍可读取</option>
+                {translationVersions.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    修订 {r.revision_no} · {r.target_language} ·{' '}
+                    {r.prompt_revision === 'human-review-v1' ? '人工审阅' : '模型翻译'} · {r.status}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {translationId && (
+            <TranslationReview
+              translation={translationId}
+              canWrite={canWrite}
+              onRevision={(id) => {
+                setTranslationId(id);
+                void api(`/studio/translations/${id}/segments`)
+                  .then(setSegments)
+                  .catch((e) => setError(errorMessage(e)));
+              }}
+            />
+          )}
           {segments.length > 0 && (
             <Suspense fallback={<p>加载双语阅读器…</p>}>
               <BilingualReader segments={segments} />
@@ -549,6 +664,13 @@ export default function Studio({
           >
             检索后续证据（公开元数据，不调用模型）
           </button>
+          <DirectionReview
+            docs={docs
+              .filter((d) => d.native_parse_id)
+              .map((d) => ({ id: d.native_parse_id!, title: d.title }))}
+            disabled={busy || !canWrite}
+            submit={(args) => task('direction_review', args)}
+          />
           <p>保存检索时间、范围和原文 Future Work 候选。摘要匹配需后续全文核验，未找到不能当作问题未解决。</p>
         </>
       )}
@@ -702,6 +824,8 @@ export default function Studio({
               </a>
             </p>
           )}
+          {canWrite && <CancelTask id={r.id} status={r.status} />}
+          <TaskEvents run={r.id} />
           {r.error_json && <p role="alert">{runErrorMessage(r.error_json)}</p>}
           {r.result_json && (
             <>
@@ -748,6 +872,22 @@ export default function Studio({
                     ))}
                 </details>
               )}
+              {r.operation === 'direction_review' && (
+                <section>
+                  <h4>{r.result_json.question}</h4>
+                  <p>
+                    人工判断：{r.result_json.assessment} · {r.result_json.reason}
+                  </p>
+                  {r.result_json.evidence?.map((span, i) => (
+                    <article key={i}>
+                      <blockquote>{span.quote}</blockquote>
+                      <button onClick={() => setTarget(span)}>
+                        {span.role === 'original_evidence' ? '原研究' : '后续研究'} · 原文第 {span.page} 页
+                      </button>
+                    </article>
+                  ))}
+                </section>
+              )}
               {r.result_json.sections?.map((s, i) => (
                 <article key={i}>
                   <h4>{s.title}</h4>
@@ -772,11 +912,11 @@ export default function Studio({
               {r.result_json.translation_id && (
                 <button
                   onClick={() =>
-                    void action(async () =>
-                      setSegments(
-                        await api(`/studio/translations/${r.result_json!.translation_id}/segments`),
-                      ),
-                    )
+                    void action(async () => {
+                      const id = r.result_json!.translation_id!;
+                      setSegments(await api(`/studio/translations/${id}/segments`));
+                      setTranslationId(id);
+                    })
                   }
                 >
                   打开中英逐块对照

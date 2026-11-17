@@ -15,7 +15,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile, Form
 from fastapi.responses import FileResponse
 import sqlalchemy as sa
 
-from scholarship.api.auth import identity, mutation_identity, Identity
+from scholarship.api.auth import identity, Identity
+from scholarship.api.offline import demo_actor
 from scholarship.config import DATA_DIR
 from scholarship.infrastructure.database import tenant_transaction
 from scholarship.infrastructure.schema import tables as T
@@ -113,7 +114,7 @@ async def upload(
     project_id: UUID,
     file: UploadFile,
     paper_id: UUID | None = Form(None),
-    user: Identity = Depends(mutation_identity),
+    user: Identity = Depends(demo_actor),
     idempotency_key: str = Header(min_length=1, max_length=128),
 ):
     return await store_upload(project_id, file, paper_id, user, idempotency_key)
@@ -286,6 +287,21 @@ async def store_upload(project_id, file, paper_id, user, idempotency_key, *, sou
                     .all()
                 )
                 candidates.extend(c for c in matches if c["id"] not in [x["id"] for x in candidates])
+            if info.get("content_signature"):
+                from scholarship.domains.document_identity import similarity
+
+                prior_versions = conn.execute(
+                    sa.select(T["paper_versions"].c.metadata_json, T["papers"].c.id, T["papers"].c.title)
+                    .join(T["papers"], T["papers"].c.id == T["paper_versions"].c.paper_id)
+                    .where(T["paper_versions"].c.project_id == project_id, T["papers"].c.deleted_at.is_(None))
+                    .limit(1000)
+                ).mappings()
+                for prior_version in prior_versions:
+                    score = similarity(
+                        info["content_signature"], prior_version["metadata_json"].get("content_signature", [])
+                    )
+                    if score >= 0.65 and prior_version["id"] not in [x["id"] for x in candidates]:
+                        candidates.append({"id": prior_version["id"], "title": prior_version["title"]})
             if paper_id is not None:
                 selected = (
                     conn.execute(
@@ -320,7 +336,10 @@ async def store_upload(project_id, file, paper_id, user, idempotency_key, *, sou
                         "schema_version": 1,
                         "title": title,
                         "page_count": pages,
-                        "source": "pdf_metadata_filename_and_first_page_candidates",
+                        "source": "pdf_metadata_first_page_and_content_candidates",
+                        "content_signature": info.get("content_signature", []),
+                        "signature_scope": info.get("signature_scope"),
+                        "arxiv_revision": info.get("arxiv_revision"),
                         "identifier_candidates": identifiers,
                         "download_source_record_id": str(source_record["id"]) if source_record else None,
                     },
@@ -347,6 +366,8 @@ async def store_upload(project_id, file, paper_id, user, idempotency_key, *, sou
                         upload_id=uid,
                         candidate_json={
                             "new_version_id": str(vid),
+                            "notice": "标题、文档标识或前三页文字高度相似，需要人工确认；未自动覆盖已有文件。",
+                            "incoming_revision": info.get("arxiv_revision"),
                             "papers": [{"id": str(c["id"]), "title": c["title"]} for c in candidates],
                         },
                     )
@@ -397,7 +418,7 @@ def original(version_id: UUID, user: Identity = Depends(identity)):
 
 
 @router.post("/paper-versions/{version_id}/parses", status_code=202)
-def reparse(version_id: UUID, user: Identity = Depends(mutation_identity)):
+def reparse(version_id: UUID, user: Identity = Depends(demo_actor)):
     with tenant_transaction(user.user_id) as conn:
         v = version_row(conn, version_id)
         conn.execute(
@@ -489,7 +510,7 @@ class ReviewDecision(BaseModel):
 
 
 @router.post("/duplicate-reviews/{review_id}/decision")
-def decide(review_id: UUID, body: ReviewDecision, user: Identity = Depends(mutation_identity)):
+def decide(review_id: UUID, body: ReviewDecision, user: Identity = Depends(demo_actor)):
     with tenant_transaction(user.user_id) as conn:
         row = (
             conn.execute(
@@ -551,7 +572,7 @@ def decide(review_id: UUID, body: ReviewDecision, user: Identity = Depends(mutat
 
 
 @router.post("/parses/{parse_id}/resume", status_code=202)
-def resume(parse_id: UUID, user: Identity = Depends(mutation_identity)):
+def resume(parse_id: UUID, user: Identity = Depends(demo_actor)):
     with tenant_transaction(user.user_id) as conn:
         p = (
             conn.execute(sa.select(T["document_parses"]).where(T["document_parses"].c.id == parse_id).with_for_update())

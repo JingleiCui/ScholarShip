@@ -1,3 +1,5 @@
+import TaskEvents from './TaskEvents';
+import CancelTask from './CancelTask';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { api, errorMessage, runErrorMessage, runStatus } from './researchApi';
 import type { Target } from './SourceReader';
@@ -82,15 +84,19 @@ export default function Research({ project, role }: { project: string; role?: st
     setBusy(true);
     setError('');
     try {
-      await api(`/research/projects/${project}/${kind}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
-        body: JSON.stringify({
-          version_ids: selected,
-          mode,
-          ...(kind === 'questions' ? { question, parent_run_id: parent || null } : {}),
-        }),
-      });
+      // Each document has its own durable index task; QA still freezes the full selected scope.
+      const groups = kind === 'indexes' ? selected.map((id) => [id]) : [selected];
+      for (const version_ids of groups) {
+        await api(`/research/projects/${project}/${kind}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify({
+            version_ids,
+            mode,
+            ...(kind === 'questions' ? { question, parent_run_id: parent || null } : {}),
+          }),
+        });
+      }
       await refresh();
     } catch (e) {
       setError(errorMessage(e));
@@ -108,7 +114,8 @@ export default function Research({ project, role }: { project: string; role?: st
   if (!project) return null;
   return (
     <section className="task-panel" style={{ marginBottom: 24 }}>
-      <h2>文献证据问答 · M2</h2>
+      <h2>文献证据问答</h2>
+      <p>多篇建索引按文献分别排队，每篇独立显示结果；提问时可同时选择多篇。所有任务共用项目额度。</p>
       <p>
         使用正式文献版本与结构化原文（OCR
         或本地文本层）。当前可做离线验收：向量、重排和回答为模拟响应，不代表科研正确性。云端任务须同时满足模型、文献范围及限额准入。
@@ -219,6 +226,8 @@ export default function Research({ project, role }: { project: string; role?: st
               )[r.status] ?? r.status}
             </strong>
           </summary>
+          {role === 'researcher' && <CancelTask id={r.id} status={r.status} />}
+          <TaskEvents run={r.id} />
           <p>任务模型组合：{r.model_preset}</p>
           {r.error_json && <p role="alert">{runErrorMessage(r.error_json)}</p>}
           {r.result_json && (

@@ -22,16 +22,42 @@ from scholarship.domains.runs import public_run
 router = APIRouter(prefix="/studio")
 
 
+class TextSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    block_id: UUID
+    start: int = Field(ge=0)
+    end: int = Field(gt=0)
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class EvidenceSpan(TextSelection):
+    pass
+
+
 class ToolRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     operation: Literal[
-        "translate", "draft", "summary", "direction", "direction_check", "review_artifact", "diagram", "local_parse"
+        "direction_review",
+        "translate",
+        "draft",
+        "summary",
+        "direction",
+        "direction_check",
+        "review_artifact",
+        "diagram",
+        "local_parse",
     ]
     mode: Literal["offline_acceptance", "cloud"] = "offline_acceptance"
     version_id: UUID | None = None
     parse_id: UUID | None = None
     parse_ids: list[UUID] = Field(default_factory=list, max_length=30)
     block_ids: list[UUID] = Field(default_factory=list, max_length=200)
+    original_evidence: EvidenceSpan | None = None
+    followup_evidence: EvidenceSpan | None = None
+    question: str = Field(default="", max_length=2000)
+    assessment: Literal["supported", "partly_supported", "contradicted", "insufficient"] = "insufficient"
+    reason: str = Field(default="", max_length=4000)
+    source_selection: TextSelection | None = None
     language: Literal["zh-CN", "en"] = "zh-CN"
     idea: str = Field(default="", max_length=2000)
     description: str = Field(default="", max_length=2000)
@@ -42,6 +68,13 @@ class ToolRequest(BaseModel):
 
     @model_validator(mode="after")
     def source_required(self):
+        if self.operation == "direction_review" and (
+            not self.original_evidence
+            or not self.followup_evidence
+            or len(self.question.strip()) < 3
+            or len(self.reason.strip()) < 3
+        ):
+            raise ValueError("two_fulltext_spans_and_review_required")
         if self.operation == "review_artifact" and self.artifact_version_id is None:
             raise ValueError("source_artifact_version_required")
         if self.operation == "local_parse" and self.version_id is None:
@@ -383,7 +416,12 @@ def references(parse_id: UUID, user: Identity = Depends(identity)):
             .join(T["document_pages"], T["document_pages"].c.id == T["document_blocks"].c.page_id)
             .where(T["bibliographic_refs"].c.parse_id == parse_id)
         ).mappings()
-        return [{**dict(r), "version_id": str(version), "pdf_bbox": r["source_locator"].get("pdf_bbox")} for r in rows]
+        from scholarship.domains.studio.reference_reviews import apply_reviews
+
+        return [
+            {**r, "version_id": str(version), "pdf_bbox": r["source_locator"].get("pdf_bbox")}
+            for r in apply_reviews(conn, rows)
+        ]
 
 
 @router.get("/blocks/{block_id}/locate")

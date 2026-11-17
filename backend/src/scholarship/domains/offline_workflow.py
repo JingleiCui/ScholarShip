@@ -523,6 +523,8 @@ def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
         return {"answer": receipt["result"]}
 
     def publish(state):
+        from scholarship.domains.cancellation import check_cancelled
+        check_cancelled(owner, run)
         return {
             "result": persist_answer(
                 owner, project, run, original_question, state["answer"], state["selected"], state["retrieval"]["trace"]

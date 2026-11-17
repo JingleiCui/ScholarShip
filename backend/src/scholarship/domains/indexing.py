@@ -326,6 +326,7 @@ def build_index(
     model_client=None,
     model_gateway=None,
     task_generation=False,
+    batch_size=10,
 ):
     profile_id = None
     expected_vectors = {}
@@ -407,8 +408,13 @@ def build_index(
         with tenant_transaction(owner) as conn:
             conn.execute(sa.text("SELECT pg_advisory_xact_lock(hashtextextended(:k,0))"), {"k": g["collection_name"]})
             ensure_collection(client, g["collection_name"], dimensions)
-        for offset in range(0, len(rows), 10):
-            batch = rows[offset : offset + 10]
+        if type(batch_size) is not int or not 1 <= batch_size <= 32:
+            raise ContractError("invalid_embedding_batch_size")
+        for offset in range(0, len(rows), batch_size):
+            from scholarship.domains.cancellation import check_cancelled
+
+            check_cancelled(owner, run)
+            batch = rows[offset : offset + batch_size]
             arguments = {"texts": [c["canonical_text"] for c in batch]}
             if model_selection is None:
                 step = call_step(owner, g["project_id"], run, f"index:{g['id']}:{offset}", arguments)
@@ -445,6 +451,7 @@ def build_index(
                 ],
                 wait=True,
             )
+        check_cancelled(owner, run)
         if after_upsert:
             after_upsert(g)
         # Verify exact identities and all authoritative payload fields, not just counts.

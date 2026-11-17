@@ -1,3 +1,4 @@
+import WorkspaceCreate from './WorkspaceCreate';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
@@ -47,8 +48,8 @@ const modules = [
     title: '知识图谱',
     en: 'CONNECT',
     icon: '⌘',
-    desc: '沿着引用、主题与方法，连接你的研究线索。',
-    tags: ['引用网络', '主题演化'],
+    desc: '沿着原文引用连接文献，比较所选论文的局域中心性。',
+    tags: ['引用网络', 'PageRank'],
   },
   {
     title: '写作与研究核验',
@@ -285,6 +286,15 @@ function App() {
                 </select>
               </label>
             )}
+            {user?.role === 'researcher' && (
+              <WorkspaceCreate
+                onCreated={(p) => {
+                  setProjects([...projects, p]);
+                  setProject(p.id);
+                  setActive(0);
+                }}
+              />
+            )}
             <span className="local-tag">本地开发</span>
             <button className="account" onClick={() => (user ? void logout() : setLoginOpen(true))}>
               <span className="avatar">{user ? '研' : '访'}</span>
@@ -327,7 +337,12 @@ function App() {
           )}
           {(active === -1 || active === 0 || active === 1) && (
             <React.Suspense fallback={<p>正在加载文献阅读器…</p>}>
-              <Library project={project} onResearch={() => setActive(2)} />
+              <Library
+                key={`${user?.id}:${project}`}
+                role={user?.role}
+                project={project}
+                onResearch={() => setActive(2)}
+              />
             </React.Suspense>
           )}
           {active === -1 && (
@@ -498,7 +513,7 @@ function App() {
           <footer>
             <span>ScholarShip · 学者之舟</span>
             <span>
-              2026 研究生组参赛项目 <i>·</i> 研究工作室 · 开发与分项验收
+              学海无涯，AI作舟 <i>·</i> 研究工作室 · 开发与分项验收
             </span>
           </footer>
         </div>

@@ -29,3 +29,5 @@
 - The 541-page textbook was parsed locally as text-layer structure (541 pages, four empty-text pages, no OCR or model calls). This is not an OCR or semantic table/formula quality acceptance. See docs/studio/report-2026-11-16.md and docs/competition/audit-2026-11-16.md for final scope.
 
 - Brand update authorized 2026-11-16: ScholarShip / 学者之舟, tagline 学海无涯，AI作舟. Use blue-white top navigation and vertical content flow; no persistent left/right navigation rails. UI redesign must expose implemented workflows only; generated concept data is not live application data. See docs/studio/topnav-redesign-2026-11-16.md.
+
+- On 2026-11-17 the user ended competition participation. Current goal: a personal research assistant portfolio project for GitHub presentation and technical interviews. Preserve historical acceptance records as evidence, but do not treat competition submission, deadlines, registration or a competition video as current deliverables. Existing cloud and data authorization limits remain unchanged.

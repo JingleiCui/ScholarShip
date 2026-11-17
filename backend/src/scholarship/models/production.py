@@ -5,6 +5,7 @@ AND the shared live budget AND configuration gates. Unknown sends never retry.
 """
 
 from contextlib import AbstractContextManager
+from scholarship.domains.cancellation import check_cancelled
 from dataclasses import asdict, replace
 import httpx
 import sqlalchemy as sa
@@ -70,6 +71,7 @@ class ProductionGateway(AbstractContextManager):
         self.transport_factory, self.transports = transport_factory, {}
 
     def invoke(self, intent, role, operation, arguments):
+        check_cancelled(self.owner, self.run)
         require_cloud(self.selection)
         restore_snapshot(self.selection.snapshot())
         if operation not in ROLE_OPERATIONS.get(role, set()):

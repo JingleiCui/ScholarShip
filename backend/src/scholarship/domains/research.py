@@ -66,6 +66,20 @@ def enqueue_research(
             if not p:
                 raise ContractError("ready_native_parse_required")
             parses.append({"version_id": str(vid), "parse_id": str(p)})
+        if kind == "research_build":
+            from scholarship.domains.indexing import block_rows, chunks
+
+            needed = 0
+            for source in parses:
+                count = sum(
+                    1
+                    for b in block_rows(conn, UUID(source["parse_id"]))
+                    if b["kind"] != "other"
+                    for _ in chunks(b["canonical_text"], b["kind"])
+                )
+                needed += 1 + (count + 31) // 32
+            if needed > selection.max_requests_per_run:
+                raise ContractError("index_scope_exceeds_run_limit_split_documents")
     scope = (
         snapshot(owner, project, ids, model_selection=selection, simulated=mode != "cloud")
         if kind == "research_qa"
@@ -79,6 +93,7 @@ def enqueue_research(
         "models": selection.snapshot(),
         "answer_contract": "quote-menu-v1",
         "structural_evidence": "native-table-decimal-v2",
+        "embedding_batch_size": 32,
     }
     inputs = {
         "version_ids": [str(v) for v in ids],
@@ -182,7 +197,15 @@ def execute_research(owner, project, run_id, *, interrupt_after=None):
         docs = []
         for source in row["input_json"]["parses"]:
             vid, pid = UUID(source["version_id"]), UUID(source["parse_id"])
-            gid = build_index(owner, vid, pid, run_id, model_gateway=gateway, task_generation=True)
+            gid = build_index(
+                owner,
+                vid,
+                pid,
+                run_id,
+                model_gateway=gateway,
+                task_generation=True,
+                batch_size=config.get("embedding_batch_size", 10),
+            )
             docs.append({**source, "generation_id": str(gid)})
         return {
             "documents": docs,

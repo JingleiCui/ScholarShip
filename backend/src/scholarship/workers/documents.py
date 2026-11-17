@@ -9,6 +9,7 @@ from scholarship.api.library import stored_file
 from scholarship.infrastructure.database import tenant_transaction, engine
 from scholarship.infrastructure.schema import tables as T
 from scholarship.domains.runs import emit
+from scholarship.domains.cancellation import RunCancelled, check_cancelled
 from scholarship.workers.celery_app import app
 
 # USER CONFIGURATION
@@ -111,6 +112,7 @@ def preview_parse(owner, project, run_id):
             with pdfplumber.open(path) as pdf:
                 total = len(pdf.pages)
                 for number in range(1, total + 1):
+                    check_cancelled(owner, run_id)
                     with tenant_transaction(owner) as conn:
                         prior = (
                             conn.execute(
@@ -261,8 +263,8 @@ def preview_parse(owner, project, run_id):
                         .update()
                         .where(T["runs"].c.id == run_id)
                         .values(
-                            status="failed",
-                            error_json={"code": "preview_failed", "type": type(exc).__name__},
+                            status="cancelled" if isinstance(exc, RunCancelled) else "failed",
+                            error_json={"code": "preview_cancelled" if isinstance(exc, RunCancelled) else "preview_failed", "type": type(exc).__name__},
                             lease_token=None,
                             lease_until=None,
                             finished_at=sa.func.now(),
@@ -273,7 +275,7 @@ def preview_parse(owner, project, run_id):
                             T["document_parses"]
                             .update()
                             .where(T["document_parses"].c.id == pid, T["document_parses"].c.status != "ready")
-                            .values(status="failed")
+                            .values(status="cancelled" if isinstance(exc, RunCancelled) else "failed")
                         )
                     if "step_id" in locals():
                         conn.execute(
@@ -285,8 +287,8 @@ def preview_parse(owner, project, run_id):
                     emit(
                         conn,
                         run_id,
-                        "failed",
-                        {"message": "预览解析失败，可保留已完成页并重试。", "code": type(exc).__name__},
+                        "cancelled" if isinstance(exc, RunCancelled) else "failed",
+                        {"message": "已在页边界取消，已提取内容保留。" if isinstance(exc, RunCancelled) else "预览解析失败，可保留已完成页并重试。", "code": type(exc).__name__},
                     )
         finally:
             lock.execute(sa.text("SELECT pg_advisory_unlock(hashtextextended(:k,0))"), {"k": key})

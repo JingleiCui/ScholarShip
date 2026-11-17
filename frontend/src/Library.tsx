@@ -1,3 +1,5 @@
+import LibraryActions from './LibraryActions';
+import CancelTask from './CancelTask';
 import { api as request, errorMessage } from './researchApi';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import * as pdfjs from 'pdfjs-dist';
@@ -22,8 +24,18 @@ type Parse = {
   expected_pages: number;
   error_json?: unknown;
   result_json?: unknown;
+  run_id?: string;
 };
-export default function Library({ project, onResearch }: { project: string; onResearch?: () => void }) {
+export default function Library({
+  project,
+  role,
+  onResearch,
+}: {
+  project: string;
+  role?: string;
+  onResearch?: () => void;
+}) {
+  const canWrite = role === 'researcher';
   const [papers, setPapers] = useState<Paper[]>([]),
     [selected, setSelected] = useState<Paper | null>(null),
     [parses, setParses] = useState<Parse[]>([]),
@@ -33,6 +45,8 @@ export default function Library({ project, onResearch }: { project: string; onRe
     [append, setAppend] = useState(false),
     [busy, setBusy] = useState(false),
     [reviews, setReviews] = useState<{ id: string; candidate_json: { papers: { title: string }[] } }[]>([]);
+  const [queue, setQueue] = useState<{ file: File; key: string; state: string }[]>([]);
+  const stopQueue = useRef(false);
   const [parseChoice, setParseChoice] = useState('');
   const [notice, setNotice] = useState('');
   const [readerTarget, setReaderTarget] = useState<Target | null>(null);
@@ -47,7 +61,9 @@ export default function Library({ project, onResearch }: { project: string; onRe
     pdf = useRef<pdfjs.PDFDocumentProxy | null>(null);
   async function refresh() {
     if (project) {
-      setPapers(await request(`/projects/${project}/papers`));
+      const fresh: Paper[] = await request(`/projects/${project}/papers`);
+      setPapers(fresh);
+      setSelected((old) => (old ? (fresh.find((p) => p.version_id === old.version_id) ?? null) : null));
       setReviews(await request(`/projects/${project}/duplicate-reviews`));
     }
   }
@@ -168,8 +184,7 @@ export default function Library({ project, onResearch }: { project: string; onRe
       cancelled = true;
     };
   }, [page, currentParse?.id, currentParse?.status, currentParse?.completed_pages, selected?.version_id]);
-  async function upload(file: File) {
-    setBusy(true);
+  async function upload(file: File, key: string) {
     setError('');
     try {
       const data = new FormData();
@@ -177,7 +192,7 @@ export default function Library({ project, onResearch }: { project: string; onRe
       if (append && selected) data.append('paper_id', selected.id);
       const result = await request(`/projects/${project}/uploads`, {
         method: 'POST',
-        headers: { 'Idempotency-Key': crypto.randomUUID() },
+        headers: { 'Idempotency-Key': key },
         body: data,
       });
       await refresh();
@@ -194,17 +209,34 @@ export default function Library({ project, onResearch }: { project: string; onRe
         setParses([]);
         setParseChoice('');
       }
-      if (result.review_id) setError('发现同标题候选，已保留两个载体，等待去重核验。');
+      if (result.review_id) setError('发现标题、标识或文本相似候选，已保留两个载体，等待去重核验。');
     } catch (e) {
       setError(errorMessage(e));
-    } finally {
-      setBusy(false);
+      throw e;
     }
+  }
+  async function uploadBatch(items: { file: File; key: string; state: string }[]) {
+    setBusy(true);
+    stopQueue.current = false;
+    setQueue(items);
+    for (let i = 0; i < items.length; i++) {
+      if (stopQueue.current) break;
+      items = items.map((v, j) => (j === i ? { ...v, state: '上传中' } : v));
+      setQueue([...items]);
+      try {
+        await upload(items[i].file, items[i].key);
+        items[i] = { ...items[i], state: '已导入' };
+      } catch (e) {
+        items[i] = { ...items[i], state: errorMessage(e) };
+      }
+      setQueue([...items]);
+    }
+    setBusy(false);
   }
   return (
     <section className="task-panel library" style={{ marginBottom: 24 }}>
       <h2>文献库 · 原文与解析版本</h2>
-      {selected && (
+      {selected && canWrite && (
         <label>
           <input type="checkbox" checked={append} onChange={(e) => setAppend(e.target.checked)} />
           将下次导入明确作为当前作品的新文件版本
@@ -220,19 +252,62 @@ export default function Library({ project, onResearch }: { project: string; onRe
           <input
             aria-label="导入 PDF"
             type="file"
+            multiple={!append}
             accept="application/pdf"
-            disabled={busy}
+            disabled={busy || !canWrite}
             style={{ display: 'block', marginTop: 12 }}
             onChange={(e) => {
-              const f = e.target.files?.[0];
+              const files = [...(e.target.files ?? [])];
               e.currentTarget.value = '';
-              if (f) void upload(f);
+              if (files.length > 50) {
+                setError('单批最多 50 份 PDF，请分批导入。');
+                return;
+              }
+              if (files.length)
+                void uploadBatch(
+                  files.map((file) => ({ file, key: crypto.randomUUID(), state: '等待上传' })),
+                );
             }}
           />
         </label>
       ) : (
         <p>请先登录研究空间。</p>
       )}
+      {queue.length > 0 && (
+        <section className="upload-queue" aria-live="polite">
+          <p>
+            本批 {queue.filter((q) => q.state === '已导入').length}/{queue.length}{' '}
+            份已导入；逐文件保留结果，后续解析独立执行。
+          </p>
+          {busy && (
+            <button
+              onClick={() => {
+                stopQueue.current = true;
+              }}
+            >
+              停止后续上传
+            </button>
+          )}
+          <ul>
+            {queue.map((q) => (
+              <li key={q.key}>
+                <span>{q.file.name}</span> — {q.state}
+                {!busy && q.state !== '已导入' && (
+                  <button onClick={() => void uploadBatch([{ ...q, state: '等待上传' }])}>重试此文件</button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <LibraryActions
+        canWrite={canWrite}
+        key={project}
+        project={project}
+        papers={papers}
+        selected={selected}
+        refresh={refresh}
+      />
       {notice && <p role="status">{notice}</p>}
       {error && (
         <p role="alert" className="error">
@@ -246,6 +321,7 @@ export default function Library({ project, onResearch }: { project: string; onRe
           {(['keep_both', 'reject'] as const).map((d) => (
             <button
               key={d}
+              disabled={!canWrite}
               onClick={() =>
                 void request(`/duplicate-reviews/${r.id}/decision`, {
                   method: 'POST',
@@ -332,6 +408,18 @@ export default function Library({ project, onResearch }: { project: string; onRe
             </button>
           )}
           {onResearch && <button onClick={onResearch}>前往证据问答</button>}
+          {currentParse?.run_id && (
+            <CancelTask
+              id={currentParse.run_id}
+              status={
+                currentParse.status === 'processing'
+                  ? 'running'
+                  : currentParse.status === 'pending'
+                    ? 'queued'
+                    : currentParse.status
+              }
+            />
+          )}
           <p>
             {currentParse
               ? `${currentParse.status} · ${currentParse.completed_pages}/${currentParse.expected_pages} 页`

@@ -1,4 +1,14 @@
 const messages: Record<string, string> = {
+  index_scope_exceeds_run_limit_split_documents:
+    '当前文献范围超过单任务请求上限。请逐篇建索引；超长文献需先调整项目的单任务限制并核对总额度。',
+  model_request_quota_exhausted: '本任务请求次数已达到上限，已暂停后续执行；已有回执保留。',
+  workspace_name_exists: '这个空间名称已存在，请换一个名称。',
+  workspace_name_required: '请输入空间名称。',
+  parse_required_for_comparison: '请等待两份文献完成文本解析后再比较。',
+  comparison_requires_text_or_ocr: '缺少可比较文本，扫描件需要先完成 OCR。',
+  protected_translation_literals_changed: '修订改变了公式、代码、链接或标签，请保留这些原文字面量。',
+  translation_revision_conflict: '译文版本不匹配，请重新加载后修订。',
+  ready_translation_required: '请先选择已完成的翻译版本。',
   embedding_profile_requires_rebuild: '当前向量模型与索引不匹配，请先重建所选文献索引。',
   version_not_indexed_in_project: '所选文献尚未建立索引，请先建立索引。',
   ready_native_parse_required: '该文献尚无已完成的深解析；导入 PDF 后的本地预览不能代替 OCR。',

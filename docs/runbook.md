@@ -2,7 +2,9 @@
 
 本机项目：`/Users/cuijinglei/PycharmProjects/ScholarShip`。Python 解释器：根目录 `.venv/bin/python`。常用选项在入口脚本顶部修改，命令行覆盖仅为可选方式。
 
-## 当前版本（2026-11-16）
+## 当前版本（2026-11-17）
+
+最新功能及检查见[复核记录](qa/completion-2026-11-17.md)。完整操作见[使用手册](guides/user-manual.md)。批量导入、版本比较、翻译修订、参考文献审阅、任务取消和 SSE 步骤均已接入；下方旧阶段叙述仅保留历史。
 
 以下旧阶段段落保留历史背景；当前状态以[本批报告](studio/report-2026-11-16.md)为准。迁移已到 0013，41 张业务表未变。云端批次 74/80 完成，所有准入已关闭，未使用的六次不能直接续用。模型选择与 Key 配置本身不授权请求。
 
@@ -11,6 +13,10 @@
 `verify_studio_local.py` 验证受控图表、拓扑图及本地编辑派生，不请求模型；`run_cloud_business.py` 默认只读 status，已完成批次不可再执行。`prepare_competition_corpus.py`、`verify_textbook_structure.py`、`review_official_answers.py`、`recover_translation_receipts.py` 均默认只读状态，配置在顶部。`format_frontend.py` 使用锁定的项目格式器。
 
 部署预检通过 runtime 专用的只读文件清单函数核对所有已登记 ready 文件，不能使用空租户查询假装全部通过，也不再读管理员配置。管理员仅用于显式迁移和已授权的策略维护。
+
+## 本地模型检查
+
+在 PyCharm 运行 `local_models_doctor.py`，无需填写 Key。它核对 local 配置对应的 Ollama 模型清单，报告明确区分模型缺失与尚未完成的业务接线。当前不是本地推理启动器，不自动安装、拉取模型或调用云端。结果在 `var/reports/local-models.json`；详细状态见[复核记录](qa/completion-2026-11-17.md)。
 
 ## 第一次初始化
 
