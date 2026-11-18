@@ -1,0 +1,21 @@
+flowchart TB
+    UI["React 研究工作空间"] --> API["FastAPI：会话、范围、任务提交"]
+    API --> PG[("PostgreSQL：权威状态、来源、Outbox、事件")]
+    PG --> DISPATCH["Beat / Outbox 投递器"]
+    DISPATCH --> REDIS[("Redis Broker：至少一次消息投递")]
+    REDIS --> WORKER["Celery Worker：租约、心跳、取消与恢复"]
+    WORKER --> DOMAIN["共享领域流程：文献 / LangGraph 问答 / Studio"]
+    DOMAIN --> Q[("Qdrant：Dense + BM25 派生索引")]
+    DOMAIN --> FILES["持久化文件：PDF、解析与研究产物"]
+    DOMAIN --> GW["模型 Gateway：角色端口、协议与传输"]
+    GW --> GATE["真实请求：来源范围、开关与额度准入"]
+    GATE --> CLOUD["所选云端服务"]
+    GW --> MOCK["隔离模拟传输"]
+    DOMAIN -. "结果与回执写回" .-> PG
+    PG -. "经 API 查询 / SSE 回读" .-> UI
+    classDef application fill:#E9F0FC,stroke:#719DD0,color:#202936
+    classDef storage fill:#E9F0FC,stroke:#719DD0,color:#202936
+    classDef boundary fill:#E9F0FC,stroke:#719DD0,color:#202936
+    class UI,API,DOMAIN,WORKER application
+    class PG,Q,FILES storage
+    class GATE,CLOUD boundary

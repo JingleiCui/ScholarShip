@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { api, errorMessage } from './researchApi';
 export default function WorkspaceCreate({
   onCreated,
+  initialOpen = false,
 }: {
+  initialOpen?: boolean;
   onCreated: (project: { id: string; name: string; description: string }) => void;
 }) {
-  const [open, setOpen] = useState(false),
+  const [open, setOpen] = useState(initialOpen),
     [name, setName] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');

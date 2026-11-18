@@ -2,7 +2,7 @@
   <title id="title">ScholarShip · 学者之舟</title>
   <desc id="desc">学海无涯，AI作舟</desc>
   <rect width="920" height="220" rx="20" fill="#f6f9ff"/>
-  <g transform="translate(72 58) scale(1.8)"><path d="M27 6v31H8L27 6Z" fill="#3978f6"/><path d="M31 13v24h16L31 13Z" fill="#91b7ff"/><path d="M6 41h44l-9 9H16L6 41Z" fill="#3978f6"/></g>
+  <g transform="translate(72 52) scale(1.1)"><rect x="57" y="16" width="3" height="72" rx="1.5" fill="#19345c"/><path d="M54 24 C40 34 26 56 20 82 C34 78 46 80 54 84 Z" fill="#3978f6"/><path d="M30 62L44 56M27 70L45 64" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.9"/><path d="M63 36 C76 46 88 64 94 82 C80 78 70 80 63 84 Z" fill="#8fb4ff"/><path d="M74 64L86 60M72 72L87 68" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.9"/><path d="M12 88 C34 96 86 96 108 88 L99 101 C80 110 40 110 21 101 Z" fill="#19345c"/><circle cx="58.5" cy="70" r="6" fill="#ffffff"/><circle cx="58.5" cy="70" r="3" fill="#f2a93b"/><path d="M24 114 C34 110 44 118 54 114M66 114 C76 110 86 118 96 114" stroke="#8fb4ff" stroke-width="2" stroke-linecap="round"/></g>
   <text x="205" y="104" fill="#19345c" font-family="Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="46" font-weight="700" letter-spacing="-1">ScholarShip</text>
   <text x="502" y="103" fill="#19345c" font-family="'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="30" font-weight="600">学者之舟</text>
   <text x="207" y="151" fill="#617695" font-family="'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="21">学海无涯，AI作舟</text>

@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1360" height="800" viewBox="0 0 1360 800" role="img" aria-labelledby="title">
+<title id="title">ScholarShip 分层架构</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4569A8"/></marker></defs>
+<rect width="1360" height="800" fill="white"/>
+<g font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, sans-serif" fill="#202936" font-size="18">
+<rect x="20" y="20" width="170" height="110" rx="2" fill="#3763BA" stroke="#3763BA" stroke-width="1"/>
+<text x="105" y="61.225" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">交互呈现层</text>
+<text x="105" y="88.775" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">frontend/src</text>
+<rect x="210" y="20" width="1130" height="110" rx="6" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<rect x="228.0" y="38" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="404.33333333333337" y="61.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">研究空间与导航</text>
+<text x="404.33333333333337" y="88.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">React / TypeScript</text>
+<rect x="598.6666666666667" y="38" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="775.0000000000001" y="61.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">原文与双语阅读</text>
+<text x="775.0000000000001" y="88.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">PDF.js / KaTeX</text>
+<rect x="969.3333333333334" y="38" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1145.6666666666667" y="61.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">图谱与图形呈现</text>
+<text x="1145.6666666666667" y="88.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Cytoscape / Mermaid</text>
+<rect x="20" y="150" width="170" height="110" rx="2" fill="#3763BA" stroke="#3763BA" stroke-width="1"/>
+<text x="105" y="191.225" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">应用接口层</text>
+<text x="105" y="218.775" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">api</text>
+<rect x="210" y="150" width="1130" height="110" rx="6" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<rect x="228.0" y="168" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="404.33333333333337" y="191.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">文献 / 问答 / Studio API</text>
+<text x="404.33333333333337" y="218.04999999999998" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">FastAPI / Pydantic</text>
+<rect x="598.6666666666667" y="168" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="775.0000000000001" y="191.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">会话 / CSRF / 项目范围</text>
+<text x="775.0000000000001" y="218.04999999999998" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">输入校验 / 幂等键</text>
+<rect x="969.3333333333334" y="168" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1145.6666666666667" y="191.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">结果与文件交付</text>
+<text x="1145.6666666666667" y="218.04999999999998" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">状态查询 / SSE 事件</text>
+<rect x="20" y="280" width="170" height="110" rx="2" fill="#3763BA" stroke="#3763BA" stroke-width="1"/>
+<text x="105" y="321.225" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">领域编排层</text>
+<text x="105" y="348.77500000000003" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">domains</text>
+<rect x="210" y="280" width="1130" height="110" rx="6" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<rect x="228.0" y="298" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="404.33333333333337" y="321.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">文献与解析</text>
+<text x="404.33333333333337" y="348.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">版本 / 原文块 / 检索</text>
+<rect x="598.6666666666667" y="298" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="775.0000000000001" y="321.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">qa_graph</text>
+<text x="775.0000000000001" y="348.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">四节点证据问答</text>
+<rect x="969.3333333333334" y="298" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1145.6666666666667" y="321.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Studio workflows</text>
+<text x="1145.6666666666667" y="348.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">翻译 / 图谱 / 写作 / 绘图</text>
+<rect x="20" y="410" width="170" height="110" rx="2" fill="#3763BA" stroke="#3763BA" stroke-width="1"/>
+<text x="105" y="451.225" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">模型接入层</text>
+<text x="105" y="478.77500000000003" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">models</text>
+<rect x="210" y="410" width="1130" height="110" rx="6" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<rect x="228.0" y="428" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="404.33333333333337" y="451.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Catalog / Configuration</text>
+<text x="404.33333333333337" y="478.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">能力目录 / 固定配置</text>
+<rect x="598.6666666666667" y="428" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="775.0000000000001" y="451.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Gateway / Protocols</text>
+<text x="775.0000000000001" y="478.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">角色端口 / 协议适配</text>
+<rect x="969.3333333333334" y="428" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1145.6666666666667" y="451.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Production / Transports</text>
+<text x="1145.6666666666667" y="478.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">调用准入 / 额度 / HTTP</text>
+<rect x="20" y="540" width="170" height="110" rx="2" fill="#3763BA" stroke="#3763BA" stroke-width="1"/>
+<text x="105" y="581.225" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">任务执行层</text>
+<text x="105" y="608.775" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">workers</text>
+<rect x="210" y="540" width="1130" height="110" rx="6" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<rect x="228.0" y="558" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="404.33333333333337" y="581.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Celery Worker / Beat</text>
+<text x="404.33333333333337" y="608.0500000000001" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">任务执行 / 调度</text>
+<rect x="598.6666666666667" y="558" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="775.0000000000001" y="581.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Outbox / Lease</text>
+<text x="775.0000000000001" y="608.0500000000001" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">持久投递 / 租约 / 心跳</text>
+<rect x="969.3333333333334" y="558" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1145.6666666666667" y="581.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">检查点 / 持久事件</text>
+<text x="1145.6666666666667" y="608.0500000000001" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">恢复 / 安全取消 / 回执</text>
+<rect x="20" y="670" width="170" height="110" rx="2" fill="#3763BA" stroke="#3763BA" stroke-width="1"/>
+<text x="105" y="711.225" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">基础设施层</text>
+<text x="105" y="738.775" text-anchor="middle" dominant-baseline="central" font-size="19" fill="white">infrastructure</text>
+<rect x="210" y="670" width="1130" height="110" rx="6" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<rect x="228.0" y="688" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="404.33333333333337" y="711.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">PostgreSQL / SQLAlchemy Core</text>
+<text x="404.33333333333337" y="738.0500000000001" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">租户事务 / RLS / 归属约束</text>
+<rect x="598.6666666666667" y="688" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="775.0000000000001" y="711.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Qdrant / Redis</text>
+<text x="775.0000000000001" y="738.0500000000001" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">派生索引 / 消息投递</text>
+<rect x="969.3333333333334" y="688" width="352.6666666666667" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1145.6666666666667" y="711.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">持久化文件 / Alembic</text>
+<text x="1145.6666666666667" y="738.0500000000001" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">文件清单 / 前向迁移</text>
+</g>
+</svg>

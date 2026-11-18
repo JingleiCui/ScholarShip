@@ -1,0 +1,114 @@
+[
+  {
+    "chapter": 1,
+    "start_seconds": 0,
+    "duration_seconds": 3,
+    "title": "首页与研究路径",
+    "mode": "本地操作"
+  },
+  {
+    "chapter": 2,
+    "start_seconds": 3,
+    "duration_seconds": 5,
+    "title": "新建独立研究空间",
+    "mode": "本地操作"
+  },
+  {
+    "chapter": 3,
+    "start_seconds": 8,
+    "duration_seconds": 6,
+    "title": "导入 PDF，检查原件",
+    "mode": "本地操作"
+  },
+  {
+    "chapter": 4,
+    "start_seconds": 14,
+    "duration_seconds": 5,
+    "title": "提取本地文本结构",
+    "mode": "本地操作"
+  },
+  {
+    "chapter": 5,
+    "start_seconds": 19,
+    "duration_seconds": 5,
+    "title": "建立问答索引",
+    "mode": "模拟流程 · 不用于科研"
+  },
+  {
+    "chapter": 6,
+    "start_seconds": 24,
+    "duration_seconds": 7,
+    "title": "提交问题，直接展示结果",
+    "mode": "模拟流程 · 不用于科研"
+  },
+  {
+    "chapter": 7,
+    "start_seconds": 31,
+    "duration_seconds": 7,
+    "title": "点击引用，定位 PDF 原文",
+    "mode": "历史真实样本 · 只读回看"
+  },
+  {
+    "chapter": 8,
+    "start_seconds": 38,
+    "duration_seconds": 7,
+    "title": "双语阅读与同步滚动",
+    "mode": "历史真实译文 · 只读回看"
+  },
+  {
+    "chapter": 9,
+    "start_seconds": 45,
+    "duration_seconds": 6,
+    "title": "公开文献检索",
+    "mode": "Crossref 元数据 · 非模型调用"
+  },
+  {
+    "chapter": 10,
+    "start_seconds": 51,
+    "duration_seconds": 6,
+    "title": "局域引用图谱",
+    "mode": "本地计算 · 候选边待核对"
+  },
+  {
+    "chapter": 11,
+    "start_seconds": 57,
+    "duration_seconds": 7,
+    "title": "带来源的写作框架",
+    "mode": "模拟草稿 · 不用于科研"
+  },
+  {
+    "chapter": 12,
+    "start_seconds": 64,
+    "duration_seconds": 6,
+    "title": "从 CSV 生成图表",
+    "mode": "本地计算 · PDF 页级字符数"
+  },
+  {
+    "chapter": 13,
+    "start_seconds": 70,
+    "duration_seconds": 4,
+    "title": "下载数据、图像与脚本",
+    "mode": "本地导出"
+  },
+  {
+    "chapter": 14,
+    "start_seconds": 74,
+    "duration_seconds": 5,
+    "title": "查看导出图像",
+    "mode": "实际 chart.png · 非性能实验"
+  },
+  {
+    "chapter": 15,
+    "start_seconds": 79,
+    "duration_seconds": 5,
+    "title": "按明确步骤生成拓扑",
+    "mode": "本地工具 · Mermaid"
+  },
+  {
+    "chapter": 16,
+    "start_seconds": 84,
+    "duration_seconds": 6,
+    "title": "成果统一回看",
+    "mode": "本地与模拟产物"
+  }
+]

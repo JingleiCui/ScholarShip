@@ -30,10 +30,16 @@ export default function Library({
   project,
   role,
   onResearch,
+  onRead,
+  layout = 'manage',
+  initialVersionId,
 }: {
   project: string;
   role?: string;
-  onResearch?: () => void;
+  onResearch?: (versionId: string) => void;
+  onRead?: (versionId: string) => void;
+  layout?: 'manage' | 'reader';
+  initialVersionId?: string;
 }) {
   const canWrite = role === 'researcher';
   const [papers, setPapers] = useState<Paper[]>([]),
@@ -85,6 +91,7 @@ export default function Library({
         .then(([p, r]) => {
           if (!cancelled) {
             setPapers(p);
+            setSelected(p.find((row: Paper) => row.version_id === initialVersionId) ?? null);
             setReviews(r);
           }
         })
@@ -94,7 +101,7 @@ export default function Library({
     return () => {
       cancelled = true;
     };
-  }, [project]);
+  }, [project, initialVersionId]);
   useEffect(() => {
     if (!selected) return;
     let cancelled = false;
@@ -235,135 +242,152 @@ export default function Library({
   }
   return (
     <section className="task-panel library" style={{ marginBottom: 24 }}>
-      <h2>文献库 · 原文与解析版本</h2>
-      {selected && canWrite && (
-        <label>
-          <input type="checkbox" checked={append} onChange={(e) => setAppend(e.target.checked)} />
-          将下次导入明确作为当前作品的新文件版本
-        </label>
+      {layout === 'manage' && (
+        <>
+          <h2>文献与文件版本</h2>
+          <p>导入 → 检查原件 → 准备文本结构 → 阅读与问答。文件导入不会自动发送到云端。</p>
+        </>
       )}
-      <p>
-        原件按账号隔离。导入只生成本地预览；已完成的 OCR
-        可在解析修订中选择。尚无深解析的文献不能直接用于证据问答。
-      </p>
-      {project ? (
-        <label className="primary">
-          {busy ? '正在导入…' : '导入 PDF'}
-          <input
-            aria-label="导入 PDF"
-            type="file"
-            multiple={!append}
-            accept="application/pdf"
-            disabled={busy || !canWrite}
-            style={{ display: 'block', marginTop: 12 }}
-            onChange={(e) => {
-              const files = [...(e.target.files ?? [])];
-              e.currentTarget.value = '';
-              if (files.length > 50) {
-                setError('单批最多 50 份 PDF，请分批导入。');
-                return;
-              }
-              if (files.length)
-                void uploadBatch(
-                  files.map((file) => ({ file, key: crypto.randomUUID(), state: '等待上传' })),
-                );
-            }}
-          />
-        </label>
-      ) : (
-        <p>请先登录研究空间。</p>
-      )}
-      {queue.length > 0 && (
-        <section className="upload-queue" aria-live="polite">
-          <p>
-            本批 {queue.filter((q) => q.state === '已导入').length}/{queue.length}{' '}
-            份已导入；逐文件保留结果，后续解析独立执行。
-          </p>
-          {busy && (
-            <button
-              onClick={() => {
-                stopQueue.current = true;
-              }}
-            >
-              停止后续上传
-            </button>
+      {layout === 'manage' && (
+        <>
+          {selected && canWrite && (
+            <label>
+              <input type="checkbox" checked={append} onChange={(e) => setAppend(e.target.checked)} />
+              将下次导入明确作为当前作品的新文件版本
+            </label>
           )}
-          <ul>
-            {queue.map((q) => (
-              <li key={q.key}>
-                <span>{q.file.name}</span> — {q.state}
-                {!busy && q.state !== '已导入' && (
-                  <button onClick={() => void uploadBatch([{ ...q, state: '等待上传' }])}>重试此文件</button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      <LibraryActions
-        canWrite={canWrite}
-        key={project}
-        project={project}
-        papers={papers}
-        selected={selected}
-        refresh={refresh}
-      />
-      {notice && <p role="status">{notice}</p>}
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-      {reviews.map((r) => (
-        <div key={r.id} className="notice">
-          疑似重复：{r.candidate_json.papers.map((p) => p.title).join('；')}
-          。请核验后选择：
-          {(['keep_both', 'reject'] as const).map((d) => (
-            <button
-              key={d}
-              disabled={!canWrite}
-              onClick={() =>
-                void request(`/duplicate-reviews/${r.id}/decision`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ decision: d }),
-                })
-                  .then(() => refresh())
-                  .catch((e) => setError(errorMessage(e)))
-              }
-            >
-              {d === 'keep_both' ? '保留两份独立记录' : '拒绝本次新增记录'}
-            </button>
-          ))}
-        </div>
-      ))}
-      <div className="paper-grid">
-        {papers.map((p) => (
-          <button
-            className="module-card paper-card"
-            key={p.version_id}
-            onClick={() => {
-              setSelected(p);
-              setParses([]);
-              setParseChoice('');
-              setReaderTarget(null);
-              setError('');
-              setNotice('');
-            }}
-          >
-            <div className="paper-cover" aria-hidden="true">
-              <span>PDF</span>
-              <strong>{p.title}</strong>
-              <div className="paper-lines" />
-              <div className="paper-lines short" />
+          <p>
+            原件按账号隔离。导入只生成本地预览；已完成的 OCR
+            可在解析修订中选择。问答前需要已完成的文本结构与匹配索引。
+          </p>
+          {project ? (
+            <label className="primary">
+              {busy ? '正在导入…' : '导入 PDF'}
+              <input
+                aria-label="导入 PDF"
+                type="file"
+                multiple={!append}
+                accept="application/pdf"
+                disabled={busy || !canWrite}
+                style={{ display: 'block', marginTop: 12 }}
+                onChange={(e) => {
+                  const files = [...(e.target.files ?? [])];
+                  e.currentTarget.value = '';
+                  if (files.length > 50) {
+                    setError('单批最多 50 份 PDF，请分批导入。');
+                    return;
+                  }
+                  if (files.length)
+                    void uploadBatch(
+                      files.map((file) => ({ file, key: crypto.randomUUID(), state: '等待上传' })),
+                    );
+                }}
+              />
+            </label>
+          ) : (
+            <p>请先登录研究空间。</p>
+          )}
+          {queue.length > 0 && (
+            <section className="upload-queue" aria-live="polite">
+              <p>
+                本批 {queue.filter((q) => q.state === '已导入').length}/{queue.length}{' '}
+                份已导入；逐文件保留结果，后续解析独立执行。
+              </p>
+              {busy && (
+                <button
+                  onClick={() => {
+                    stopQueue.current = true;
+                  }}
+                >
+                  停止后续上传
+                </button>
+              )}
+              <ul>
+                {queue.map((q) => (
+                  <li key={q.key}>
+                    <span>{q.file.name}</span> — {q.state}
+                    {!busy && q.state !== '已导入' && (
+                      <button onClick={() => void uploadBatch([{ ...q, state: '等待上传' }])}>
+                        重试此文件
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <LibraryActions
+            canWrite={canWrite}
+            key={project}
+            project={project}
+            papers={papers}
+            selected={selected}
+            refresh={refresh}
+          />
+          {notice && <p role="status">{notice}</p>}
+          {error && (
+            <p role="alert" className="error">
+              {error}
+            </p>
+          )}
+          {reviews.map((r) => (
+            <div key={r.id} className="notice">
+              疑似重复：{r.candidate_json.papers.map((p) => p.title).join('；')}
+              。请核验后选择：
+              {(['keep_both', 'reject'] as const).map((d) => (
+                <button
+                  key={d}
+                  disabled={!canWrite}
+                  onClick={() =>
+                    void request(`/duplicate-reviews/${r.id}/decision`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ decision: d }),
+                    })
+                      .then(() => refresh())
+                      .catch((e) => setError(errorMessage(e)))
+                  }
+                >
+                  {d === 'keep_both' ? '保留两份独立记录' : '拒绝本次新增记录'}
+                </button>
+              ))}
             </div>
-            <strong className="paper-title">{p.title}</strong>
-            <small style={{ display: 'block' }}>
-              {p.metadata_json.page_count} 页 · {p.version_id.slice(0, 8)}
-            </small>
-          </button>
-        ))}
-      </div>
+          ))}
+          {project && !papers.length && (
+            <div className="library-empty">
+              <h3>还没有文献，从一份 PDF 开始。</h3>
+              <p>在上方选择文件，可一次导入多份。扫描件没有文本时会提示 OCR，不会冒充解析成功。</p>
+            </div>
+          )}
+          <div className="paper-grid">
+            {papers.map((p) => (
+              <button
+                className="module-card paper-card"
+                key={p.version_id}
+                onClick={() => {
+                  setSelected(p);
+                  setParses([]);
+                  setParseChoice('');
+                  setReaderTarget(null);
+                  setError('');
+                  setNotice('');
+                }}
+              >
+                <div className="paper-cover" aria-hidden="true">
+                  <span>PDF</span>
+                  <strong>{p.title}</strong>
+                  <div className="paper-lines" />
+                  <div className="paper-lines short" />
+                </div>
+                <strong className="paper-title">{p.title}</strong>
+                <small style={{ display: 'block' }}>
+                  {p.metadata_json.page_count} 页 · {p.version_id.slice(0, 8)}
+                </small>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       {readerTarget && (
         <Suspense fallback={<p>正在加载结构化原文…</p>}>
           <SourceReader
@@ -375,7 +399,14 @@ export default function Library({
       )}
       {selected && (
         <>
-          <h3>{selected.title}</h3>
+          <div className="selected-paper-heading">
+            <h3>{selected.title}</h3>
+            {layout === 'manage' && onRead && (
+              <button className="primary" onClick={() => onRead(selected.version_id)}>
+                开始阅读
+              </button>
+            )}
+          </div>
           {parses.length > 0 && (
             <label>
               解析修订{' '}
@@ -407,7 +438,7 @@ export default function Library({
               阅读结构化原文
             </button>
           )}
-          {onResearch && <button onClick={onResearch}>前往证据问答</button>}
+          {onResearch && <button onClick={() => onResearch(selected.version_id)}>向这篇文献提问</button>}
           {currentParse?.run_id && (
             <CancelTask
               id={currentParse.run_id}
@@ -430,6 +461,7 @@ export default function Library({
             (currentParse?.status === 'partial' &&
               currentParse.completed_pages < currentParse.expected_pages)) && (
             <button
+              disabled={!canWrite}
               onClick={() =>
                 void request(`/parses/${currentParse.id}/resume`, {
                   method: 'POST',
@@ -440,6 +472,7 @@ export default function Library({
             </button>
           )}
           <button
+            disabled={!canWrite}
             onClick={() =>
               void request(`/paper-versions/${selected.version_id}/parses`, {
                 method: 'POST',
@@ -471,7 +504,8 @@ export default function Library({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))',
+              gridTemplateColumns:
+                layout === 'reader' ? 'minmax(0,1fr)' : 'repeat(auto-fit,minmax(min(100%,280px),1fr))',
               gap: 20,
               marginTop: 20,
             }}

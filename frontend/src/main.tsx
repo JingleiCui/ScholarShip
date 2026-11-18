@@ -1,576 +1,497 @@
-import WorkspaceCreate from './WorkspaceCreate';
-import React, { useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import './styles.css';
-import ServiceStatus from './ServiceStatus';
-import ModelConfiguration from './ModelConfiguration';
-import OfflineResearch from './OfflineResearch';
-import Research from './Research';
-const Studio = React.lazy(() => import('./Studio'));
-const Library = React.lazy(() => import('./Library'));
-
-type User = {
-  id: string;
-  username: string;
-  display_name: string;
-  role: string;
-};
+import './workspace.css';
+import Brand, { BRAND, BrandMark, Icon } from './Brand';
+import Home, { Tools } from './Home';
+import WorkspaceCreate from './WorkspaceCreate';
+import { api, errorMessage } from './researchApi';
+import { pageNames, parseRoute, routeHash, type Page, type ReadingTab, type Route } from './navigation';
+const Reader = lazy(() => import('./Reader'));
+const Library = lazy(() => import('./Library'));
+const Results = lazy(() => import('./Results'));
+const Studio = lazy(() => import('./Studio'));
+const ModelConfiguration = lazy(() => import('./ModelConfiguration'));
+const ServiceStatus = lazy(() => import('./ServiceStatus'));
+const OfflineResearch = lazy(() => import('./OfflineResearch'));
+const SystemProbe = lazy(() => import('./SystemProbe'));
+type User = { id: string; username: string; display_name: string; role: string };
 type Project = { id: string; name: string; description: string };
-type Health = {
-  ready: boolean;
-  services: Record<string, { ready: boolean; version?: string; error?: string }>;
-};
-type Run = { id: string; kind: string; status: string; result_json?: unknown };
-type Event = { seq: number; type: string; message: string };
-const modules = [
-  {
-    title: '文献管理',
-    en: 'LIBRARY',
-    icon: '▤',
-    desc: '统一收纳论文与教材，保留文件版本和原始来源。',
-    tags: ['版本管理', '重复核验'],
-  },
-  {
-    title: '论文阅读与翻译',
-    en: 'READ & UNDERSTAND',
-    icon: '▥',
-    desc: '双语阅读、公式与表格理解，让回答回到原文。',
-    tags: ['原文定位', '证据问答'],
-  },
-  {
-    title: '检索与推荐',
-    en: 'DISCOVER',
-    icon: '⌕',
-    desc: '围绕研究方向发现文献，追踪新进展与开源代码。',
-    tags: ['混合检索', '方向核验'],
-  },
-  {
-    title: '知识图谱',
-    en: 'CONNECT',
-    icon: '⌘',
-    desc: '沿着原文引用连接文献，比较所选论文的局域中心性。',
-    tags: ['引用网络', 'PageRank'],
-  },
-  {
-    title: '写作与研究核验',
-    en: 'WRITE WITH EVIDENCE',
-    icon: '✎',
-    desc: '整理研究主张与支撑证据，追溯每一次修改。',
-    tags: ['主张核验', '产物版本'],
-  },
-  {
-    title: '数据分析与绘图',
-    en: 'ANALYZE & CREATE',
-    icon: '▧',
-    desc: '用受控分析模板生成图表，关联数据与生成脚本。',
-    tags: ['可复现分析', '来源追踪'],
-  },
-];
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const csrf =
-    document.cookie
-      .split('; ')
-      .find((x) => x.startsWith('ss_csrf='))
-      ?.split('=')[1] ?? '';
-  const response = await fetch('/api/v1' + path, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': csrf,
-      ...init?.headers,
-    },
-  });
-  if (!response.ok)
-    throw new Error(
-      response.status === 401
-        ? '请登录后继续。'
-        : response.status === 403
-          ? '会话校验失败，请重新登录。'
-          : `请求未完成（${response.status}）。`,
-    );
-  return response.json() as Promise<T>;
-}
-function Sail({ small = false }: { small?: boolean }) {
-  return (
-    <svg width={small ? 32 : 56} height={small ? 32 : 56} viewBox="0 0 56 56" fill="none" aria-hidden="true">
-      <path d="M27 6v31H8L27 6Z" fill="currentColor" />
-      <path d="M31 13v24h16L31 13Z" fill="currentColor" opacity=".48" />
-      <path d="M6 41h44l-9 9H16L6 41Z" fill="currentColor" />
-    </svg>
-  );
-}
 function App() {
-  const [active, setActive] = useState(() => {
-      const value = new URLSearchParams(window.location.hash.slice(1)).get('module');
-      const index = value === null ? -1 : Number(value);
-      return Number.isInteger(index) && index >= -1 && index < modules.length ? index : -1;
-    }),
-    [health, setHealth] = useState<Health | null>(null),
-    [user, setUser] = useState<User | null>(null),
+  const [route, setRoute] = useState<Route>(() => parseRoute(location.hash));
+  const [user, setUser] = useState<User | null>(null),
     [projects, setProjects] = useState<Project[]>([]),
     [project, setProject] = useState('');
+  const [authLoading, setAuthLoading] = useState(true),
+    [projectLoading, setProjectLoading] = useState(false),
+    [projectError, setProjectError] = useState('');
   const [loginOpen, setLoginOpen] = useState(false),
     [username, setUsername] = useState('researcher'),
     [password, setPassword] = useState(''),
-    [error, setError] = useState(''),
-    [busy, setBusy] = useState(false),
-    [run, setRun] = useState<Run | null>(null),
-    [events, setEvents] = useState<Event[]>([]),
-    [streamState, setStreamState] = useState('');
-  const stream = useRef<EventSource | null>(null);
+    [loginError, setLoginError] = useState(''),
+    [busy, setBusy] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null),
+    main = useRef<HTMLElement>(null),
+    returnFocus = useRef<HTMLElement | null>(null);
+  function navigate(page: Page, options: Partial<Route> = {}) {
+    const next = { ...route, page, run: undefined, ...options };
+    const hash = routeHash(next);
+    if (location.hash !== hash) location.hash = hash;
+    else setRoute(next);
+  }
   useEffect(() => {
-    const hash = active === -1 ? '' : `#module=${active}`;
-    window.history.replaceState(null, '', window.location.pathname + window.location.search + hash);
-  }, [active]);
-  async function refresh() {
+    const sync = () => {
+      if (['#main-content', '#reading-assistant', '#workflow'].includes(location.hash)) return;
+      setRoute(parseRoute(location.hash));
+    };
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, []);
+  useEffect(() => {
+    document.title = `${BRAND.name} · ${BRAND.chinese} | ${pageNames[route.page]}`;
+    main.current?.focus({ preventScroll: true });
+    if (!route.run) window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [route.page]);
+  useEffect(() => {
+    if (!loginOpen) return;
+    returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog.current?.showModal();
+    dialog.current?.querySelector('input')?.focus();
+    return () => {
+      dialog.current?.close();
+      returnFocus.current?.focus();
+    };
+  }, [loginOpen]);
+  async function loadProjects(current: User) {
+    setProjectLoading(true);
+    setProjectError('');
     try {
-      setHealth(await api<Health>('/health/ready'));
-    } catch {
-      setHealth({ ready: false, services: {} });
+      const rows: Project[] = await api('/projects');
+      setProjects(rows);
+      let previous = '';
+      try {
+        previous = sessionStorage.getItem('scholarship:project:' + current.id) ?? '';
+      } catch {}
+      setProject(rows.find((p) => p.id === previous)?.id ?? rows[0]?.id ?? '');
+    } catch (e) {
+      setProjects([]);
+      setProject('');
+      setProjectError(errorMessage(e));
+    } finally {
+      setProjectLoading(false);
     }
   }
-  async function loadProjects() {
-    const rows = await api<Project[]>('/projects');
-    setProjects(rows);
-    setProject(rows[0]?.id ?? '');
-  }
   useEffect(() => {
-    void refresh();
-    void api<User>('/auth/me')
-      .then((u) => {
-        setUser(u);
-        void loadProjects();
+    let stopped = false;
+    void api('/auth/me')
+      .then((current: User) => {
+        if (!stopped) {
+          setUser(current);
+          void loadProjects(current);
+        }
       })
-      .catch(() => {});
-    const timer = setInterval(() => void refresh(), 30000);
+      .catch(() => {})
+      .finally(() => {
+        if (!stopped) setAuthLoading(false);
+      });
     return () => {
-      clearInterval(timer);
-      stream.current?.close();
+      stopped = true;
     };
   }, []);
+  function changeProject(id: string) {
+    setProject(id);
+    if (user)
+      try {
+        sessionStorage.setItem('scholarship:project:' + user.id, id);
+      } catch {}
+    navigate(route.page, { versions: [], run: undefined });
+  }
+  function created(p: Project) {
+    setProjects((old) => [...old, p]);
+    setProject(p.id);
+    if (user)
+      try {
+        sessionStorage.setItem('scholarship:project:' + user.id, p.id);
+      } catch {}
+    navigate('library', { versions: [] });
+  }
   async function login(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
     setBusy(true);
+    setLoginError('');
     try {
-      const u = await api<User>('/auth/login', {
+      const current: User = await api('/auth/login', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-      setUser(u);
+      setUser(current);
       setPassword('');
       setLoginOpen(false);
-      await loadProjects();
+      await loadProjects(current);
     } catch (e) {
-      setError((e as Error).message);
+      setLoginError(errorMessage(e));
     } finally {
       setBusy(false);
     }
   }
   async function logout() {
+    setBusy(true);
     try {
       await api('/auth/logout', { method: 'POST' });
-      stream.current?.close();
       setUser(null);
       setProjects([]);
       setProject('');
-      setRun(null);
-      setEvents([]);
+      navigate('home', { versions: [] });
     } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-  async function probe() {
-    setError('');
-    setBusy(true);
-    try {
-      const r = await api<Run>('/runs', {
-        method: 'POST',
-        headers: { 'Idempotency-Key': crypto.randomUUID() },
-        body: JSON.stringify({ project_id: project }),
-      });
-      setRun(r);
-      setEvents([]);
-      setStreamState('正在连接事件流');
-      stream.current?.close();
-      const es = new EventSource(`/api/v1/runs/${r.id}/events`);
-      stream.current = es;
-      for (const type of ['queued', 'running', 'succeeded', 'failed'])
-        es.addEventListener(type, (e) => {
-          const event = e as MessageEvent;
-          const data = JSON.parse(event.data) as { message: string };
-          setEvents((old) =>
-            old.some((x) => x.seq === Number(event.lastEventId))
-              ? old
-              : [
-                  ...old,
-                  {
-                    seq: Number(event.lastEventId),
-                    type,
-                    message: data.message,
-                  },
-                ],
-          );
-          setRun((old) => (old ? { ...old, status: type } : old));
-          setStreamState('实时事件已连接');
-          if (type === 'succeeded' || type === 'failed') {
-            es.close();
-            setStreamState('事件已完整接收');
-            setBusy(false);
-          }
-        });
-      es.onerror = () => {
-        setStreamState('连接中断，正在按游标重连');
-        void api<Run>(`/runs/${r.id}`)
-          .then((state) => {
-            setRun(state);
-            if (['succeeded', 'failed', 'cancelled'].includes(state.status)) {
-              es.close();
-              setBusy(false);
-              setStreamState('任务状态已核对；事件流中断');
-            }
-          })
-          .catch(() => {
-            es.close();
-            setBusy(false);
-            setError('会话或网络不可用，请刷新重试。');
-          });
-      };
-    } catch (e) {
-      setError((e as Error).message);
+      setProjectError(errorMessage(e));
+    } finally {
       setBusy(false);
     }
   }
-  const serviceNames: Record<string, string> = {
-    postgresql: 'PostgreSQL',
-    qdrant: 'Qdrant',
-    redis: 'Redis',
-  };
-  return (
-    <div className="shell">
-      <div className="site-nav">
-        <a className="brand" href="#" onClick={() => setActive(-1)}>
-          <Sail small />
-          <div>
-            ScholarShip<small>学者之舟</small>
-          </div>
-        </a>
-
-        <nav aria-label="主导航">
-          <button className={active === -1 ? 'selected' : ''} onClick={() => setActive(-1)}>
-            首页
+  function start() {
+    navigate('library');
+    if (!user && !authLoading) setLoginOpen(true);
+  }
+  function scope(ids: string[]) {
+    navigate(route.page, { versions: ids, tab: route.tab });
+  }
+  function read(version: string, tab: ReadingTab = 'document') {
+    navigate('read', { versions: [version], tab });
+  }
+  const moduleId: Partial<Record<Page, number>> = { discover: 2, graph: 3, write: 4, charts: 5 };
+  const protectedPage = !['home', 'tools'].includes(route.page);
+  const activeNav = ['discover', 'graph', 'write', 'charts', 'settings', 'tools'].includes(route.page)
+    ? 'tools'
+    : route.page;
+  function content() {
+    if (route.page === 'home')
+      return <Home signedIn={!!user} project={project} onNavigate={navigate} onStart={start} />;
+    if (route.page === 'tools')
+      return <Tools onNavigate={(page, tab) => navigate(page, { tab: tab ?? route.tab })} />;
+    if (authLoading || projectLoading)
+      return (
+        <section className="empty-state" role="status">
+          <h1>正在打开研究空间…</h1>
+          <p>正在核对账号与当前空间，已有资料不会改变。</p>
+        </section>
+      );
+    if (!user)
+      return (
+        <section className="empty-state">
+          <BrandMark size={64} />
+          <h1>进入你的研究空间</h1>
+          <p>登录后导入文献、阅读原文，找回自己的任务与成果。</p>
+          <button className="primary" onClick={() => setLoginOpen(true)}>
+            登录并继续
           </button>
-          {modules.map((m, i) => (
-            <button key={m.en} className={active === i ? 'selected' : ''} onClick={() => setActive(i)}>
-              <span>{m.icon}</span>
-              {['文献库', '阅读', '发现', '图谱', '写作', '绘图'][i]}
-            </button>
+          <button className="text-link" onClick={() => navigate('home')}>
+            返回首页了解流程
+          </button>
+        </section>
+      );
+    if (!project)
+      return (
+        <section className="empty-state">
+          <Icon name="book" size={36} />
+          <h1>{projectError ? '研究空间暂时未能读取' : '先为研究建一个空间。'}</h1>
+          <p>
+            {projectError || '一个课题一个空间，文献、问题与成果集中保存。首次创建默认不会发送云端请求。'}
+          </p>
+          {projectError ? (
+            <button onClick={() => void loadProjects(user)}>重新读取空间</button>
+          ) : user.role === 'researcher' ? (
+            <WorkspaceCreate onCreated={created} initialOpen />
+          ) : (
+            <p>当前只读账号尚无研究空间，请使用已分配的账号查看资料。</p>
+          )}
+        </section>
+      );
+    const key = `${user.id}:${project}`;
+    if (route.page === 'library')
+      return (
+        <>
+          <div className="page-title">
+            <h1>你的文献，从这里出发。</h1>
+            <p>先检查原件与版本，再打开阅读。文献准备、问答索引与内容核对分别展示。</p>
+          </div>
+          <Library
+            key={key}
+            project={project}
+            role={user.role}
+            onRead={(id) => read(id)}
+            onResearch={(id) => read(id, 'qa')}
+          />
+        </>
+      );
+    if (route.page === 'read')
+      return (
+        <Reader
+          key={key}
+          project={project}
+          role={user.role}
+          versions={route.versions}
+          tab={route.tab}
+          run={route.run}
+          onScope={scope}
+          onTab={(tab) => navigate('read', { tab })}
+          onLibrary={() => navigate('library')}
+          onResults={() => navigate('results')}
+        />
+      );
+    if (route.page === 'results')
+      return (
+        <Results
+          key={key}
+          project={project}
+          role={user.role}
+          onNavigate={(page, run, tab, versions) =>
+            navigate(page, { run, tab: tab ?? route.tab, versions: versions ?? route.versions })
+          }
+        />
+      );
+    if (route.page === 'settings')
+      return (
+        <>
+          <div className="page-title">
+            <h1>模型与运行设置</h1>
+            <p>模型配置、执行准入与实际内容质量分别记录。修改配置不会自动启用推理。</p>
+          </div>
+          <ServiceStatus key={key} userId={user.id} />
+          <ModelConfiguration key={'models:' + key} project={project} role={user.role} />
+          <details className="developer-tools">
+            <summary>开发与离线流程检查</summary>
+            <p>在独立练习空间使用模拟模型，只验证软件流程。不要在真实文献空间覆盖活动索引。</p>
+            <SystemProbe key={'probe:' + key} project={project} role={user.role} />
+            <OfflineResearch key={'offline:' + key} project={project} userId={user.id} role={user.role} />
+          </details>
+        </>
+      );
+    return (
+      <>
+        <div className="page-title">
+          <button className="text-link" onClick={() => navigate('tools')}>
+            研究工具
+          </button>
+          <h1>{pageNames[route.page]}</h1>
+          <p>
+            {route.page === 'discover'
+              ? '搜索公开元数据、跟踪新文献；向自己的文献提问请进入阅读与问答。'
+              : route.page === 'graph'
+                ? '从选定文献的真实引用出发，连接局域图谱、来源综述与后续证据。'
+                : route.page === 'charts'
+                  ? '使用自己的 CSV 和明确的节点连线，保留数据、配置、图片与脚本。'
+                  : '从明确的 Idea 与文献来源开始，整理仍需核对的摘要和论文框架。'}
+          </p>
+          {route.page === 'write' && (
+            <div className="action-row">
+              <button onClick={() => navigate('charts')}>数据图表与架构拓扑</button>
+              <button onClick={() => navigate('read', { tab: 'translation' })}>中译英与阅读翻译</button>
+            </div>
+          )}
+        </div>
+        <Studio
+          key={key + ':' + moduleId[route.page]}
+          project={project}
+          role={user.role}
+          module={moduleId[route.page]!}
+          versionIds={route.versions}
+          onScopeChange={scope}
+          focusRunId={route.run}
+          onResults={() => navigate('results')}
+        />
+      </>
+    );
+  }
+  return (
+    <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        跳至主要内容
+      </a>
+      <header className="app-header">
+        <a
+          className="app-brand"
+          href={routeHash({ ...route, page: 'home', run: undefined })}
+          aria-label="ScholarShip 学者之舟，回到首页"
+        >
+          <Brand />
+        </a>
+        <nav className="app-nav" aria-label="主导航">
+          {(['home', 'library', 'read', 'results'] as Page[]).map((page) => (
+            <a
+              key={page}
+              href={routeHash({ ...route, page, run: undefined })}
+              aria-current={activeNav === page ? 'page' : undefined}
+            >
+              {pageNames[page]}
+            </a>
           ))}
         </nav>
-      </div>
-      <main>
-        <header>
-          <div className="breadcrumb">
-            学海无涯，AI作舟 <span>/</span> {active < 0 ? '工作台' : modules[active].title}
-          </div>
-          <div className="header-actions">
-            {user && (
-              <label className="workspace-picker">
-                研究空间{' '}
-                <select aria-label="研究项目" value={project} onChange={(e) => setProject(e.target.value)}>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {user?.role === 'researcher' && (
-              <WorkspaceCreate
-                onCreated={(p) => {
-                  setProjects([...projects, p]);
-                  setProject(p.id);
-                  setActive(0);
-                }}
-              />
-            )}
-            <span className="local-tag">本地开发</span>
-            <button className="account" onClick={() => (user ? void logout() : setLoginOpen(true))}>
-              <span className="avatar">{user ? '研' : '访'}</span>
-              {user ? `${user.display_name} · 退出` : '登录研究空间'}
-            </button>
-          </div>
-        </header>
-        <div className="content">
-          {active === -1 && (
-            <section className="home-intro">
-              <div>
-                <h1>今天，继续探索。</h1>
-                <p>学海无涯，AI作舟</p>
-              </div>
-              <button className="primary" onClick={() => setActive(2)}>
-                向文献提问
-              </button>
-            </section>
-          )}
-          {active >= 1 && (
-            <React.Suspense fallback={<p>正在加载研究工具…</p>}>
-              <Studio
-                key={`studio:${user?.id}:${project}:${active}`}
-                project={project}
-                role={user?.role}
-                module={active}
-              />
-            </React.Suspense>
-          )}
-          {active === 2 && (
-            <Research key={`research:${user?.id}:${project}`} project={project} role={user?.role} />
-          )}
-          {active === 2 && (
-            <OfflineResearch
-              key={`offline:${user?.id}:${project}`}
-              project={project}
-              userId={user?.id}
-              role={user?.role}
-            />
-          )}
-          {(active === -1 || active === 0 || active === 1) && (
-            <React.Suspense fallback={<p>正在加载文献阅读器…</p>}>
-              <Library
-                key={`${user?.id}:${project}`}
-                role={user?.role}
-                project={project}
-                onResearch={() => setActive(2)}
-              />
-            </React.Suspense>
-          )}
-          {active === -1 && (
-            <>
-              <section className="research">
-                <div className="section-top">
-                  <div>
-                    <h2>{active < 0 ? '你的研究工具箱' : modules[active].title}</h2>
-                    <p>六个能力模块，一个连贯的研究过程。</p>
-                  </div>
-                  <span className="outline-tag">研究工作室 · 分项验收</span>
-                </div>
-                <div className="module-grid">
-                  {modules.map((m, i) => (
-                    <button
-                      onClick={() => setActive(i)}
-                      className={`module-card ${active === i ? 'focused' : ''}`}
-                      key={m.en}
-                    >
-                      <div className="card-top">
-                        <span className="module-icon">{m.icon}</span>
-                        <span className="planned">{i === 0 ? '本地文献库' : '首版待验收'}</span>
-                      </div>
-                      <small className="module-en">{m.en}</small>
-                      <h3>
-                        {m.title}
-                        <span>↗</span>
-                      </h3>
-                      <p>{m.desc}</p>
-                      <div className="tags">
-                        {m.tags.map((t) => (
-                          <span key={t}>{t}</span>
-                        ))}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </section>
-              <details className="system-details">
-                <summary>模型配置与运行状态</summary>
-                <ServiceStatus userId={user?.id} />
-                <ModelConfiguration
-                  key={`models:${user?.id}:${project}`}
-                  project={project}
-                  role={user?.role}
-                />
-                <section className="environment">
-                  <div className="section-top">
-                    <h2>
-                      环境状态 <span>LIVE</span>
-                    </h2>
-                    <button className="text-button" onClick={() => void refresh()}>
-                      刷新状态 ↻
-                    </button>
-                  </div>
-                  <div className="status-grid">
-                    <div className="service">
-                      <span className={`status-dot ${health?.ready ? 'ok' : ''}`} />
-                      <div>
-                        <strong>研究服务</strong>
-                        <small>{health?.ready ? '依赖与迁移就绪' : '正在检查或依赖未就绪'}</small>
-                      </div>
-                      <span className="service-mark">API</span>
-                    </div>
-                    {Object.entries(serviceNames).map(([key, name]) => (
-                      <div className="service" key={key}>
-                        <span className={`status-dot ${health?.services[key]?.ready ? 'ok' : ''}`} />
-                        <div>
-                          <strong>{name}</strong>
-                          <small>
-                            {health?.services[key]?.ready
-                              ? health.services[key].version?.split(' ')[0]
-                              : '未就绪'}
-                          </small>
-                        </div>
-                        <span className="service-mark">
-                          {key === 'postgresql' ? 'DB' : key === 'qdrant' ? 'VEC' : 'MQ'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-                <section className="bottom-grid">
-                  <div className="task-panel">
-                    <div className="section-top">
-                      <h2>
-                        任务中心 <span>LOCAL PROBE</span>
-                      </h2>
-                      <span className="outline-tag">不产生模型费用</span>
-                    </div>
-                    <p>检查任务投递、LangGraph 持久化与实时事件回传。</p>
-                    <div className="probe-controls">
-                      {!user && <span className="signin-hint">登录后可运行基础设施探针</span>}
-                      <button
-                        className="primary"
-                        disabled={busy || !health?.ready || (!!user && !project)}
-                        onClick={() => (user ? void probe() : setLoginOpen(true))}
-                      >
-                        {busy ? '正在执行…' : user ? '运行探针 ↗' : '登录并体验 ↗'}
-                      </button>
-                    </div>
-                    {run ? (
-                      <div className="run-detail">
-                        <div className="run-heading">
-                          <strong>
-                            {run.status === 'succeeded'
-                              ? '✓ 探针已完成'
-                              : run.status === 'failed'
-                                ? '探针失败'
-                                : '◌ 任务处理中'}
-                          </strong>
-                          <code>{run.id.slice(0, 8)}</code>
-                        </div>
-                        <ol>
-                          {events.map((e) => (
-                            <li key={e.seq}>
-                              <span>{String(e.seq).padStart(2, '0')}</span>
-                              {e.message}
-                            </li>
-                          ))}
-                        </ol>
-                        <small>{streamState}</small>
-                      </div>
-                    ) : (
-                      <div className="empty-task">
-                        <span>⌁</span>
-                        <div>
-                          还没有运行记录
-                          <small>开启第一次环境验证，确认研究工作流的起点。</small>
-                        </div>
-                      </div>
-                    )}
-                    {error && !loginOpen && (
-                      <div role="alert" className="error">
-                        {error}
-                      </div>
-                    )}
-                  </div>
-                  <div className="principles">
-                    <span className="eyebrow">BUILT FOR TRUST</span>
-                    <h2>从起点，就认真对待证据。</h2>
-                    <div>
-                      <span>01</span>
-                      <p>
-                        <strong>来源可查</strong>
-                        <small>原文、页码与证据锚点，构成每条结论的依据。</small>
-                      </p>
-                    </div>
-                    <div>
-                      <span>02</span>
-                      <p>
-                        <strong>过程可追</strong>
-                        <small>任务、数据与产物版本，保留研究演进的轨迹。</small>
-                      </p>
-                    </div>
-                    <div>
-                      <span>03</span>
-                      <p>
-                        <strong>成本可控</strong>
-                        <small>外部服务默认关闭，首期 AI 预算目标 ¥100。</small>
-                      </p>
-                    </div>
-                  </div>
-                </section>
-              </details>
-            </>
-          )}
-          <footer>
-            <span>ScholarShip · 学者之舟</span>
-            <span>
-              学海无涯，AI作舟 <i>·</i> 研究工作室 · 开发与分项验收
-            </span>
-          </footer>
+        <div className="app-header-end">
+          <a
+            href={routeHash({ ...route, page: 'tools', run: undefined })}
+            aria-current={activeNav === 'tools' ? 'page' : undefined}
+          >
+            研究工具
+          </a>
+          <button
+            className="account-button"
+            onClick={() => (user ? navigate('settings') : setLoginOpen(true))}
+          >
+            {user ? user.display_name : '登录研究空间'}
+          </button>
         </div>
+      </header>
+      <div className="app-context">
+        <span className="context-tag">{protectedPage ? pageNames[route.page] : BRAND.slogan}</span>
+        {user ? (
+          <>
+            <label>
+              研究空间{' '}
+              <select aria-label="研究空间" value={project} onChange={(e) => changeProject(e.target.value)}>
+                {!projects.length && <option value="">{projectLoading ? '读取中…' : '尚无空间'}</option>}
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {user.role === 'researcher' && !!projects.length && <WorkspaceCreate onCreated={created} />}
+            <button className="text-link context-settings" onClick={() => navigate('settings')}>
+              设置
+            </button>
+            <button className="text-link" disabled={busy} onClick={() => void logout()}>
+              退出
+            </button>
+          </>
+        ) : (
+          <span className="context-hint">以文献为起点，让理解有据可循。</span>
+        )}
+      </div>
+      {projectError && project && (
+        <p role="alert" className="error">
+          {projectError}
+        </p>
+      )}
+      <main
+        ref={main}
+        className={'app-main ' + (route.page === 'read' ? 'app-main-wide' : '')}
+        id="main-content"
+        tabIndex={-1}
+      >
+        <Suspense
+          fallback={
+            <p role="status" className="loading-state">
+              正在加载研究工具…
+            </p>
+          }
+        >
+          {content()}
+        </Suspense>
       </main>
+      <footer className="app-footer">
+        <span>
+          {BRAND.name} · {BRAND.chinese}
+        </span>
+        <span>{BRAND.slogan}</span>
+        <a href={routeHash({ ...route, page: 'tools', run: undefined })}>六大研究模块</a>
+        <a href={routeHash({ ...route, page: 'settings', run: undefined })}>模型与运行状态</a>
+      </footer>
       {loginOpen && (
-        <div
-          className="modal-backdrop"
+        <dialog
+          className="login-dialog"
+          ref={dialog}
+          onCancel={() => {
+            setPassword('');
+            setLoginOpen(false);
+          }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) setLoginOpen(false);
+            if (e.target === e.currentTarget) {
+              const box = e.currentTarget.getBoundingClientRect();
+              if (
+                e.clientX < box.left ||
+                e.clientX > box.right ||
+                e.clientY < box.top ||
+                e.clientY > box.bottom
+              ) {
+                setPassword('');
+                setLoginOpen(false);
+              }
+            }
           }}
         >
-          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="login-title">
-            <button className="close" aria-label="关闭" onClick={() => setLoginOpen(false)}>
-              ×
+          <button
+            className="dialog-close"
+            aria-label="关闭登录"
+            onClick={() => {
+              setPassword('');
+              setLoginOpen(false);
+            }}
+          >
+            ×
+          </button>
+          <BrandMark size={56} />
+          <h2>进入你的研究空间</h2>
+          <p>文献、任务与成果按账号隔离。</p>
+          <form onSubmit={(e) => void login(e)}>
+            <label>
+              账号
+              <input
+                autoFocus
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              密码
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </label>
+            {loginError && (
+              <p className="error" role="alert">
+                {loginError}
+              </p>
+            )}
+            <button className="primary" disabled={busy}>
+              {busy ? '正在登录…' : '登录并继续'}
             </button>
-            <Sail small />
-            <h2 id="login-title">进入你的研究空间</h2>
-            <p>研究账号与评审账号拥有独立的数据空间。</p>
-            <form onSubmit={(e) => void login(e)}>
-              <label>
-                账号
-                <input
-                  autoFocus
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
-              </label>
-              <label>
-                密码
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </label>
-              {error && (
-                <div className="error" role="alert">
-                  {error}
-                </div>
-              )}
-              <button className="primary" disabled={busy}>
-                {busy ? '正在登录…' : '登录'}
-              </button>
-            </form>
-            <small>初始账号凭据由本地初始化生成，请从项目私有配置中查看。</small>
-          </section>
-        </div>
+          </form>
+        </dialog>
       )}
     </div>
   );
 }
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+class RenderBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? (
+      <section className="empty-state">
+        <h1>页面暂时未能显示</h1>
+        <p>已保存的资料不受影响。请重新加载页面；不会自动重发任务。</p>
+        <button onClick={() => location.reload()}>重新加载页面</button>
+      </section>
+    ) : (
+      this.props.children
+    );
+  }
+}
+// Vite may reevaluate this entry during development. Retain the root so updates
+// cannot create competing React trees on the same container.
+const root: Root = import.meta.hot?.data.root ?? createRoot(document.getElementById('root')!);
+if (import.meta.hot) import.meta.hot.data.root = root;
+root.render(
+  <RenderBoundary>
     <App />
-  </React.StrictMode>,
+  </RenderBoundary>,
 );

@@ -1,7 +1,8 @@
 import TaskEvents from './TaskEvents';
 import CancelTask from './CancelTask';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, useRef } from 'react';
 import { api, errorMessage, runErrorMessage, runStatus } from './researchApi';
+import useExecution from './useExecution';
 import type { Target } from './SourceReader';
 const SourceReader = lazy(() => import('./SourceReader'));
 
@@ -35,7 +36,43 @@ type Run = {
   error_json?: { code: string; contract_code?: string };
 };
 
-export default function Research({ project, role }: { project: string; role?: string }) {
+export default function Research({
+  project,
+  role,
+  versionIds,
+  onScopeChange,
+  onEvidence,
+  focusRunId,
+  onResults,
+}: {
+  project: string;
+  role?: string;
+  versionIds?: string[];
+  onScopeChange?: (ids: string[]) => void;
+  onEvidence?: (target: Target) => void;
+  focusRunId?: string;
+  onResults?: () => void;
+}) {
+  const execution = useExecution(project);
+  const scopeKey = versionIds?.join(',');
+  function selectSources(ids: string[]) {
+    if (ids.length > 8 && ids.length >= selected.length) {
+      setError('一次问答最多选择 8 个版本，请缩小范围。');
+      return;
+    }
+    setSelected(ids);
+    setParent('');
+    onScopeChange?.(ids);
+  }
+  function showEvidence(value: Target) {
+    if (onEvidence) {
+      onEvidence(value);
+      requestAnimationFrame(() =>
+        document.querySelector('.reading-source')?.scrollIntoView({ block: 'start' }),
+      );
+    } else setTarget(value);
+  }
+  const focused = useRef('');
   const [docs, setDocs] = useState<Doc[]>([]),
     [selected, setSelected] = useState<string[]>([]);
   const [runs, setRuns] = useState<Run[]>([]),
@@ -45,8 +82,26 @@ export default function Research({ project, role }: { project: string; role?: st
   const [busy, setBusy] = useState(false),
     [target, setTarget] = useState<Target | null>(null);
   const [parent, setParent] = useState('');
-  useEffect(() => setParent(''), [project]);
-  const [mode, setMode] = useState<'offline_acceptance' | 'cloud'>('offline_acceptance');
+  useEffect(() => setParent(''), [project, scopeKey]);
+  const [mode, setMode] = useState<'offline_acceptance' | 'cloud'>('cloud');
+  useEffect(() => {
+    if (versionIds) {
+      const next = versionIds.filter((id) => docs.some((d) => d.id === id));
+      setSelected((old) => (old.join(',') === next.join(',') ? old : next));
+    }
+  }, [scopeKey, docs]);
+  useEffect(() => {
+    if (!focusRunId || !runs.some((r) => r.id === focusRunId) || focused.current === focusRunId) return;
+    focused.current = focusRunId;
+    requestAnimationFrame(() =>
+      document.getElementById('research-run-' + focusRunId)?.scrollIntoView({ block: 'start' }),
+    );
+  }, [focusRunId, runs]);
+  const cloudReady = execution.available(['embedding', 'rerank', 'chat']);
+  const buildReady =
+    mode === 'cloud'
+      ? execution.available(['embedding'])
+      : !docs.some((d) => selected.includes(d.id) && d.active_index_id && d.model_simulated === false);
   async function refresh() {
     const [d, r] = await Promise.all([
       api(`/research/projects/${project}/documents`),
@@ -81,6 +136,10 @@ export default function Research({ project, role }: { project: string; role?: st
     };
   }, [project]);
   async function submit(kind: 'indexes' | 'questions') {
+    if ((kind === 'indexes' && !buildReady) || (kind === 'questions' && !queryReady)) {
+      setError('当前来源与执行条件尚未就绪，请核对提示。');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -106,6 +165,8 @@ export default function Research({ project, role }: { project: string; role?: st
   }
   const queryReady =
     selected.length > 0 &&
+    selected.length <= 8 &&
+    (mode !== 'cloud' || cloudReady) &&
     selected.every((id) =>
       docs.some(
         (d) => d.id === id && (mode === 'offline_acceptance' ? d.can_query_offline : d.can_query_cloud),
@@ -114,63 +175,98 @@ export default function Research({ project, role }: { project: string; role?: st
   if (!project) return null;
   return (
     <section className="task-panel" style={{ marginBottom: 24 }}>
-      <h2>文献证据问答</h2>
-      <p>多篇建索引按文献分别排队，每篇独立显示结果；提问时可同时选择多篇。所有任务共用项目额度。</p>
-      <p>
-        使用正式文献版本与结构化原文（OCR
-        或本地文本层）。当前可做离线验收：向量、重排和回答为模拟响应，不代表科研正确性。云端任务须同时满足模型、文献范围及限额准入。
-      </p>
-      <label>
-        执行模式{' '}
-        <select
-          value={mode}
-          onChange={(e) => {
-            setMode(e.target.value as typeof mode);
-            setError('');
-          }}
-        >
-          <option value="offline_acceptance">离线验收 · 不发出外部请求</option>
-          <option value="cloud">云端业务 · 需正式额度准入</option>
-        </select>
-      </label>
+      <div className="section-top">
+        <h2>向所选文献提问</h2>
+        {onResults && (
+          <button className="text-link" onClick={onResults}>
+            历史成果
+          </button>
+        )}
+      </div>
+      <p>回答只依据当前选择的文献。单篇细节、多轮续问与跨文对比使用相同的来源核对方式。</p>
+      <p className="inline-notice">{execution.notice}</p>
+      <details className="execution-options">
+        <summary>执行方式：{mode === 'cloud' ? '真实云端 / 历史回看' : '离线流程验收（模拟）'}</summary>
+        <label>
+          执行模式{' '}
+          <select
+            value={mode}
+            onChange={(e) => {
+              setMode(e.target.value as typeof mode);
+              setError('');
+            }}
+          >
+            <option value="offline_acceptance">离线验收 · 不发出外部请求</option>
+            <option value="cloud">云端业务 · 需正式额度准入</option>
+          </select>
+        </label>
+      </details>
       {(error || pollError) && (
         <p role="alert" className="error">
           {error || pollError}
         </p>
       )}
       {docs.length === 0 && <p>请先在文献库导入 PDF；已授权的 MinerU 本地产物通过项目导入脚本发布。</p>}
-      {docs.map((d) => (
-        <div key={d.id} style={{ margin: '12px 0' }}>
-          <label>
-            <input
-              type="checkbox"
-              disabled={!d.native_parse_id}
-              checked={selected.includes(d.id)}
-              onChange={(e) =>
-                setSelected(e.target.checked ? [...selected, d.id] : selected.filter((v) => v !== d.id))
-              }
-            />
-            {d.title} ·{' '}
-            {d.native_index_stale
-              ? '新 OCR 待重建索引，问答使用原活动修订'
-              : d.native_parse_id
-                ? '原文已入库'
-                : '尚无深解析'}{' '}
-            · {d.active_index_id ? (d.model_simulated ? '模拟索引' : '真实索引') : '未建索引'}
-          </label>{' '}
-          {d.native_parse_id && (
-            <button onClick={() => setTarget({ version_id: d.id, parse_id: d.native_parse_id!, page: 1 })}>
-              阅读结构化原文
-            </button>
-          )}
+      <details className="source-scope" open={!selected.length}>
+        <summary>问答来源 · 已选 {selected.length} 篇（最多 8 篇，可多文对比）</summary>
+        <div className="action-row">
+          <button disabled={!selected.length} onClick={() => selectSources(selected.slice(0, 1))}>
+            只问当前这篇
+          </button>
+          <button onClick={() => selectSources([])}>清空来源</button>
         </div>
-      ))}
-      <button
-        disabled={busy || !selected.length || role !== 'researcher'}
-        onClick={() => void submit('indexes')}
-      >
-        建立所选文献索引
-      </button>
+        {selected.length > 8 && (
+          <p className="inline-notice">
+            当前从其他工具带入 {selected.length} 篇。一次问答最多 8
+            篇，请缩小来源范围；也可点击“只问当前这篇”。
+          </p>
+        )}
+        {docs.map((d) => (
+          <div key={d.id} style={{ margin: '12px 0' }}>
+            <label>
+              <input
+                type="checkbox"
+                disabled={!d.native_parse_id}
+                checked={selected.includes(d.id)}
+                onChange={(e) =>
+                  selectSources(e.target.checked ? [...selected, d.id] : selected.filter((v) => v !== d.id))
+                }
+              />
+              {d.title} ·{' '}
+              {d.native_index_stale
+                ? '新结构修订待重建索引，历史问答保留原修订'
+                : d.native_parse_id
+                  ? '原文已入库'
+                  : '尚未提取文本结构'}{' '}
+              · {d.active_index_id ? (d.model_simulated ? '模拟索引' : '真实索引') : '未建索引'}
+            </label>{' '}
+            {d.native_parse_id && (
+              <button
+                onClick={() => showEvidence({ version_id: d.id, parse_id: d.native_parse_id!, page: 1 })}
+              >
+                阅读结构化原文
+              </button>
+            )}
+          </div>
+        ))}
+      </details>
+      <details className="index-preparation">
+        <summary>问答准备与索引状态</summary>
+        <p className="helper">仅在需要时建立索引。模拟索引不会覆盖所选文献已有的真实活动索引。</p>
+        <button
+          disabled={busy || !buildReady || !selected.length || role !== 'researcher'}
+          onClick={() => void submit('indexes')}
+        >
+          建立所选文献索引
+        </button>
+        {!buildReady && (
+          <p className="helper">
+            {mode === 'cloud'
+              ? '新的真实向量化未开放；可回看现有索引与历史回答。'
+              : '所选文献已有真实活动索引，请在独立练习空间执行模拟建索引。'}
+          </p>
+        )}
+      </details>
       <label>
         会话上下文{' '}
         <select value={parent} onChange={(e) => setParent(e.target.value)}>
@@ -206,9 +302,11 @@ export default function Research({ project, role }: { project: string; role?: st
       >
         提交证据问答
       </button>
+      <h3 className="history-heading">空间历史回答与任务</h3>
       {runs.map((r, index) => (
         <details
-          open={index === 0}
+          open={focusRunId ? r.id === focusRunId : index === 0}
+          id={'research-run-' + r.id}
           key={r.id}
           style={{ marginTop: 20, borderTop: '1px solid #ddd', paddingTop: 12 }}
         >
@@ -255,7 +353,7 @@ export default function Research({ project, role }: { project: string; role?: st
                   key={c.id}
                   onClick={() =>
                     void api(`/research/evidence/${c.id}`)
-                      .then(setTarget)
+                      .then(showEvidence)
                       .catch((e) => setError(errorMessage(e)))
                   }
                 >

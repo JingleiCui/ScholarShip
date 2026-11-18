@@ -1,0 +1,21 @@
+flowchart LR
+    subgraph GRAPH["qa_graph：实际 StateGraph 节点与边"]
+        START((START)) --> retrieve["retrieve<br/>结构证据或 Dense + BM25 / RRF"]
+        retrieve --> rerank["rerank<br/>校验候选 / 重排或复用结构证据"]
+        rerank --> answer["answer<br/>证据生成 / 结构答案 / 无证据拒答"]
+        answer --> publish["publish<br/>取消检查 / 引用约束 / 结果持久化"]
+        publish --> END((END))
+    end
+    PRE["图外准备<br/>解析、索引世代、来源范围与模型快照"] --> START
+    retrieve -. "状态" .-> CP[("PostgresSaver / QAState<br/>durability=sync / 固定 thread_id")]
+    rerank -. "状态" .-> CP
+    answer -. "状态" .-> CP
+    publish -. "状态" .-> CP
+    BOUNDARY["Worker / Gateway 边界<br/>未知请求或策略拒绝转 waiting_user；回执与检查点分开记录"]
+    BOUNDARY -. "约束执行，不是图节点" .-> GRAPH
+    classDef node fill:#E9F0FC,stroke:#719DD0,color:#202936
+    classDef state fill:#E9F0FC,stroke:#719DD0,color:#202936
+    classDef boundary fill:#E9F0FC,stroke:#719DD0,color:#202936
+    class retrieve,rerank,answer,publish node
+    class CP,PRE state
+    class BOUNDARY boundary

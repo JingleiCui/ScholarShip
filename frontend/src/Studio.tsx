@@ -2,11 +2,12 @@ import TaskEvents from './TaskEvents';
 import DirectionReview from './DirectionReview';
 import TranslationReview from './TranslationReview';
 import CancelTask from './CancelTask';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, useRef } from 'react';
 import { api, errorMessage, runErrorMessage, runStatus } from './researchApi';
+import useExecution from './useExecution';
 import type { GraphData } from './CitationGraph';
 import type { Segment } from './BilingualReader';
-import type { Target } from './SourceReader';
+import type { Target, SourceSelection } from './SourceReader';
 const CitationGraph = lazy(() => import('./CitationGraph'));
 const BilingualReader = lazy(() => import('./BilingualReader'));
 const DiagramPreview = lazy(() => import('./DiagramPreview'));
@@ -78,17 +79,30 @@ export default function Studio({
   project,
   role,
   module,
+  versionIds,
+  onScopeChange,
+  focusRunId,
+  onResults,
+  sourceSelection,
 }: {
   project: string;
   role?: string;
   module: number;
+  sourceSelection?: SourceSelection | null;
+  versionIds?: string[];
+  onScopeChange?: (ids: string[]) => void;
+  focusRunId?: string;
+  onResults?: () => void;
 }) {
+  const execution = useExecution(project);
+  const scopeKey = versionIds?.join(',');
+  const focused = useRef('');
   const [docs, setDocs] = useState<Doc[]>([]),
     [papers, setPapers] = useState<Paper[]>([]),
     [runs, setRuns] = useState<Run[]>([]);
   const [selected, setSelected] = useState<string[]>([]),
     [graphPapers, setGraphPapers] = useState<string[]>([]),
-    [mode, setMode] = useState('offline_acceptance');
+    [mode, setMode] = useState('cloud');
   const [error, setError] = useState(''),
     [note, setNote] = useState(''),
     [busy, setBusy] = useState(false),
@@ -119,7 +133,7 @@ export default function Studio({
         const needsSources = [1, 3, 4].includes(module);
         const operationFilters: Record<number, string> = {
           1: 'local_parse,translate,summary,review_artifact',
-          3: 'direction,direction_check,direction_review',
+          3: 'direction,direction_check,direction_review,summary,review_artifact',
           4: 'draft,summary,review_artifact',
           5: 'chart,diagram',
         };
@@ -150,6 +164,39 @@ export default function Studio({
       clearInterval(timer);
     };
   }, [project, module]);
+  useEffect(() => {
+    if (!versionIds) return;
+    const next = docs
+      .filter((d) => versionIds.includes(d.id) && d.native_parse_id)
+      .map((d) => d.native_parse_id!);
+    setSelected((old) => (old.join(',') === next.join(',') ? old : next));
+    const graphIds = [...new Set(papers.filter((p) => versionIds.includes(p.version_id)).map((p) => p.id))];
+    setGraphPapers((old) => (old.join(',') === graphIds.join(',') ? old : graphIds));
+  }, [scopeKey, docs, papers]);
+  useEffect(() => {
+    if (!focusRunId || !runs.some((r) => r.id === focusRunId) || focused.current === focusRunId) return;
+    focused.current = focusRunId;
+    requestAnimationFrame(() =>
+      document.getElementById('studio-run-' + focusRunId)?.scrollIntoView({ block: 'start' }),
+    );
+  }, [focusRunId, runs]);
+  function selectSources(ids: string[]) {
+    setSelected(ids);
+    onScopeChange?.(
+      docs.filter((d) => d.native_parse_id && ids.includes(d.native_parse_id)).map((d) => d.id),
+    );
+  }
+  function selectGraphPapers(ids: string[]) {
+    setGraphPapers(ids);
+    onScopeChange?.([...new Set(papers.filter((p) => ids.includes(p.id)).map((p) => p.version_id))]);
+  }
+  const graphVersionIds = [
+    ...new Map(papers.filter((p) => graphPapers.includes(p.id)).map((p) => [p.id, p.version_id])).values(),
+  ];
+  const graphParsed = docs.filter((d) => graphVersionIds.includes(d.id) && d.native_parse_id);
+  const cloudReady = execution.available([module === 1 ? 'translation' : 'chat']);
+  const canGenerate = mode === 'offline_acceptance' || cloudReady;
+  const canGenerateText = mode === 'offline_acceptance' || execution.available(['chat']);
   async function action(fn: () => Promise<void>) {
     setError('');
     setNote('');
@@ -163,6 +210,14 @@ export default function Studio({
     }
   }
   async function task(operation: string, extra: object = {}) {
+    if (
+      ['translate', 'summary', 'draft', 'direction'].includes(operation) &&
+      mode === 'cloud' &&
+      !execution.available([operation === 'translate' ? 'translation' : 'chat'])
+    ) {
+      setError('新的云端生成尚未开放，可回看已有产物或继续本地处理。');
+      return;
+    }
     await action(async () => {
       await api(`/studio/projects/${project}/tasks`, {
         method: 'POST',
@@ -200,6 +255,15 @@ export default function Studio({
       setTranslationId(id);
     });
   }
+  const openedTranslation = useRef('');
+  useEffect(() => {
+    const record = runs.find((r) => r.id === focusRunId);
+    const id = record?.result_json?.translation_id;
+    if (module === 1 && id && openedTranslation.current !== id) {
+      openedTranslation.current = id;
+      void openTranslation(id);
+    }
+  }, [focusRunId, runs, module]);
   const [sourcePage, setSourcePage] = useState(1),
     [pageBlocks, setPageBlocks] = useState<{ id: string; canonical_text: string }[]>([]),
     [blockIds, setBlockIds] = useState<string[]>([]);
@@ -223,6 +287,12 @@ export default function Studio({
     end: number;
     text: string;
   } | null>(null);
+  useEffect(() => {
+    if (sourceSelection && module === 1 && selected.includes(sourceSelection.parse_id)) {
+      setTextSelection(sourceSelection);
+      setSourcePage(sourceSelection.page);
+    }
+  }, [sourceSelection, selected.join(','), module]);
   const [followupQuery, setFollowupQuery] = useState('');
   const [description, setDescription] = useState('输入 → 解析 → 检索 → 生成 → 证据核验');
   const operationNames: Record<string, string> = {
@@ -254,6 +324,12 @@ export default function Studio({
           )[module]
         }
       </h2>
+      {onResults && (
+        <button className="text-link" onClick={onResults}>
+          查看全部成果
+        </button>
+      )}
+      {[1, 3, 4].includes(module) && <p className="inline-notice">{execution.notice}</p>}
       {(error || note) && <p role={error ? 'alert' : 'status'}>{error || note}</p>}
       {[1, 3, 4].includes(module) && (
         <details open={module !== 3}>
@@ -272,7 +348,7 @@ export default function Studio({
             <div className="source-actions">
               <button
                 onClick={() =>
-                  setSelected(
+                  selectSources(
                     docs
                       .filter((d) => d.native_parse_id)
                       .slice(0, 30)
@@ -282,7 +358,7 @@ export default function Studio({
               >
                 选择全部来源（最多 30 篇）
               </button>
-              <button onClick={() => setSelected([])}>清空来源</button>
+              <button onClick={() => selectSources([])}>清空来源</button>
               <span>已选 {selected.length} 篇</span>
             </div>
             {docs.map((d) => (
@@ -292,7 +368,7 @@ export default function Studio({
                   disabled={!d.native_parse_id}
                   checked={!!d.native_parse_id && selected.includes(d.native_parse_id)}
                   onChange={(e) =>
-                    setSelected(
+                    selectSources(
                       e.target.checked
                         ? [...selected, d.native_parse_id!]
                         : selected.filter((id) => id !== d.native_parse_id),
@@ -300,7 +376,7 @@ export default function Studio({
                   }
                 />
                 {d.title}
-                {!d.native_parse_id ? ' · 尚无深解析' : ''}
+                {!d.native_parse_id ? ' · 尚未提取文本结构' : ''}
               </label>
             ))}
           </fieldset>
@@ -334,9 +410,33 @@ export default function Studio({
               <option value="en">English</option>
             </select>
           </label>
+          {textSelection && (
+            <div className="selected-text-action">
+              <h3>从原文选中的内容</h3>
+              <blockquote>{textSelection.text}</blockquote>
+              <button
+                disabled={busy || !canWrite || !canGenerate || selected.length !== 1}
+                onClick={() =>
+                  void task('translate', {
+                    parse_id: selected[0],
+                    block_ids: [],
+                    source_selection: {
+                      block_id: textSelection.block_id,
+                      start: textSelection.start,
+                      end: textSelection.end,
+                      text: textSelection.text,
+                    },
+                  })
+                }
+              >
+                翻译当前选中文字
+              </button>
+              <p>确认目标语言与执行方式后再提交；当前未开放的云端请求不会执行。</p>
+            </div>
+          )}
           <p>整篇或选段翻译按原文块保存；公式、代码和引用标记受保护。模拟模式不会产生真正的中文翻译。</p>
           <button
-            disabled={busy || !canWrite || selected.length !== 1}
+            disabled={busy || !canWrite || !canGenerate || selected.length !== 1}
             onClick={() => void task('translate', { parse_id: selected[0] })}
           >
             翻译所选整篇
@@ -386,14 +486,14 @@ export default function Studio({
               </label>
             ))}
             <button
-              disabled={busy || !canWrite || selected.length !== 1 || !blockIds.length}
+              disabled={busy || !canWrite || !canGenerate || selected.length !== 1 || !blockIds.length}
               onClick={() => void task('translate', { parse_id: selected[0], block_ids: blockIds })}
             >
               翻译勾选段落
             </button>
             <p>在上面的原文框中选择单词或句子，再点击翻译。公式与代码需完整选择。</p>
             <button
-              disabled={busy || !canWrite || !textSelection || selected.length !== 1}
+              disabled={busy || !canWrite || !canGenerate || !textSelection || selected.length !== 1}
               onClick={() =>
                 void task('translate', {
                   parse_id: selected[0],
@@ -405,7 +505,10 @@ export default function Studio({
               翻译选中文字
             </button>
           </details>
-          <button disabled={busy || !canWrite || !selected.length} onClick={() => void task('summary')}>
+          <button
+            disabled={busy || !canWrite || !canGenerateText || !selected.length}
+            onClick={() => void task('summary')}
+          >
             生成有来源摘要
           </button>
           {translationVersions.length > 0 && (
@@ -594,13 +697,40 @@ export default function Studio({
       )}
       {module === 3 && (
         <>
+          <section className="graph-summary">
+            <h3>从图谱文献整理来源综述</h3>
+            <p>
+              选择图谱文献后，使用其中已解析的原文整理简短来源综述。局域中心性不等于领域影响力；综述仍需人工核对。
+            </p>
+            <p className="helper">
+              已选 {graphPapers.length} 个作品，其中 {graphParsed.length}{' '}
+              份原文已准备。此次综述只使用已准备的原文，未解析的文献不会被假装读过。
+            </p>
+            <button
+              disabled={
+                busy ||
+                !canWrite ||
+                !canGenerate ||
+                !graphVersionIds.some((id) => docs.some((d) => d.id === id && d.native_parse_id))
+              }
+              onClick={() =>
+                void task('summary', {
+                  parse_ids: docs
+                    .filter((d) => graphVersionIds.includes(d.id) && d.native_parse_id)
+                    .map((d) => d.native_parse_id!),
+                })
+              }
+            >
+              整理图谱文献综述
+            </button>
+          </section>
           <fieldset className="source-picker">
             <legend>图谱文献范围（正式验收至少 20 篇）</legend>
             <div className="source-actions">
-              <button onClick={() => setGraphPapers([...new Set(papers.map((p) => p.id))])}>
+              <button onClick={() => selectGraphPapers([...new Set(papers.map((p) => p.id))])}>
                 选择全部图谱文献
               </button>
-              <button onClick={() => setGraphPapers([])}>清空图谱范围</button>
+              <button onClick={() => selectGraphPapers([])}>清空图谱范围</button>
               <span>已选 {graphPapers.length} 篇</span>
             </div>
             {[...new Map(papers.map((p) => [p.id, p])).values()].map((p) => (
@@ -609,7 +739,7 @@ export default function Studio({
                   type="checkbox"
                   checked={graphPapers.includes(p.id)}
                   onChange={(e) =>
-                    setGraphPapers(
+                    selectGraphPapers(
                       e.target.checked ? [...graphPapers, p.id] : graphPapers.filter((id) => id !== p.id),
                     )
                   }
@@ -649,7 +779,7 @@ export default function Studio({
           </label>
           <p>当前方向草稿基于所选文献；没有后续联网证据时必须显示覆盖不足，不能断言问题未解决。</p>
           <button
-            disabled={busy || !canWrite || !selected.length || !idea.trim()}
+            disabled={busy || !canWrite || !canGenerate || !selected.length || !idea.trim()}
             onClick={() => void task('direction')}
           >
             整理研究方向证据草稿
@@ -685,12 +815,15 @@ export default function Studio({
             和计划实验框架；来源由服务端固定。草稿与文献身份均需人工核验，不生成虚构性能结果。
           </p>
           <button
-            disabled={busy || !canWrite || !selected.length || !idea.trim()}
+            disabled={busy || !canWrite || !canGenerate || !selected.length || !idea.trim()}
             onClick={() => void task('draft')}
           >
             生成带来源清单的框架
           </button>
-          <button disabled={busy || !canWrite || !selected.length} onClick={() => void task('summary')}>
+          <button
+            disabled={busy || !canWrite || !canGenerateText || !selected.length}
+            onClick={() => void task('summary')}
+          >
             整理来源摘要
           </button>
         </>
@@ -812,7 +945,7 @@ export default function Studio({
         <p>本模块还没有任务。选择来源并运行后，可在这里查看结果与下载产物。</p>
       )}
       {runs.map((r) => (
-        <details key={r.id}>
+        <details key={r.id} id={'studio-run-' + r.id} open={focusRunId === r.id}>
           <summary>
             {operationNames[r.operation] ?? r.operation} · {runStatus(r.status)}
           </summary>

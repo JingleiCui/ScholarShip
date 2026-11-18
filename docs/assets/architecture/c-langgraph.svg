@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="730" viewBox="0 0 1080 730" role="img" aria-labelledby="title">
+<title id="title">ScholarShip LangGraph 证据问答工作流</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4569A8"/></marker></defs>
+<rect width="1080" height="730" fill="white"/>
+<g font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, sans-serif" fill="#202936" font-size="18">
+<rect x="270" y="20" width="450" height="690" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="495.0" y="45.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">StateGraph / QAState</text>
+<rect x="435" y="66" width="120" height="36" rx="18" fill="white" stroke="#719DD0" stroke-width="1"/>
+<text x="495.0" y="84.0" text-anchor="middle" dominant-baseline="central" font-size="16" fill="#202936">START</text>
+<rect x="300" y="140" width="390" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="495.0" y="163.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">retrieve</text>
+<text x="495.0" y="190.04999999999998" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">结构化证据 / Dense + BM25 / RRF</text>
+<rect x="300" y="274" width="390" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="495.0" y="297.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">rerank</text>
+<text x="495.0" y="324.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">候选校验 / 模型重排 / 证据选择</text>
+<rect x="300" y="408" width="390" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="495.0" y="431.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">answer</text>
+<text x="495.0" y="458.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">证据约束生成 / 结构答案 / 拒答</text>
+<rect x="300" y="542" width="390" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="495.0" y="565.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">publish</text>
+<text x="495.0" y="592.0500000000001" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">取消检查 / 引用校验 / 结果入库</text>
+<path d="M 495 102 L 495 140" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 495 214 L 495 274" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 495 348 L 495 408" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 495 482 L 495 542" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="435" y="654" width="120" height="36" rx="18" fill="white" stroke="#719DD0" stroke-width="1"/>
+<text x="495.0" y="672.0" text-anchor="middle" dominant-baseline="central" font-size="16" fill="#202936">END</text>
+<path d="M 495 616 L 495 654" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="20" y="140" width="200" height="74" rx="2" fill="white" stroke="#719DD0" stroke-width="1"/>
+<text x="120.0" y="164.675" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">固定任务输入</text>
+<text x="120.0" y="189.32500000000002" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">问题 / 来源 / 模型快照</text>
+<path d="M 220 177 L 300 177" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="20" y="274" width="200" height="208" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="120.0" y="325.8" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">统一模型 Gateway</text>
+<text x="120.0" y="351.90000000000003" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936"></text>
+<text x="120.0" y="378.0" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Query Embedding</text>
+<text x="120.0" y="404.1" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Rerank</text>
+<text x="120.0" y="430.2" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Chat</text>
+<path d="M 300 195 L 246 195 L 246 311 L 220 311" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 300 311 L 220 311" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 300 445 L 220 445" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 780 127 A 135.0 12 0 0 1 1050 127 L 1050 203 A 135.0 12 0 0 1 780 203 Z" fill="#E9F0FC" stroke="#719DD0"/>
+<ellipse cx="915.0" cy="127" rx="135.0" ry="12" fill="#E9F0FC" stroke="#719DD0"/>
+<text x="915.0" y="158.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Qdrant</text>
+<text x="915.0" y="185.04999999999998" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">按固定来源范围检索</text>
+<path d="M 690 177 L 780 177" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 780 327 A 135.0 12 0 0 1 1050 327 L 1050 403 A 135.0 12 0 0 1 780 403 Z" fill="#E9F0FC" stroke="#719DD0"/>
+<ellipse cx="915.0" cy="327" rx="135.0" ry="12" fill="#E9F0FC" stroke="#719DD0"/>
+<text x="915.0" y="358.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">PostgresSaver</text>
+<text x="915.0" y="385.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">固定 thread_id / 同步持久化</text>
+<path d="M 748 203 L 748 579" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" stroke-dasharray="5 4"/>
+<path d="M 690 203 L 748 203" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" stroke-dasharray="5 4"/>
+<path d="M 690 311 L 748 311" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" stroke-dasharray="5 4"/>
+<path d="M 690 445 L 748 445" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" stroke-dasharray="5 4"/>
+<path d="M 690 579 L 748 579" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" stroke-dasharray="5 4"/>
+<path d="M 748 365 L 780 365" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<rect x="780" y="630" width="270" height="74" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="915.0" y="653.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">PostgreSQL</text>
+<text x="915.0" y="680.0500000000001" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">证据 / 回答 / 引用 / 轨迹</text>
+<path d="M 690 590 L 734 590 L 734 667 L 780 667" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+</g>
+</svg>

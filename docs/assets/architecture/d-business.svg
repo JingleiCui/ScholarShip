@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1360" height="650" viewBox="0 0 1360 650" role="img" aria-labelledby="title">
+<title id="title">ScholarShip 业务架构</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4569A8"/></marker></defs>
+<rect width="1360" height="650" fill="white"/>
+<g font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, sans-serif" fill="#202936" font-size="18">
+<rect x="20" y="20" width="1320" height="108" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="680.0" y="45.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">研究工作空间</text>
+<rect x="40" y="64" width="305" height="44" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="192.5" y="86.0" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">文献库</text>
+<rect x="365" y="64" width="305" height="44" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="517.5" y="86.0" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">阅读与问答</text>
+<rect x="690" y="64" width="305" height="44" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="842.5" y="86.0" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">研究工具</text>
+<rect x="1015" y="64" width="305" height="44" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1167.5" y="86.0" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">成果</text>
+<rect x="20" y="158" width="200" height="298" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="120.0" y="183.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">文献管理与解析</text>
+<rect x="32" y="210" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="120.0" y="231.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">PDF 导入</text>
+<rect x="32" y="268" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="120.0" y="289.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">重复候选与版本</text>
+<rect x="32" y="326" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="120.0" y="347.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">文本层 / OCR 结果</text>
+<rect x="32" y="384" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="120.0" y="405.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">页面与原文块</text>
+<rect x="244" y="158" width="200" height="298" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="344.0" y="183.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">检索与证据问答</text>
+<rect x="256" y="210" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="344.0" y="231.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">固定文献范围</text>
+<rect x="256" y="268" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="344.0" y="289.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">Dense + BM25</text>
+<rect x="256" y="326" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="344.0" y="347.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">重排与证据回答</text>
+<rect x="256" y="384" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="344.0" y="405.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">引用定位原文</text>
+<rect x="468" y="158" width="200" height="298" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="568.0" y="183.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">双语阅读</text>
+<rect x="480" y="210" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="568.0" y="231.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">PDF / 大纲跳转</text>
+<rect x="480" y="268" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="568.0" y="289.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">选段 / 全文翻译</text>
+<rect x="480" y="326" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="568.0" y="347.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">双语联动阅读</text>
+<rect x="480" y="384" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="568.0" y="405.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">人工修订与导出</text>
+<rect x="692" y="158" width="200" height="298" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="792.0" y="183.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">文献发现与跟踪</text>
+<rect x="704" y="210" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="792.0" y="231.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">arXiv / Crossref</text>
+<rect x="704" y="268" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="792.0" y="289.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">订阅与反馈评分</text>
+<rect x="704" y="326" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="792.0" y="347.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">允许来源下载</text>
+<rect x="704" y="384" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="792.0" y="405.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">文献身份核对</text>
+<rect x="916" y="158" width="200" height="298" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="1016.0" y="183.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">图谱与研究方向</text>
+<rect x="928" y="210" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1016.0" y="231.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">局域引用图</text>
+<rect x="928" y="268" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1016.0" y="289.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">候选边 / PageRank</text>
+<rect x="928" y="326" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1016.0" y="347.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">图谱来源摘要</text>
+<rect x="928" y="384" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1016.0" y="405.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">方向与证据核查</text>
+<rect x="1140" y="158" width="200" height="298" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="1240.0" y="183.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">写作与绘图</text>
+<rect x="1152" y="210" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1240.0" y="231.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">来源摘要与框架</text>
+<rect x="1152" y="268" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1240.0" y="289.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">CSV 受控图表</text>
+<rect x="1152" y="326" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1240.0" y="347.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">配置与 Python 脚本</text>
+<rect x="1152" y="384" width="176" height="42" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1240.0" y="405.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">Mermaid 图形脚本</text>
+<rect x="20" y="486" width="1320" height="144" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="680.0" y="511.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">共享业务基础</text>
+<rect x="40" y="538" width="415" height="70" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="247.5" y="559.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">来源与版本</text>
+<text x="247.5" y="586.0500000000001" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">文献 → 版本 → 解析 → 原文块</text>
+<rect x="475" y="538" width="415" height="70" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="682.5" y="559.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">任务与执行记录</text>
+<text x="682.5" y="586.0500000000001" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">状态 / 配置 / 回执 / 事件</text>
+<rect x="910" y="538" width="415" height="70" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1117.5" y="559.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">产物与审阅</text>
+<text x="1117.5" y="586.0500000000001" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">来源清单 / 修订 / 导出</text>
+</g>
+</svg>

@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1360" height="820" viewBox="0 0 1360 820" role="img" aria-labelledby="title">
+<title id="title">ScholarShip 技术与部署架构</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4569A8"/></marker></defs>
+<rect width="1360" height="820" fill="white"/>
+<g font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, sans-serif" fill="#202936" font-size="18">
+<rect x="540" y="20" width="280" height="64" rx="2" fill="white" stroke="#719DD0" stroke-width="1"/>
+<text x="680.0" y="40.4" text-anchor="middle" dominant-baseline="central" font-size="16" fill="#202936">Web Browser</text>
+<text x="680.0" y="63.599999999999994" text-anchor="middle" dominant-baseline="central" font-size="16" fill="#202936">React / TypeScript / PDF.js / KaTeX</text>
+<rect x="20" y="120" width="230" height="190" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="135.0" y="145.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">本地开发入口（二选一）</text>
+<rect x="40" y="178" width="190" height="100" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="135.0" y="203.35" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">Vite Dev Server</text>
+<text x="135.0" y="228.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">项目 Node / pnpm</text>
+<text x="135.0" y="252.64999999999998" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">127.0.0.1:15173</text>
+<rect x="280" y="120" width="1060" height="560" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="810.0" y="145.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936"></text>
+<text x="1050" y="145.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">Docker Compose / scholarship</text>
+<rect x="540" y="175" width="280" height="64" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="680.0" y="193.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Caddy</text>
+<text x="680.0" y="220.04999999999998" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">SPA 静态文件 / API 反向代理</text>
+<path d="M 680 84 L 680 175" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="540" y="294" width="280" height="84" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="680.0" y="311.35" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">api</text>
+<text x="680.0" y="336.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">FastAPI / Uvicorn / Pydantic</text>
+<text x="680.0" y="360.65000000000003" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">SQLAlchemy Core / Psycopg</text>
+<path d="M 680 239 L 680 294" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 540 52 L 135 52 L 135 120" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M 230 228 L 265 228 L 265 266 L 600 266 L 600 294" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<rect x="315" y="294" width="185" height="84" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="407.5" y="311.35" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">beat</text>
+<text x="407.5" y="336.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">Celery Beat</text>
+<text x="407.5" y="360.65000000000003" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">Outbox 调度</text>
+<rect x="860" y="294" width="440" height="84" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1080.0" y="311.35" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">worker / Python 3.12</text>
+<text x="1080.0" y="336.0" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">Celery / LangGraph / pdfplumber / PyPDF</text>
+<text x="1080.0" y="360.65000000000003" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#202936">NetworkX / NumPy / pandas / Matplotlib</text>
+<path d="M 407 378 L 407 418" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round"/>
+<path d="M 680 378 L 680 418" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round"/>
+<path d="M 1080 378 L 1080 418" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round"/>
+<path d="M 407 418 L 1190 418" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round"/>
+<path d="M 432 418 L 432 470" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 315 482 A 117.5 12 0 0 1 550 482 L 550 544 A 117.5 12 0 0 1 315 544 Z" fill="#E9F0FC" stroke="#719DD0"/>
+<ellipse cx="432.5" cy="482" rx="117.5" ry="12" fill="#E9F0FC" stroke="#719DD0"/>
+<text x="432.5" y="506.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">PostgreSQL 17</text>
+<text x="432.5" y="533.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">业务 / RLS / 检查点</text>
+<path d="M 682 418 L 682 470" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 565 482 A 117.5 12 0 0 1 800 482 L 800 544 A 117.5 12 0 0 1 565 544 Z" fill="#E9F0FC" stroke="#719DD0"/>
+<ellipse cx="682.5" cy="482" rx="117.5" ry="12" fill="#E9F0FC" stroke="#719DD0"/>
+<text x="682.5" y="506.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Redis 7.4</text>
+<text x="682.5" y="533.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">消息 Broker</text>
+<path d="M 932 418 L 932 470" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 815 482 A 117.5 12 0 0 1 1050 482 L 1050 544 A 117.5 12 0 0 1 815 544 Z" fill="#E9F0FC" stroke="#719DD0"/>
+<ellipse cx="932.5" cy="482" rx="117.5" ry="12" fill="#E9F0FC" stroke="#719DD0"/>
+<text x="932.5" y="506.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Qdrant 1.20</text>
+<text x="932.5" y="533.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">Dense + BM25</text>
+<path d="M 1182 418 L 1182 470" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<path d="M 1065 482 A 117.5 12 0 0 1 1300 482 L 1300 544 A 117.5 12 0 0 1 1065 544 Z" fill="#E9F0FC" stroke="#719DD0"/>
+<ellipse cx="1182.5" cy="482" rx="117.5" ry="12" fill="#E9F0FC" stroke="#719DD0"/>
+<text x="1182.5" y="506.95" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">共享文件目录</text>
+<text x="1182.5" y="533.05" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">PDF / 解析 / 产物</text>
+<rect x="315" y="594" width="985" height="56" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="807.5" y="622.0" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#202936">model_config.py → Catalog / Gateway → Protocols / Adapters → HTTPX → 云端服务</text>
+<path d="M 1300 336 L 1320 336 L 1320 622 L 1300 622" fill="none" stroke="#4569A8" stroke-width="1.3" stroke-linejoin="round" marker-end="url(#arrow)"/>
+<rect x="20" y="710" width="1320" height="90" rx="8" fill="white" stroke="#719DD0" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="680.0" y="735.0" text-anchor="middle" dominant-baseline="central" font-size="19" fill="#202936">工程交付</text>
+<rect x="40" y="750" width="305" height="32" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="192.5" y="766.0" text-anchor="middle" dominant-baseline="central" font-size="16" fill="#202936">项目 .venv / uv.lock</text>
+<rect x="365" y="750" width="305" height="32" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="517.5" y="766.0" text-anchor="middle" dominant-baseline="central" font-size="16" fill="#202936">Node / pnpm-lock</text>
+<rect x="690" y="750" width="305" height="32" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="842.5" y="766.0" text-anchor="middle" dominant-baseline="central" font-size="16" fill="#202936">Alembic 前向迁移</text>
+<rect x="1015" y="750" width="305" height="32" rx="2" fill="#E9F0FC" stroke="#719DD0" stroke-width="1"/>
+<text x="1167.5" y="766.0" text-anchor="middle" dominant-baseline="central" font-size="16" fill="#202936">pytest / Vitest / validate.py</text>
+</g>
+</svg>

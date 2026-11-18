@@ -6,68 +6,71 @@
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12" />
   <img src="https://img.shields.io/badge/React-19.3-149ECA?logo=react&logoColor=white" alt="React 19.3" />
   <img src="https://img.shields.io/badge/FastAPI-0.162-009688?logo=fastapi&logoColor=white" alt="FastAPI 0.162" />
-  <a href="#license"><img src="https://img.shields.io/badge/License-not_specified-lightgrey" alt="License not specified" /></a>
+  <a href="#license"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue" alt="项目采用 AGPL-3.0 许可证" /></a>
 </p>
 <p align="center"><a href="README.en.md">English</a> | <a href="README.md">简体中文</a></p>
 
-**ScholarShip 是一个以证据溯源为核心的 AI 科研工作空间。** 将文献导入、阅读翻译、检索问答、引用图谱和写作绘图串联起来，让每个回答能回到原文，每次修改有版本，每张图表有生成依据。
+**ScholarShip（学者之舟）是面向学生与个人研究者的 AI 科研工作空间。** 从一篇 PDF 开始，在同一处阅读、翻译、提问和整理成果。回答中的引用可回到原文位置，译文与草稿保留来源和修订记录。
 
-![ScholarShip 实际界面浏览](docs/assets/demo.gif)
+项目将分散的文献、对话和研究笔记连接起来：**文献版本 → 解析修订 → 原文片段 → 研究产物**。你可以沿这条来源链核对材料，再决定如何使用生成内容。
 
-<p align="center"><a href="#quickstart">快速开始</a> · <a href="docs/guides/user-manual.md">使用手册</a> · <a href="docs/engineering/code-walkthrough.md">代码导读</a> · <a href="docs/guides/models.md">模型配置</a></p>
+<p align="center"><a href="#demo">演示视频</a> · <a href="#features">核心能力</a> · <a href="#architecture">系统架构</a> · <a href="#quickstart">快速开始</a> · <a href="docs/guides/user-manual.md">使用手册</a></p>
 
-## ✨ 特性
+<a id="demo"></a>
+## 功能速览
 
-| 能力 | 可以做什么 | 关键设计 |
+<p align="center"><a href="docs/assets/demo-preview.mp4"><img src="docs/assets/demo.gif" width="1000" alt="ScholarShip 功能演示：导入 PDF、解析、问答与引用核对、双语阅读、文献检索与图谱、写作和绘图导出" /></a></p>
+<p align="center"><sub>点击观看demo视频</sub></p>
+
+[demo高清视频](docs/assets/demo-preview.mp4) · [详细操作版](docs/assets/demo.mp4) · [从头使用教程](docs/guides/first-research-session.md) 
+按使用顺序展示一次：**新建空间 → 导入 PDF → 本地解析 → 索引与提问 → 引用核对 → 双语阅读 → 文献发现与图谱 → 写作 → 绘图与导出 → 成果回看**。全部等待、调试和重复切换已剪除，保留关键操作和完成结果。
+
+视频为真实页面录制，1920×1080、25 fps，带中文步骤字幕。新建问答与写作使用明确标记的模拟模式，真实回答与译文为历史成果回看；未新增云端推理、OCR 或全文上传。Crossref 检索只发送公开查询词。
+
+<a id="features"></a>
+## 核心能力
+
+典型场景：导入某个研究方向的文献，选定来源提问，点击引用核对 PDF；对照原文修订译文，再将摘要、研究线索和图表保存为可回看的成果。
+
+| 能力 | 主要操作 | 来源与产物管理 |
 |---|---|---|
-| 📚 文献与版本 | 批量导入 PDF、核对重复候选、比较版本、归档恢复 | 文件哈希、正文身份线索、不可变解析修订 |
-| 🔎 证据问答 | 在选定文献中检索、提问，点击引用核对原文 | 向量 + BM25、重排、证据位置校验、无证据拒答 |
-| 📖 双语阅读 | PDF 阅读、全文或选段翻译、人工修订与导出 | 字面量保护、片段缓存、译文版本记录 |
-| 🕸️ 文献连接 | 公开元数据检索、参考文献核对、局域引用图 | arXiv / Crossref、审阅覆盖层、PageRank |
-| ✍️ 研究与写作 | 整理有来源的摘要、论文框架和研究方向证据 | 文献范围固定、来源清单、产物版本 |
-| 📊 可复现绘图 | 从 CSV 生成图表，导出图像、配置与脚本 | 受控绘图模板、单位与缺失值检查 |
-| 🔌 模型适配 | 分别配置生成、翻译、向量、重排与解析服务 | 协议插件、配置快照、独立 embedding profile |
-| ⚙️ 后台执行 | 查看进度、取消任务、恢复中断的工作 | Celery、事务 outbox、租约、持久化 SSE 事件 |
+| 文献管理与解析 | 批量导入 PDF、核对重复候选、管理版本、提取文本结构 | 文件哈希、不可变解析修订、页面与原文块 |
+| 检索与证据问答 | 在选定的 1–8 个文献版本中提问，沿引用核对原文 | 向量 + BM25、重排、固定来源范围、证据不足时拒答 |
+| 双语阅读 | PDF 阅读、选段或全文翻译、双语对照、人工修订与导出 | 公式与代码字面量保护、片段缓存、译文版本 |
+| 文献发现与跟踪 | arXiv / Crossref 元数据检索、订阅、反馈评分与身份核对 | 允许来源下载、候选身份审阅、追踪记录 |
+| 引用图谱与研究方向 | 查看局域引用图、整理来源摘要与方向草稿、核查后续证据 | 候选边标记、局域 PageRank、来源清单与人工核查 |
+| 写作与可复现绘图 | 整理摘要与论文框架；从 CSV 生成图表，从节点和边生成 Mermaid 图 | 草稿版本；数据、图像、配置与 Python 脚本导出 |
 
-重点不只是“接上一个模型”：PostgreSQL 保存权威业务状态，派生索引可重建；引用固定到文献与解析版本；向量模型切换先建立新索引，再切换活动世代。可从[架构说明](docs/engineering/architecture-current.md)和[代码导读](docs/engineering/code-walkthrough.md)了解实现与取舍。
+各工具可按需要独立使用。**证据问答需要就绪的解析与索引；翻译、写作和 CSV 绘图不要求先完成问答或建索引。** 本地预览、文本层提取、图谱计算和受控绘图无需模型 Key；公开元数据检索会联网。模型生成另需配置服务和执行准入。
 
+<a id="architecture"></a>
+## 系统架构
 
-## 🏗️ 架构
+ScholarShip 采用 **React + FastAPI 模块化单体**。API、Celery Worker 与 Beat 分进程运行，共享领域代码。PostgreSQL 保存权威业务状态，Redis 负责消息投递，Qdrant 保存可重建检索索引，持久化文件目录保存原件与产物。
 
-![ScholarShip system architecture](docs/assets/diagrams/system-layered.svg)
+![ScholarShip 整体架构](docs/assets/architecture/a-overall.svg)
 
-![ScholarShip business architecture](docs/assets/diagrams/business-layered.svg)
+### 证据问答工作流
 
-```mermaid
-flowchart TB
-    UI[React · TypeScript 工作台] --> API[FastAPI · 会话与项目范围]
-    API --> PG[(PostgreSQL · 业务状态与来源)]
-    API --> Outbox[事务 Outbox]
-    Outbox --> Queue[Redis · Celery · Beat]
-    Queue --> Worker[后台任务 · 租约与取消]
-    Worker --> Parse[PDF 解析 · 页面与原文块]
-    Parse --> Files[持久化文件目录]
-    Parse --> PG
-    Worker --> RAG[LangGraph · 检索与证据问答]
-    RAG --> Qdrant[(Qdrant · 向量与 BM25)]
-    RAG --> Models[统一模型端口 · 协议适配器]
-    Models --> Providers[配置的云端服务]
-    Worker --> Artifacts[翻译 · 图谱 · 草稿 · 图表]
-    Artifacts --> PG
-    Worker --> Events[持久化任务事件]
-    Events --> UI
-```
+LangGraph 按 **检索 → 重排 → 回答 → 发布** 四个节点执行。任务固定来源与模型配置，节点状态通过 PostgreSQL 检查点持久化。作者顺序、表格计算等确定性工具可在节点内复用结果；翻译、图谱和写作等任务通过 Studio 操作分派执行。
 
-SSE 展示持久化任务步骤。模型调用通过统一接口执行，任务保存配置快照与来源范围。
+![ScholarShip LangGraph 证据问答工作流](docs/assets/architecture/c-langgraph.svg)
+
+关键设计：
+
+- **来源随版本保存。** 引用绑定文献版本、解析修订与原文跨度，重解析保留旧回答的来源。
+- **长任务可追查。** Outbox 保存投递意图，Worker 使用租约与心跳，SSE 展示持久化任务事件。检查点与外部调用回执分别记录，结果未知时先对账再恢复。
+- **模型统一接入。** `model_config.py` 与 Gateway 管理角色、协议、配置快照和调用准入。更换向量模型先创建新索引世代，真实与模拟 profile 分开保存。
+- **隔离落实到数据层。** 租户事务设置 `app.owner_id`，配合 RLS 与归属约束；检索候选回到 PostgreSQL 核对来源后才进入证据。
+
+[架构详解](docs/engineering/architecture-current.md) · [其他架构视图与可编辑源码](docs/engineering/architecture-gallery.md) · [代码导读](docs/engineering/code-walkthrough.md) · [模型接入设计](docs/models/adapter-design.md)
 
 <a id="quickstart"></a>
-## 🚀 Quickstart
+## 快速开始
 
-### 1. 前置条件
+### 1. 准备环境
 
-已验证的开发环境为 **macOS Apple Silicon + Python 3.12 + Docker Desktop**。先启动 Docker Desktop。初始化脚本准备项目专用的 Python、Node 与 pnpm 工具链，不需要全局升级这些工具。其他平台参见[部署说明](docs/guides/deployment.md)，尚未承诺全平台一键运行。
-
-### 2. 安装
+已验证的开发环境为 **macOS Apple Silicon、Python 3.12 和 Docker Desktop**。先启动 Docker Desktop。初始化脚本准备项目专用的 Python、Node 与 pnpm 工具链；Windows / Linux 自动初始化尚未验证，其他运行方式见[部署说明](docs/guides/deployment.md)。
 
 ```bash
 git clone https://github.com/JingleiCui/ScholarShip.git
@@ -76,34 +79,36 @@ python3.12 --version
 docker compose version
 ```
 
-检查 `bootstrap.py` 顶部 `BOOTSTRAP_PYTHON`，将其设为本机 Python 3.12 路径（可用 `command -v python3.12` 查看），然后运行：
+### 2. 初始化
+
+将 `bootstrap.py` 顶部的 `BOOTSTRAP_PYTHON` 设为本机 Python 3.12 路径（可用 `command -v python3.12` 查看），然后运行：
 
 ```bash
 python3.12 bootstrap.py
 ```
 
-### 3. 配置
+初始化会生成 `.env` 和初始账号、准备基础容器并执行数据库迁移。已有配置与数据会保留。**首次运行不要预先复制空的 `.env.example`，已有 `.env` 不要用模板覆盖。** 首次使用保留 `EXTERNAL_SERVICES_ENABLED=false`，无需模型 Key。
 
-初始化会创建 `.env` 与随机登录密码，不要用模板覆盖已有配置。首次体验保留 `EXTERNAL_SERVICES_ENABLED=false`，无需 API Key。模型目录及各角色配置集中在 `model_config.py`。
-
-| 体验方式 | 适用范围 | 额外要求 |
-|---|---|---|
-| 本地文献与绘图 | 导入、文本层解析、PDF 阅读、受控图表 | 无模型 Key |
-| mock | 验证检索、问答与翻译业务流转 | 合成结果，不用于研究结论 |
-| 云端模型 | 真实生成、向量化、重排与翻译 | [配置服务与生产准入](docs/guides/models.md) |
-
-### 4. 运行与首次使用
+### 3. 启动与登录
 
 ```bash
 .venv/bin/python dev.py
 ```
 
-打开 **http://127.0.0.1:15173**，以 `researcher` 登录，密码取自 `.env` 的 `INITIAL_USER_PASSWORD`。API 文档：http://127.0.0.1:18080/docs。
+打开 **http://127.0.0.1:15173**，以 `researcher` 登录，密码在本地 `.env` 的 `INITIAL_USER_PASSWORD` 中。API 文档：[http://127.0.0.1:18080/docs](http://127.0.0.1:18080/docs)。本地应用与容器应用模式互斥，请勿重复启动 Worker 或 Beat。
 
-1. 创建研究空间，进入文献库，导入一份自己有权使用的文本型 PDF。
-2. 等待导入完成，打开原文预览，再运行文本结构解析。
-3. 在阅读页面核对页码与原文；扫描文件需要 OCR，不能用空文本冒充解析成功。
-4. 如需检验问答流程，使用空间中的模拟模式；真实问答需另行完成模型准入。
+### 4. 完成第一次阅读
+
+1. 创建研究空间，在“文献库”导入有权使用的 PDF。新克隆不附带开发者的文献、索引或模型额度。
+2. 选择文献并“开始阅读”，先查看原件，再按需要运行“提取文本结构（本地）”。扫描件需要 OCR，本地文本层提取不能替代 OCR。
+3. 按任务选择工具：问答先建立索引，双语翻译和写作需要模型配置，CSV 绘图可直接本地运行。
+4. 在“成果”回看已保存的回答、译文、摘要和图表，再沿引用或来源标记核对材料。
+
+| 执行方式 | 用途 | 要求 |
+|---|---|---|
+| 本地工具 | 导入、预览、文本结构提取、图谱计算与受控绘图 | 无模型 Key |
+| 模拟模式（mock） | 在独立练习空间体验检索、问答与翻译流程 | 输出带模拟标记，不用于研究结论 |
+| 云端模型 | 真实生成、向量化、重排与翻译 | [模型配置与生产准入](docs/guides/models.md) |
 
 停止本项目的本地进程，保留基础容器和数据：
 
@@ -111,52 +116,37 @@ python3.12 bootstrap.py
 .venv/bin/python stop.py
 ```
 
-[完整操作手册](docs/guides/user-manual.md) · [安装细节](docs/guides/getting-started.md) · [故障排查](docs/runbook.md)
+[安装细节](docs/guides/getting-started.md) · [完整操作手册](docs/guides/user-manual.md) · [故障排查](docs/runbook.md)
 
-## 📁 项目结构
+## 项目结构
 
 ```text
 ScholarShip/
-├── frontend/src/                 # 工作台、PDF 阅读器、引用与任务交互
-├── backend/src/scholarship/
-│   ├── api/                      # HTTP 接口、会话与请求校验
-│   ├── domains/                  # 文献、检索、问答与研究产物逻辑
-│   ├── models/                   # 模型目录、协议、传输与调用准入
-│   ├── infrastructure/           # 数据库、存储与基础服务
-│   └── workers/                  # 后台任务与调度
-├── backend/tests/                # 契约测试与集成测试
-├── deploy/                       # 容器构建和反向代理
-├── docs/                         # 使用、架构、模型与开发说明
-├── model_config.py               # 统一模型与运行参数
-├── bootstrap.py                  # 环境初始化
-├── dev.py                        # 本地应用启动
-└── validate.py                   # 代码、构建及集成检查
+├── frontend/src/                # 页面导航、PDF 阅读、引用定位与任务交互
+├── backend/
+│   ├── src/scholarship/
+│   │   ├── api/                 # HTTP 接口、会话、请求校验与 SSE
+│   │   ├── domains/             # 文献、解析、检索、问答与 Studio 工作流
+│   │   ├── models/              # 模型目录、协议、传输、网关与调用准入
+│   │   ├── infrastructure/      # 数据库、存储与基础服务
+│   │   └── workers/             # 后台执行、投递与调度
+│   ├── migrations/             # Alembic 前向迁移
+│   └── tests/                  # 契约与集成测试
+├── deploy/                     # 容器构建和反向代理
+├── docs/                       # 使用、架构、模型与开发说明
+├── model_config.py             # 统一模型配置
+├── bootstrap.py                # 环境初始化
+├── dev.py / stop.py             # 本地应用启停
+└── doctor.py / validate.py      # 诊断与工程检查
 ```
-
-## 🧪 效果与验证
-
-**回答 → 引用片段 → PDF 原文位置**
-
-![历史问答的原文溯源](docs/assets/evidence.jpg)
-
-这张历史验收截图展示 Transformer 论文第 7 页的训练硬件与耗时片段，以及原 PDF 中的对应高亮。截图采用当时的界面；它证明该样本能够定位原文，不代表任意问题都回答正确。
-
-自行复验：
-
-```bash
-.venv/bin/python doctor.py
-.venv/bin/python validate.py
-```
-
-`validate.py` 需要基础容器运行，使用独立临时数据库、队列与向量集合。报告保存在 `var/reports/`，不随代码分发。
 
 ## 文档与参与
 
 [文档首页](docs/README.md) · [开发与贡献](CONTRIBUTING.md) · [安全说明](SECURITY.md) · [AI 辅助开发说明](docs/development/ai-assisted-development.md)
 
-项目由个人开发，欢迎通过 Issue 提供可复现的问题、解析样本特征或改进建议。请勿上传密钥、会话 Cookie、个人数据或无权分发的论文。启用外部服务时，对应文本会发送给所选供应商。
+项目由个人开发，欢迎通过 Issue 提供可复现的问题和改进建议。请勿附带密钥、会话 Cookie、个人数据或无权分发的论文。启用外部服务后，相关内容会发送给所选供应商。
 
 <a id="license"></a>
 ## 📄 License
 
-**项目整体许可证尚未指定。** 当前不声明采用 MIT、Apache-2.0 或其他开源许可证。第三方依赖按各自许可证使用，参见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+本项目采用 **GNU Affero General Public License v3.0（AGPL-3.0）**，完整条款见根目录 [LICENSE](LICENSE)。

@@ -34,7 +34,7 @@ export default function BilingualReader({ segments }: { segments: Segment[] }) {
     }
     const blocks = [...source.querySelectorAll<HTMLElement>('[data-block]')];
     const anchor =
-      [...blocks].reverse().find((n) => n.offsetTop - source.offsetTop <= source.scrollTop + 5) ?? blocks[0];
+      [...blocks].reverse().find((n) => n.offsetTop <= source.scrollTop + 5) ?? blocks[0];
     if (!anchor) return;
     const other = [...target.querySelectorAll<HTMLElement>('[data-block]')].find(
       (n) => n.dataset.block === anchor.dataset.block,
@@ -44,10 +44,10 @@ export default function BilingualReader({ segments }: { segments: Segment[] }) {
       0,
       Math.min(
         1,
-        (source.scrollTop - (anchor.offsetTop - source.offsetTop)) / Math.max(1, anchor.offsetHeight),
+        (source.scrollTop - anchor.offsetTop) / Math.max(1, anchor.offsetHeight),
       ),
     );
-    const top = other.offsetTop - target.offsetTop + ratio * other.offsetHeight;
+    const top = other.offsetTop + ratio * other.offsetHeight;
     driven.current = {
       side: side === 'left' ? 'right' : 'left',
       top: Math.max(0, Math.min(top, target.scrollHeight - target.clientHeight)),

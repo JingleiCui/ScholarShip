@@ -41,6 +41,24 @@ def test_workspace_and_reversible_library(case, signed_client):
     assert diff.status_code == 200 and not diff.json()["changes"]
 
 
+def test_history_retains_scoped_source_versions_without_exposing_task_inputs(case, signed_client):
+    owner, project = case
+    version, parse = imported(case, signed_client)
+    run = submit(owner, project, uuid4().hex, "translate", {"parse_id": str(parse), "language": "en"})
+    execute_offline(str(owner), str(project), str(run["id"]))
+    rows = signed_client.get(f"/api/v1/studio/projects/{project}/runs").json()
+    record = next(r for r in rows if r["id"] == str(run["id"]))
+    assert record["source_version_ids"] == [str(version)]
+    assert "input_json" not in record and "config_json" not in record
+    assert signed_client.get(f"/api/v1/studio/projects/{uuid4()}/runs").json() == []
+    # Even a retained task cannot make source IDs from another project visible.
+    with tenant_transaction(owner) as conn:
+        from scholarship.api.studio import history_source_versions
+
+        row = {"id": uuid4(), "input_json": {"arguments": {"parse_ids": [str(parse)], "version_id": str(version)}}}
+        assert history_source_versions(conn, [row], uuid4())[row["id"]] == []
+
+
 def test_cancel_queued_never_executes_and_running_stops_at_boundary(case, signed_client):
     owner, project = case
     run = submit(owner, project, uuid4().hex, "diagram", {"nodes": ["A", "B"], "edges": [[0, 1]]})

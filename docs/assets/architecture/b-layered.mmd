@@ -1,0 +1,20 @@
+flowchart TB
+    UI["交互呈现 / frontend/src<br/>React、PDF.js、KaTeX、Cytoscape、Mermaid"]
+    API["应用接口 / api<br/>HTTP、SSE、会话、范围、输入与任务提交"]
+    DOMAIN["领域编排 / domains<br/>文献、证据、qa_graph、Studio 工作流"]
+    MODEL["模型接入 / models<br/>Gateway、Catalog、Protocols、Adapters、HTTP、准入"]
+    INFRA["基础设施 / infrastructure<br/>SQLAlchemy Core、租户事务、Qdrant、文件存储"]
+    UI --> API --> DOMAIN
+    DOMAIN --> MODEL
+    DOMAIN --> INFRA
+    MODEL --> INFRA
+    WORKER["异步执行 / workers<br/>Celery Worker、Beat、Outbox、租约与心跳"] --> DOMAIN
+    RULES["横切约束<br/>RLS 与 owner 归属 / 固定来源与模型快照 / 持久事件与回执"]
+    RULES -.-> API
+    RULES -.-> DOMAIN
+    RULES -.-> MODEL
+    RULES -.-> INFRA
+    classDef layer fill:#E9F0FC,stroke:#719DD0,color:#202936
+    classDef governance fill:#E9F0FC,stroke:#719DD0,color:#202936
+    class UI,API,DOMAIN,MODEL,INFRA layer
+    class WORKER,RULES governance

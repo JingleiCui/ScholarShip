@@ -1,4 +1,8 @@
-# 三张图读懂 ScholarShip
+# 架构图与证据流转
+
+最新的五类架构视图见 [2026-11-18 架构图集](architecture-gallery.md)：整体架构 A、分层架构 B、LangGraph 工作流 C、业务架构 D、技术架构 E。图集含 SVG、PNG、Mermaid 与代码核对入口，供 README 选用。
+
+以下保留此前图稿，以及文献、解析与引用版本关系的补充说明。
 
 ## 先看系统如何分工
 

@@ -5,6 +5,7 @@ import FigureReader from './FigureReader';
 import ReferenceWorkbench from './ReferenceWorkbench';
 import ScientificText from './ScientificText';
 import { api, errorMessage } from './researchApi';
+import { selectedSpan } from './readingSelection';
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 export type Target = {
@@ -16,6 +17,14 @@ export type Target = {
   text?: string;
   start?: number;
   end?: number;
+};
+export type SourceSelection = {
+  block_id: string;
+  start: number;
+  end: number;
+  text: string;
+  page: number;
+  parse_id: string;
 };
 type Block = {
   id: string;
@@ -40,7 +49,27 @@ type Heading = {
   structured_json: { heading_level?: number };
 };
 
-export default function SourceReader({ target, close }: { target: Target; close: () => void }) {
+export default function SourceReader({
+  target,
+  close,
+  onSelectText,
+}: {
+  target: Target;
+  close: () => void;
+  onSelectText?: (selection: SourceSelection) => void;
+}) {
+  const [selection, setSelection] = useState<SourceSelection | null>(null);
+  function captureSelection(element: HTMLElement, block: Block) {
+    const current = window.getSelection();
+    if (!current?.rangeCount || current.isCollapsed) return;
+    const range = current.getRangeAt(0);
+    if (!element.contains(range.startContainer) || !element.contains(range.endContainer)) return;
+    const prefix = range.cloneRange();
+    prefix.selectNodeContents(element);
+    prefix.setEnd(range.startContainer, range.startOffset);
+    const span = selectedSpan(block.canonical_text, prefix.toString(), current.toString());
+    setSelection(span ? { ...span, block_id: block.id, page, parse_id: target.parse_id } : null);
+  }
   const [page, setPage] = useState(target.page),
     [error, setError] = useState('');
   const [blocks, setBlocks] = useState<Block[]>([]),
@@ -202,9 +231,9 @@ export default function SourceReader({ target, close }: { target: Target; close:
           </p>
           {target.text && target.start !== undefined && target.end !== undefined ? (
             <>
-              {target.text.slice(0, target.start)}
-              <mark>{target.text.slice(target.start, target.end)}</mark>
-              {target.text.slice(target.end)}
+              {Array.from(target.text).slice(0, target.start).join('')}
+              <mark>{Array.from(target.text).slice(target.start, target.end).join('')}</mark>
+              {Array.from(target.text).slice(target.end).join('')}
             </>
           ) : (
             target.quote
@@ -292,13 +321,27 @@ export default function SourceReader({ target, close }: { target: Target; close:
           {blocks.map((b) => (
             <article key={b.id} style={{ marginBottom: 16 }}>
               <button onClick={() => setBox(b.source_locator.pdf_bbox)}>定位 {b.kind}</button>
-              <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              <div
+                style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
+                onMouseUp={(e) => captureSelection(e.currentTarget, b)}
+                onKeyUp={(e) => captureSelection(e.currentTarget, b)}
+              >
                 {b.kind === 'paragraph' ? (
                   cited(b.canonical_text, b.source_locator.pdf_bbox)
                 ) : (
                   <ScientificText text={b.canonical_text} />
                 )}
               </div>
+              {onSelectText && selection?.block_id === b.id && (
+                <div className="selected-text-action">
+                  <p>
+                    已选原文：{selection.text.slice(0, 100)}
+                    {selection.text.length > 100 ? '…' : ''}
+                  </p>
+                  <button onClick={() => onSelectText(selection)}>翻译所选文字</button>
+                  <small>先查看原文范围和执行条件，不会自动发送。</small>
+                </div>
+              )}
               {b.asset_file_id && (
                 <img
                   src={`/api/v1/research/blocks/${b.id}/asset`}

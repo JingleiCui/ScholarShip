@@ -166,6 +166,7 @@ def history(project_id: UUID, user: Identity = Depends(identity)):
                 "question": r["input_json"].get("question"),
                 "mode": r["config_json"].get("mode"),
                 "model_preset": r["config_json"].get("models", {}).get("preset"),
+                "source_version_ids": r["input_json"].get("version_ids", []),
                 "scientific_review": reviews.get(str(r["id"])),
             }
             for r in rows

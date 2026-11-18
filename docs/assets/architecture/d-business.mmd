@@ -1,0 +1,28 @@
+flowchart TB
+    subgraph JOURNEY["典型用户旅程"]
+        direction LR
+        LIB["文献库：建立资料范围"] --> READ["阅读与问答：阅读并核验"]
+        READ --> TOOLS["研究工具：探索与整理"] --> RESULTS["成果：回看与复用"]
+    end
+    subgraph MODULES["六个业务模块"]
+        F1["F1 文献管理与解析<br/>导入、版本、解析修订与页面块"]
+        F2["F2 检索与证据问答<br/>文献范围、重排、证据与原文定位"]
+        F3["F3 双语阅读<br/>原文、翻译、人工修订与导出"]
+        F4["F4 发现与跟踪<br/>元数据检索、订阅与身份候选核对"]
+        F5["F5 图谱与研究方向<br/>候选引用边、来源摘要与方向核查"]
+        F6["F6 写作与可复现绘图<br/>摘要、框架、CSV 图表与脚本"]
+    end
+    LIB --> F1
+    READ --> F2
+    READ --> F3
+    TOOLS --> F4
+    TOOLS --> F5
+    TOOLS --> F6
+    SOURCES["共享来源链<br/>文献 → 版本 → 解析 → 页面 / 原文块 → 证据与产物来源"]
+    F1 & F2 & F3 & F4 & F5 & F6 -.-> SOURCES
+    SOURCES --> RESULTS
+    RESULTS -. "回到原文审阅，继续研究" .-> READ
+    classDef module fill:#E9F0FC,stroke:#719DD0,color:#202936
+    classDef source fill:#E9F0FC,stroke:#719DD0,color:#202936
+    class F1,F2,F3,F4,F5,F6 module
+    class SOURCES source

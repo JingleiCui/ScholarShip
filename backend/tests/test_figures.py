@@ -128,6 +128,14 @@ def test_figure_publication_retains_source_and_caption(case, signed_client):
             return {"value": VALID, "simulated": True, "provider": "contract", "requested_model": "fixture"}
 
     result = describe(owner, project, run["id"], {"block_ids": [str(block)]}, Gateway())
+    # describe publishes an immutable artifact; the worker separately completes the task row.
+    with tenant_transaction(owner) as conn:
+        conn.execute(
+            T["runs"]
+            .update()
+            .where(T["runs"].c.id == run["id"])
+            .values(result_json=result, status="succeeded", finished_at=sa.func.now())
+        )
     assert result["source"]["parse_id"] == str(parse)
     assert result["review_state"] == "unreviewed"
     with tenant_transaction(owner) as conn:
@@ -142,6 +150,10 @@ def test_figure_publication_retains_source_and_caption(case, signed_client):
         json={"assessment": "rejected", "reason": "Arrow direction contradicts the original image."},
     )
     assert review.status_code == 200
+    history = client.get(f"/api/v1/studio/projects/{project}/runs").json()
+    reviewed = next(r for r in history if (r["result_json"] or {}).get("artifact_version_id") == artifact)
+    assert reviewed["content_review"]["assessment"] == "rejected"
+    assert reviewed["source_version_ids"] == [result["source"]["version_id"]]
     with tenant_transaction(owner) as conn:
         saved = conn.scalar(
             sa.select(T["artifact_versions"].c.metadata_json).where(T["artifact_versions"].c.id == UUID(artifact))

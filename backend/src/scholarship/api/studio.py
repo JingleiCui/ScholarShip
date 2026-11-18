@@ -23,6 +23,65 @@ from scholarship.domains.runs import public_run
 router = APIRouter(prefix="/studio")
 
 
+def history_source_versions(conn, rows, project):
+    """Expose only version IDs visible in the same project; never return full task inputs."""
+    parse_ids = set()
+    version_ids = set()
+    by_run = {}
+    direct_versions = {}
+    for row in rows:
+        inputs = row["input_json"].get("arguments", {})
+        values = list(inputs.get("parse_ids") or [])
+        if inputs.get("parse_id"):
+            values.append(inputs["parse_id"])
+        source_parse = (row.get("result_json") or {}).get("source", {}).get("parse_id")
+        if source_parse:
+            values.append(source_parse)
+        chosen = set()
+        for value in values:
+            try:
+                chosen.add(UUID(str(value)))
+            except ValueError:
+                continue
+        by_run[row["id"]] = chosen
+        parse_ids.update(chosen)
+        try:
+            direct = {UUID(str(inputs["version_id"]))} if inputs.get("version_id") else set()
+        except ValueError:
+            direct = set()
+        direct_versions[row["id"]] = direct
+        version_ids.update(direct)
+    mapping = (
+        dict(
+            conn.execute(
+                sa.select(T["document_parses"].c.id, T["document_parses"].c.version_id).where(
+                    T["document_parses"].c.id.in_(parse_ids), T["document_parses"].c.project_id == project
+                )
+            ).all()
+        )
+        if parse_ids
+        else {}
+    )
+    visible_versions = (
+        set(
+            conn.scalars(
+                sa.select(T["paper_versions"].c.id).where(
+                    T["paper_versions"].c.id.in_(version_ids), T["paper_versions"].c.project_id == project
+                )
+            )
+        )
+        if version_ids
+        else set()
+    )
+    return {
+        rid: sorted(
+            {str(mapping[pid]) for pid in ids if pid in mapping}
+            | {str(vid) for vid in direct_versions[rid] if vid in visible_versions}
+        )
+        for rid, ids in by_run.items()
+    }
+
+
 class TextSelection(BaseModel):
     model_config = ConfigDict(extra="forbid")
     block_id: UUID
@@ -164,6 +223,7 @@ def runs(
             .mappings()
             .all()
         )
+        source_versions = history_source_versions(conn, rows, project)
         reviews = {}
         if rows:
             for event in conn.execute(
@@ -176,12 +236,31 @@ def runs(
                 .order_by(T["audit_events"].c.created_at.desc())
             ).mappings():
                 reviews.setdefault(event["subject_json"]["run_id"], event["safe_payload"])
+        figure_reviews = {}
+        artifacts = [
+            str(r["result_json"]["artifact_version_id"])
+            for r in rows
+            if r["result_json"] and r["result_json"].get("artifact_version_id")
+        ]
+        if artifacts:
+            for event in conn.execute(
+                sa.select(T["audit_events"])
+                .where(
+                    T["audit_events"].c.project_id == project,
+                    T["audit_events"].c.action == "figure_content_review",
+                    T["audit_events"].c.subject_json["artifact_version_id"].astext.in_(artifacts),
+                )
+                .order_by(T["audit_events"].c.created_at.desc(), T["audit_events"].c.id.desc())
+            ).mappings():
+                figure_reviews.setdefault(event["subject_json"]["artifact_version_id"], event["safe_payload"])
         return [
             {
                 **public_run(r),
                 "editorial_review": reviews.get(str(r["id"])),
                 "operation": r["config_json"].get("operation"),
                 "mode": r["config_json"].get("mode"),
+                "source_version_ids": source_versions[r["id"]],
+                "content_review": figure_reviews.get(str((r["result_json"] or {}).get("artifact_version_id"))),
             }
             for r in rows
         ]

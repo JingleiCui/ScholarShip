@@ -108,3 +108,12 @@
 参考身份核对读 `api/reference_tools.py` 与 `domains/studio/reference_reviews.py`。解析内容不可变，审阅放在追加式 audit_events；`graph.py` 和参考条目读取叠加同一套审阅逻辑。后续研究人工对照在 `direction_review.py`，校验两份原文的精确 slice 并发布带来源的 JSON。
 
 取消读 `api/task_control.py`、`domains/cancellation.py` 与 worker 的最终写回，理解 waiting_user 不等于 cancelled。`TaskEvents.tsx` 消费已持久事件，不伪造逐 Token 输出。新增回归集中在 `backend/tests/test_completion.py`。
+
+
+## 当前前端路径
+
+`navigation.ts` 负责主页面、旧模块链接兼容与版本范围的 hash 编码；`main.tsx` 负责会话、空间、受保护页面与统一顶部导航；`Brand.tsx` 和 `public/brand/scholarship-mark.svg` 统一品牌。`Home.tsx` 提供首次指引与六模块工具入口。
+
+`Reader.tsx` 将文献原件、证据问答和翻译绑定到相同版本范围；`Research.tsx` 接收并保留该范围，引用在相邻原文工作面定位。`Results.tsx` 聚合既有只读任务历史，重开时携带来源版本和任务 ID。`api/studio.py` 只增加受同项目/RLS 约束的来源 ID 与内容审阅覆盖层，不暴露完整任务输入。
+
+`execution.ts` 只用于解释界面是否可执行；服务端仍执行完整来源范围、模型、期限和额度准入。前端不可用时默认关闭，不能把配置存在当作执行权限。`readingSelection.ts` 校验显示文字与 canonical text 完全匹配，再把 DOM UTF-16 选择转换为 Unicode 码点偏移。

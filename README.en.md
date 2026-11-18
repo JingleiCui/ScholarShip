@@ -6,70 +6,72 @@
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12" />
   <img src="https://img.shields.io/badge/React-19.3-149ECA?logo=react&logoColor=white" alt="React 19.3" />
   <img src="https://img.shields.io/badge/FastAPI-0.162-009688?logo=fastapi&logoColor=white" alt="FastAPI 0.162" />
-  <a href="#license"><img src="https://img.shields.io/badge/License-not_specified-lightgrey" alt="License not specified" /></a>
+  <a href="#license"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue" alt="Project licensed under AGPL-3.0" /></a>
 </p>
 <p align="center"><a href="README.en.md">English</a> | <a href="README.md">简体中文</a></p>
 
-**ScholarShip is an evidence-first AI research workspace.** Import papers, read and translate them, ask questions, explore citations, and turn findings into drafts and reproducible charts—with document versions and source locations preserved.
+**ScholarShip (学者之舟, “a scholar’s vessel”) is an AI research workspace for students and individual researchers.** Start with a PDF, then read, translate, ask questions and organize outputs in one place. Answer citations link back to the original, while translations and drafts retain sources and revision history.
 
-![ScholarShip interface walkthrough](docs/assets/demo.gif)
+The project connects papers, conversations and research notes through a traceable chain: **document version → parse revision → source passage → research artifact**. Follow that chain to check the material before using generated content.
 
-<sub>Actual local interface captures, condensed into a page-by-page preview. No new model requests were made. The UI is currently in Chinese; historical citation evidence appears below.</sub>
+<p align="center"><a href="#demo">Demo</a> · <a href="#features">Capabilities</a> · <a href="#architecture">Architecture</a> · <a href="#quickstart">Quickstart</a> · <a href="docs/guides/user-manual.md">User guide (Chinese)</a></p>
 
-<p align="center"><a href="#quickstart">Quickstart</a> · <a href="docs/guides/user-manual.md">User guide (Chinese)</a> · <a href="docs/engineering/code-walkthrough.md">Code walkthrough (Chinese)</a> · <a href="docs/guides/models.md">Model configuration (Chinese)</a></p>
+<a id="demo"></a>
+## 36-second feature preview
 
-## ✨ Features
+<p align="center"><a href="docs/assets/demo-preview.mp4"><img src="docs/assets/demo.gif" width="1000" alt="ScholarShip feature demo: PDF import, parsing, evidence QA, citation checks, bilingual reading, literature discovery, graphs, writing and chart exports" /></a></p>
+<p align="center"><sub>36-second auto-looping preview · All waits removed · Click for the 36-second 1080p video</sub></p>
 
-| Capability | What you can do | How it works |
+[36-second HD preview](docs/assets/demo-preview.mp4) · [Detailed walkthrough (90 seconds)](docs/assets/demo.mp4) · [Start-to-finish guide (Chinese)](docs/guides/first-research-session.md) · [Captions](docs/assets/demo.srt) · [Chapter timestamps](docs/assets/demo-chapters.json)
+
+Each feature appears once, in use order: **workspace → PDF import → local parsing → indexing and QA → citation checks → bilingual reading → discovery and graphs → writing → charts and exports → saved results**. Waiting, debugging and repeated navigation have been removed; the key actions and completed results remain.
+
+Recorded from the real interface at 1920×1080 and 25 fps, with Chinese step captions. New QA and writing tasks use explicitly labelled simulation; real answers and translations are historical results. No new cloud inference, OCR or full-text upload was made. Crossref receives only the public search query.
+
+<a id="features"></a>
+## Capabilities
+
+A typical session: import papers on a topic, ask within a selected source scope and inspect citations in the PDF. Revise a translation alongside the original, then save summaries, research leads and charts as outputs you can revisit.
+
+| Capability | Main operations | Sources and artifacts |
 |---|---|---|
-| 📚 Library and versions | Batch-import PDFs, review duplicates, compare versions, archive and restore | File hashes, content identity signals, immutable parse revisions |
-| 🔎 Evidence QA | Ask within a selected corpus and inspect citations in the original PDF | Dense + BM25 retrieval, reranking, citation validation, evidence-based abstention |
-| 📖 Bilingual reading | Read PDFs, translate documents or selections, revise and export translations | Literal protection, segment caching, revision history |
-| 🕸️ Connected literature | Search public metadata, review references, inspect local citation graphs | arXiv / Crossref, review overlays, PageRank |
-| ✍️ Research and writing | Prepare source-linked summaries, outlines and research direction reviews | Frozen source scope, provenance manifests, artifact versions |
-| 📊 Reproducible charts | Generate charts from CSV and export images, settings and scripts | Controlled plotting templates, explicit units and missing-value rules |
-| 🔌 Model adapters | Configure generation, translation, embeddings, reranking and parsing separately | Protocol plugins, pinned task snapshots, independent embedding profiles |
-| ⚙️ Background work | Follow progress, cancel tasks and recover interrupted work | Celery, transactional outbox, leases, persisted SSE events |
+| Library and parsing | Batch-import PDFs, review duplicate candidates, manage versions and extract text structure | File hashes, immutable parse revisions, pages and source blocks |
+| Retrieval and evidence QA | Ask within 1–8 selected document versions and follow citations to the original | Dense + BM25 retrieval, reranking, fixed source scope and abstention when evidence is missing |
+| Bilingual reading | Read PDFs, translate selections or documents, compare languages, revise and export | Formula/code literal protection, segment caching and translation versions |
+| Discovery and tracking | Search arXiv / Crossref metadata, subscribe, record feedback and review paper identity | Permitted-source downloads, identity-candidate review and tracking records |
+| Citation graphs and research leads | Inspect local citation graphs, prepare source summaries and direction drafts, check follow-up evidence | Candidate-edge labels, local PageRank, source manifests and manual review |
+| Writing and reproducible charts | Prepare summaries and outlines; generate CSV-based charts and Mermaid graphs from nodes and edges | Draft versions; exports of data, images, settings and Python scripts |
 
-PostgreSQL is the source of truth; search indexes are derived and rebuildable. Citations remain tied to document and parse versions. Changing embedding models requires a new index generation before switching the active pointer. See the [architecture](docs/engineering/architecture-current.md) and [code walkthrough](docs/engineering/code-walkthrough.md) for implementation details.
+Use the tools independently as needed. **Evidence QA requires a ready parse and index; translation, writing and CSV plotting do not require QA or indexing first.** Local previews, text-layer extraction, graph calculations and controlled plotting need no model key. Public metadata search uses the network. Model generation requires service configuration and execution admission.
 
+<a id="architecture"></a>
+## Architecture
 
-## 🏗️ Architecture
+ScholarShip is a **React + FastAPI modular monolith**. API, Celery Worker and Beat run as separate processes over shared domain code. PostgreSQL holds authoritative business state, Redis delivers messages, Qdrant stores rebuildable search indexes, and persistent file storage holds originals and artifacts.
 
-![ScholarShip system architecture](docs/assets/diagrams/system-layered.svg)
+![ScholarShip overall architecture](docs/assets/architecture/a-overall.svg)
 
-![ScholarShip business architecture](docs/assets/diagrams/business-layered.svg)
+### Evidence QA workflow
 
-```mermaid
-flowchart TB
-    UI[React · TypeScript workspace] --> API[FastAPI · sessions and project scope]
-    API --> PG[(PostgreSQL · state and provenance)]
-    API --> Outbox[Transactional outbox]
-    Outbox --> Queue[Redis · Celery · Beat]
-    Queue --> Worker[Workers · leases and cancellation]
-    Worker --> Parse[PDF parsing · pages and blocks]
-    Parse --> Files[Persistent file storage]
-    Parse --> PG
-    Worker --> RAG[LangGraph · retrieval and evidence QA]
-    RAG --> Qdrant[(Qdrant · dense and BM25 search)]
-    RAG --> Models[Model ports · protocol adapters]
-    Models --> Providers[Configured cloud services]
-    Worker --> Artifacts[Translations · graphs · drafts · charts]
-    Artifacts --> PG
-    Worker --> Events[Persisted task events]
-    Events --> UI
-```
+LangGraph runs four nodes: **retrieve → rerank → answer → publish**. Each task pins its sources and model configuration; node state is persisted through PostgreSQL checkpoints. Deterministic author-order and table-calculation tools can supply results within those nodes. Translation, graphs and writing use Studio operation dispatch.
 
-SSE reports persisted task steps. Model calls use a shared interface, with configuration snapshots and source scope pinned to each task.
+![ScholarShip LangGraph evidence QA workflow](docs/assets/architecture/c-langgraph.svg)
+
+Key design choices:
+
+- **Preserve sources with their versions.** Citations bind document versions, parse revisions and source spans. Reparsing preserves historical answer sources.
+- **Make long-running work traceable.** An outbox records delivery intent, workers use leases and heartbeats, and SSE exposes persisted task events. Checkpoints and external-call receipts are separate; unknown outcomes require reconciliation before recovery.
+- **Use a shared model boundary.** `model_config.py` and the Gateway manage roles, protocols, snapshots and admission. Embedding changes create new index generations; real and simulated profiles stay separate.
+- **Enforce isolation in the data layer.** Tenant transactions set `app.owner_id`, backed by RLS and ownership constraints. Retrieved candidates are checked against PostgreSQL sources before becoming evidence.
+
+[Architecture details](docs/engineering/architecture-current.md) · [Other views and editable sources](docs/engineering/architecture-gallery.md) · [Code walkthrough](docs/engineering/code-walkthrough.md) · [Model adapter design](docs/models/adapter-design.md) — diagrams and supporting guides are in Chinese.
 
 <a id="quickstart"></a>
-## 🚀 Quickstart
+## Quickstart
 
-### 1. Prerequisites
+### 1. Prepare the environment
 
-The verified development environment is **macOS Apple Silicon, Python 3.12 and Docker Desktop**. Start Docker Desktop first. Bootstrap prepares project-specific Python, Node and pnpm tooling without global upgrades. See [deployment notes](docs/guides/deployment.md) for container setup; other platforms have not been fully validated.
-
-### 2. Install
+The verified development environment is **macOS Apple Silicon, Python 3.12 and Docker Desktop**. Start Docker Desktop first. Bootstrap prepares project-specific Python, Node and pnpm tooling. Windows / Linux bootstrap has not been validated; see [deployment notes](docs/guides/deployment.md) for other run modes.
 
 ```bash
 git clone https://github.com/JingleiCui/ScholarShip.git
@@ -78,34 +80,36 @@ python3.12 --version
 docker compose version
 ```
 
+### 2. Initialize
+
 Set `BOOTSTRAP_PYTHON` near the top of `bootstrap.py` to your Python 3.12 executable (`command -v python3.12`), then run:
 
 ```bash
 python3.12 bootstrap.py
 ```
 
-### 3. Configure
+Bootstrap generates a private `.env` and initial accounts, prepares the infrastructure containers and applies database migrations. Existing configuration and data are retained. **Do not copy an empty `.env.example` before the first run or overwrite an existing `.env` with the template.** Keep `EXTERNAL_SERVICES_ENABLED=false` for the first session; no model key is needed.
 
-Bootstrap creates a private `.env` and random login passwords. Do not overwrite an existing configuration with the example file. Keep `EXTERNAL_SERVICES_ENABLED=false` for the first local session. Models and role assignments live in `model_config.py`.
-
-| Mode | Purpose | Requirements |
-|---|---|---|
-| Local library and charts | Import, text-layer parsing, PDF reading and controlled charts | No model key |
-| mock | Exercise retrieval, QA and translation workflows | Synthetic outputs, not research conclusions |
-| Cloud providers | Real generation, embeddings, reranking and translation | [Service configuration and production admission](docs/guides/models.md) |
-
-### 4. Run
+### 3. Start and log in
 
 ```bash
 .venv/bin/python dev.py
 ```
 
-Open **http://127.0.0.1:15173**. Log in as `researcher` with `INITIAL_USER_PASSWORD` from your private `.env`. API docs: http://127.0.0.1:18080/docs.
+Open **http://127.0.0.1:15173**. Log in as `researcher` with `INITIAL_USER_PASSWORD` from your local `.env`. API docs: [http://127.0.0.1:18080/docs](http://127.0.0.1:18080/docs). Local and container application modes are mutually exclusive; do not run duplicate Workers or Beat processes.
 
-1. Create a workspace and import a text-based PDF you have permission to use.
-2. Wait for import, open its preview, then run text-structure parsing.
-3. Check page numbers against the original. Scanned pages need OCR; an empty text layer is not successful OCR.
-4. Use simulation mode to inspect QA workflow behavior. Real inference requires separate model admission.
+### 4. Read your first paper
+
+1. Create a research workspace and import PDFs you have permission to use in Library. A fresh clone includes no developer corpus, indexes or model quota.
+2. Select a paper and open Reading. Inspect the original, then extract text structure locally when needed. Scans need OCR; text-layer extraction does not replace it.
+3. Choose a tool: build an index for QA, configure models for translation or writing, or run CSV plotting locally.
+4. Reopen saved answers, translations, summaries and charts in Results. Check their citations and source labels against the material.
+
+| Execution mode | Purpose | Requirements |
+|---|---|---|
+| Local tools | Import, previews, text structure, graph calculations and controlled charts | No model key |
+| Simulation (mock) | Explore retrieval, QA and translation in a separate practice workspace | Outputs retain simulation labels and are not research conclusions |
+| Cloud providers | Real generation, embeddings, reranking and translation | [Model configuration and production admission](docs/guides/models.md) |
 
 Stop local application processes while retaining infrastructure and data:
 
@@ -113,43 +117,47 @@ Stop local application processes while retaining infrastructure and data:
 .venv/bin/python stop.py
 ```
 
-[Full user guide](docs/guides/user-manual.md) · [Installation](docs/guides/getting-started.md) · [Troubleshooting](docs/runbook.md) — supporting documentation is currently in Chinese.
+[Installation details](docs/guides/getting-started.md) · [Full user guide](docs/guides/user-manual.md) · [Troubleshooting](docs/runbook.md)
 
-## 📁 Project structure
+## Project structure
 
 ```text
 ScholarShip/
-├── frontend/src/                 # Workspace, PDF reader, citations and task UI
-├── backend/src/scholarship/
-│   ├── api/                      # HTTP routes, sessions and request validation
-│   ├── domains/                  # Documents, retrieval, QA and research artifacts
-│   ├── models/                   # Catalog, protocols, transports and admission
-│   ├── infrastructure/           # Database, storage and service integration
-│   └── workers/                  # Background jobs and scheduling
-├── backend/tests/                # Contract and integration tests
-├── deploy/                       # Containers and reverse proxy
-├── docs/                         # Usage, architecture and development guides
-├── model_config.py               # Unified model and runtime configuration
-├── bootstrap.py                  # Environment initialization
-├── dev.py                        # Local application launcher
-└── validate.py                   # Code, build and integration checks
+├── frontend/src/                # Navigation, PDF reading, citations and task UI
+├── backend/
+│   ├── src/scholarship/
+│   │   ├── api/                 # HTTP, sessions, request validation and SSE
+│   │   ├── domains/             # Documents, parsing, retrieval, QA and Studio
+│   │   ├── models/              # Catalog, protocols, transports, gateway and admission
+│   │   ├── infrastructure/      # Database, storage and service integration
+│   │   └── workers/             # Background execution, delivery and scheduling
+│   ├── migrations/             # Forward Alembic migrations
+│   └── tests/                  # Contract and integration tests
+├── deploy/                     # Containers and reverse proxy
+├── docs/                       # Usage, architecture, models and development
+├── model_config.py             # Unified model configuration
+├── bootstrap.py                # Environment initialization
+├── dev.py / stop.py             # Local application lifecycle
+└── doctor.py / validate.py      # Diagnostics and engineering checks
 ```
 
-## 🧪 Evidence and validation
+## Validation and boundaries
 
 **Answer → cited passage → original PDF location**
 
 ![Historical citation-to-source validation](docs/assets/evidence.jpg)
 
-This historical screenshot shows training hardware and timing on page 7 of the Transformer paper, with the corresponding original PDF region highlighted. It uses an earlier UI. It demonstrates source localization for this sample, not universal answer correctness.
+This historical screenshot shows training hardware and timing on page 7 of the Transformer paper, with the corresponding original passage highlighted. The [demo](#demo) shows citation navigation in the current UI. These illustrate source checks for this sample; they do not establish general answer accuracy.
 
-| Layer | Existing evidence | Scope |
+| Validation layer | Existing records | Scope |
 |---|---|---|
-| Engineering regression | 233 backend tests, 3 frontend tests and a production build | Local workspace results from 2026-11-17, not remote CI status |
-| User workflow | Seven local steps using real PDFs | Synthetic QA and translation responses |
-| Real model samples | Five single-paper questions, scanned-paper indexing and translation artifacts | Historical bounded runs; semantic review remains necessary |
+| Engineering regression | 234 backend tests, 12 frontend tests and a production build passed | Local workspace results from 2026-11-18, not remote CI status |
+| Real model samples | Five fixed single-paper questions, scanned-paper indexing and translation artifacts | Completed bounded runs; general and multi-paper scientific quality still need independent evaluation |
+| Content and tools | Separate checks for text-layer structure, source localization, simulation and controlled charts | No general OCR, automatic figure semantics or research novelty guarantee |
 
-Run checks locally:
+Cloud services are disabled by default. Simulated results, model drafts and unreviewed candidates retain their labels. Original papers, user databases and private receipts are not distributed with the source. See [capabilities and validation scope](docs/guides/capabilities.md) for details.
+
+Local checks:
 
 ```bash
 .venv/bin/python doctor.py
@@ -162,9 +170,19 @@ Validation requires the infrastructure containers and uses isolated temporary da
 
 [Documentation](docs/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [AI-assisted development](docs/development/ai-assisted-development.md)
 
-ScholarShip is developed by an individual. Reproducible issues and focused improvements are welcome. Do not include credentials, session cookies, private data or papers you cannot redistribute. Enabling external services sends the relevant text to the selected providers.
+ScholarShip is developed by an individual. Reproducible issues and focused improvements are welcome. Do not include credentials, session cookies, private data or papers you cannot redistribute. Enabling external services sends relevant content to the selected providers.
 
 <a id="license"></a>
 ## 📄 License
 
-**A project-wide license has not been selected.** This repository does not currently claim MIT, Apache-2.0 or another open-source license. Third-party components retain their respective licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+See the root [LICENSE](LICENSE) for the full text.
+
+Copyright (c) 2026 崔静蕾.
+
+AGPL-3.0 permits copying, modification and redistribution, including commercial use. If you
+modify the project and make it available to users over a network, you must offer the corresponding
+source code under AGPL-3.0. The project is mainly intended for learning and exchange; please
+honor the source-disclosure obligation when offering it as an online service.
+
+Third-party components retain their respective licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

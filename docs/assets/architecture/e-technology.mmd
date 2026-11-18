@@ -1,0 +1,22 @@
+flowchart TB
+    BROWSER["浏览器：React 19 / TypeScript / PDF.js / KaTeX / Cytoscape / Mermaid"]
+    BROWSER --> CADDY["容器 Web：Caddy 静态站点与 /api 反向代理"]
+    BROWSER -. "互斥的本地应用模式" .-> VITE["本地入口：Vite 开发服务器"]
+    subgraph APP["Python 3.12 后端：共享代码 / 同一镜像"]
+        API["api：FastAPI / Uvicorn / Pydantic"]
+        WORKER["worker：Celery / LangGraph<br/>pdfplumber / PyPDF / NetworkX / NumPy / pandas / Matplotlib"]
+        BEAT["beat：Celery Beat / Outbox 调度与恢复检查"]
+    end
+    CADDY --> API
+    VITE --> API
+    APP --> SHARED["后端共享资源访问；按角色分权"]
+    SHARED --> PG[("PostgreSQL 17：业务、任务、回执、RLS、检查点")]
+    SHARED --> Q[("Qdrant 1.20：Dense + BM25 / 索引世代")]
+    SHARED --> REDIS[("Redis 7.4：消息 Broker")]
+    SHARED --> FILES["持久化共享目录：原件、解析与研究产物"]
+    APP --> MODEL["model_config.py / Gateway / Protocols / HTTPX / 云端准入"]
+    BUILD["工程交付：项目工具链、锁文件、Alembic、pytest、Vitest、tsc、Vite、validate.py"] -.-> APP
+    classDef app fill:#E9F0FC,stroke:#719DD0,color:#202936
+    classDef storage fill:#E9F0FC,stroke:#719DD0,color:#202936
+    class BROWSER,CADDY,VITE,API,WORKER,BEAT app
+    class PG,Q,REDIS,FILES storage
