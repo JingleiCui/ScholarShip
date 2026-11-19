@@ -1,11 +1,13 @@
 <p align="center">
-  <img src="docs/assets/scholarship.svg" alt="ScholarShip · 学者之舟" width="680" />
+  <img src="docs/assets/scholarship.svg" alt="ScholarShip · 学者之舟 · 学海无涯 AI 作舟" width="900" />
 </p>
 <p align="center"><strong>学海无涯，AI作舟。</strong></p>
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12" />
+  <img src="https://img.shields.io/badge/TypeScript-7.0-3178C6?logo=typescript&logoColor=white" alt="TypeScript 7.0" />
   <img src="https://img.shields.io/badge/React-19.3-149ECA?logo=react&logoColor=white" alt="React 19.3" />
-  <img src="https://img.shields.io/badge/FastAPI-0.162-009688?logo=fastapi&logoColor=white" alt="FastAPI 0.162" />
+  <img src="https://img.shields.io/badge/FastAPI-0.162.5-009688?logo=fastapi&logoColor=white" alt="FastAPI 0.162.5" />
+  <img src="https://img.shields.io/badge/LangGraph-1.2.21-24745D" alt="LangGraph 1.2.21" />
   <a href="#license"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue" alt="项目采用 AGPL-3.0 许可证" /></a>
 </p>
 <p align="center"><a href="README.en.md">English</a> | <a href="README.md">简体中文</a></p>

@@ -7,7 +7,7 @@
 - `demo-poster.jpg` / `demo.srt` / `demo-chapters.json`：该视频实际帧、逐段字幕与章节时间；`demo/page-text-counts.csv` 是演示中使用的 PDF 页级文本字符数，不是模型性能指标。导出图表已在同一环境运行 `plot.py` 复现，图片哈希一致。
 - `demo.gif`：由上述真实操作视频以 2.5 倍速转换的 36 秒、1000 像素宽、6 fps 循环动图，供中英文 README 直接播放；内容与高清视频顺序一致，已剪除全部等待。点击动图打开同长度的 1080p `demo-preview.mp4`；90 秒版作为详细操作入口保留。
 - `evidence.jpg`：历史问答验收中的原文引用定位截图，展示 Transformer 论文第 7 页。保留当时界面，不将旧界面截图标为当前 UI。
-- `scholarship.svg`：项目品牌横幅。
+- `scholarship.svg`：项目品牌横幅，2026-11-19 重做为 1600×450 宽幅版（SVG 画布 1672×538 含投影留白，viewBox 完整）：左侧 ScholarShip/学者之舟/品牌语分层，右侧书页之帆插画与证据锚点。文字已转曲，无需外部字体；由 Ardot 设计稿导出，中英文 README 首行引用。
 - `workspace.jpg`：先前的实际工作台截图，保留供文档引用。
 - `architecture/`：2026-11-18 五类独立技术图，含固定版式 SVG、2,400 像素宽 PNG 和 Mermaid 简化结构源码；详见[架构图集](../engineering/architecture-gallery.md)。仅保留模块、分区与连接关系，没有页眉、页脚或合成总览。由本地脚本绘制，未上传参考 PDF 或调用模型。
 - `diagrams/`：保留的早期工程架构、业务流程与证据版本图稿。
