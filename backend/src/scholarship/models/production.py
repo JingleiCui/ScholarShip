@@ -1,6 +1,6 @@
 """Production invocation port, separate from bounded validation grants.
 
-No policies are enabled here. Free routes need an explicit, expiring DB policy
+No policies are enabled here. Local and free cloud routes need an explicit, expiring DB policy
 AND the shared live budget AND configuration gates. Unknown sends never retry.
 """
 
@@ -12,10 +12,10 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import DBAPIError
 from scholarship.adapters.providers import ExternalDisabled, ContractError
-from scholarship.config import settings
 from scholarship.infrastructure.database import tenant_transaction
 from scholarship.models.adapters import ProviderClient
-from scholarship.models.catalog import credential
+from scholarship.models.catalog import credential, provider_definition, deployment, binding_snapshot
+from scholarship.models.routing import require_execution
 from scholarship.models.configuration import restore_snapshot
 from scholarship.models.contracts import ROLE_OPERATIONS, ProviderFailure
 from scholarship.models.live import request_hash
@@ -24,21 +24,28 @@ from scholarship.models.transports import network_transport
 from scholarship.domains.indexing import call_step
 
 
-def require_cloud(selection):
-    if not selection.allow_cloud or not settings().external_services_enabled:
-        raise ExternalDisabled("production_configuration_closed")
+def require_cloud(selection, roles=None):
+    """Compatibility name: real execution may route each role locally or remotely."""
+    require_execution(selection, roles or ("chat", "translation", "embedding", "rerank"))
 
 
 class AdmissionTransport(httpx.BaseTransport):
-    def __init__(self, owner, call_id, step_id, provider, output_limit, inner):
+    def __init__(self, owner, call_id, step_id, provider, output_limit, inner, *, selection=None, role=None):
         self.owner, self.call_id, self.step_id, self.provider = owner, call_id, step_id, provider
         self.output_limit, self.inner, self.used = output_limit, inner, False
+        self.selection, self.role = selection, role
 
     def handle_request(self, request):
         if self.used:
             raise ExternalDisabled("production_one_wire_per_intent")
+        if self.selection is not None:
+            require_execution(self.selection, (self.role,))
+            spec = self.selection.roles[self.role]
+            if binding_snapshot(spec, self.role) != self.selection.bindings[self.role]:
+                raise ExternalDisabled("production_binding_changed")
+        definition = provider_definition(self.provider)
         secret = credential(self.provider)
-        if not secret:
+        if definition.get("key_env") and not secret:
             raise ExternalDisabled("production_credential_missing")
         # Conservative UTF-8 byte bound including prompt/JSON overhead; no guessed price.
         maximum = len(request.content) + self.output_limit + 8192
@@ -51,7 +58,10 @@ class AdmissionTransport(httpx.BaseTransport):
         except DBAPIError:
             raise ExternalDisabled("production_admission_closed") from None
         self.used = True
-        request.headers["Authorization"] = "Bearer " + secret
+        if secret:
+            request.headers["Authorization"] = "Bearer " + secret
+        else:
+            request.headers.pop("Authorization", None)
         return self.inner.handle_request(request)
 
     def close(self):
@@ -72,7 +82,7 @@ class ProductionGateway(AbstractContextManager):
 
     def invoke(self, intent, role, operation, arguments):
         check_cancelled(self.owner, self.run)
-        require_cloud(self.selection)
+        require_execution(self.selection, (role,))
         restore_snapshot(self.selection.snapshot())
         if operation not in ROLE_OPERATIONS.get(role, set()):
             raise ContractError("invalid_model_operation")
@@ -124,7 +134,14 @@ class ProductionGateway(AbstractContextManager):
             raise ExternalDisabled("production_binding_changed")
         client.client.close()
         transport = AdmissionTransport(
-            self.owner, cid, step, spec.provider, self.selection.max_output_tokens, self.transports[spec.provider]
+            self.owner,
+            cid,
+            step,
+            spec.provider,
+            self.selection.max_output_tokens,
+            self.transports[spec.provider],
+            selection=self.selection,
+            role=role,
         )
         client.client = httpx.Client(
             transport=transport, timeout=self.selection.timeout_seconds, follow_redirects=False, trust_env=False
@@ -152,7 +169,13 @@ class ProductionGateway(AbstractContextManager):
                         raise ContractError("unexpected_paid_usage")
                 except InvalidOperation:
                     raise ContractError("invalid_reported_cost") from None
-            receipt["cost_verification"] = "reported_zero" if cost is not None else "not_reported_free_policy_only"
+            receipt["cost_verification"] = (
+                "local_no_provider_charge"
+                if deployment(spec.provider) == "local"
+                else "reported_zero"
+                if cost is not None
+                else "not_reported_free_policy_only"
+            )
             ModelExecutor(self.owner).finish(cid, "succeeded", receipt)
             self.settle(cid, receipt)
             return receipt

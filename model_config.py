@@ -1,13 +1,14 @@
-"""ScholarShip model settings: edit this section, then restart project services.
+"""ScholarShip model settings: edit this section; new tasks reload it without a service restart.
 
 Credentials belong only in .env. Selecting a preset never authorizes inference.
 """
 
 # USER CONFIGURATION
 FIGURE_MODEL = "openrouter_vision"  # Independent visual model for new figure tasks; no automatic calls.
+INFERENCE_MODE = "auto"  # auto: mixed roles allowed; local/cloud restrict actual model dispatch.
 ACTIVE_PRESET = "free_gemma"  # mock / local / free_api (ChatAnywhere) / free_gemma
 ALLOW_LOCAL_INFERENCE = False
-ALLOW_REAL_REQUESTS = False  # Future opt-in; real dispatch also requires a separately reviewed executor.
+ALLOW_REAL_REQUESTS = False  # Real dispatch also requires project policy, scope and shared-budget admission.
 TIMEOUT_SECONDS = 120
 CONCURRENCY = 1
 MAX_OUTPUT_TOKENS = 2048
@@ -23,16 +24,19 @@ DOWNLOAD_DNS_OVERRIDES = {"cdn-mineru.openxlab.org.cn": "8.222.82.255"}
 
 PROVIDER_DEFINITIONS = {
     "mock": {
+        "deployment": "simulated",
         "roles": {r: "synthetic" for r in ("chat", "translation", "embedding", "rerank", "parser")},
         "base_urls": [""],
     },
     "chatanywhere": {
+        "deployment": "cloud",
         "roles": {"chat": "openai_chat", "translation": "openai_chat"},
         "base_urls": ["https://api.chatanywhere.tech/v1", "https://api.chatanywhere.org/v1"],
         "key_env": "CHATANYWHERE_API_KEY",
         "model_aliases": {"gpt-4o-mini": ["gpt-4o-mini-2024-07-18"]},
     },
     "openrouter": {
+        "deployment": "cloud",
         "roles": {
             "chat": "openai_chat",
             "translation": "openai_chat",
@@ -49,12 +53,14 @@ PROVIDER_DEFINITIONS = {
         "embedding_input_types": {"document": "search_document", "query": "search_query"},
     },
     "ollama": {
+        "deployment": "local",
         "roles": {"chat": "ollama_chat", "translation": "ollama_chat", "embedding": "ollama_embedding"},
         "base_urls": ["http://127.0.0.1:11434"],
     },
-    "local_reranker": {"roles": {"rerank": "rerank"}, "base_urls": ["http://127.0.0.1:18083"]},
-    "mineru_local": {"roles": {"parser": "mineru_local"}, "base_urls": ["http://127.0.0.1:18082"]},
+    "local_reranker": {"deployment": "local", "roles": {"rerank": "rerank"}, "base_urls": ["http://127.0.0.1:18083"]},
+    "mineru_local": {"deployment": "local", "roles": {"parser": "mineru_local"}, "base_urls": ["http://127.0.0.1:18082"]},
     "mineru_cloud": {
+        "deployment": "cloud",
         "roles": {"parser": "mineru_cloud"},
         "base_urls": ["https://mineru.net"],
         "key_env": "MINERU_API_KEY",

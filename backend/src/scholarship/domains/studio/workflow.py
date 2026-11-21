@@ -95,7 +95,7 @@ def submit(owner, project, key, operation, inputs, mode="offline_acceptance"):
             if row["project_id"] != project:
                 raise ContractError("figure_project_mismatch")
     if mode == "cloud":
-        require_cloud(selection)
+        require_cloud(selection, ("translation",) if operation == "translate" else ("chat",))
     config = {"revision": "research-studio-v1", "operation": operation, "mode": mode, "models": selection.snapshot()}
     if operation == "figure":
         config["figure_policy"] = "vision-graph-schema-v2"

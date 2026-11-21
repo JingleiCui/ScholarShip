@@ -71,7 +71,7 @@ def report():
     return {
         "ollama": [inspect_ollama(url, expected) for url, expected in routes.items()],
         "other_roles": pending,
-        "business_dispatch": "not_implemented",
+        "business_dispatch": "production_gateway_requires_policy_and_gates",
         "ready_for_full_workflow": False,
         "inference_requests": 0,
         "uploads": 0,

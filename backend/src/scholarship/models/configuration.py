@@ -13,6 +13,7 @@ from scholarship.models.catalog import (
     provider_definition,
     credential,
     binding_snapshot,
+    deployment,
 )
 
 ROLES = ("chat", "translation", "embedding", "rerank", "parser")
@@ -85,6 +86,8 @@ def load_selection(preset=None, overrides=None, path: Path | None = None):
     name = preset or c["ACTIVE_PRESET"]
     if name not in c["PRESETS"]:
         raise ValueError("unknown_preset")
+    if c.get("INFERENCE_MODE", "auto") not in {"auto", "local", "cloud"}:
+        raise ValueError("invalid_inference_mode")
     choices = {**c["PRESETS"][name], **c["ROLE_OVERRIDES"], **(overrides or {})}
     if set(choices) != set(ROLES):
         raise ValueError("invalid_role_set")
@@ -142,15 +145,17 @@ def restore_snapshot(body):
 
 def configuration_status(preset=None, overrides=None):
     selected = load_selection(preset, overrides)
+    catalog = configuration()
     cfg = settings()
     roles = {}
     for role, spec in selected.roles.items():
-        definition = provider_definition(spec.provider)
+        definition = provider_definition(spec.provider, catalog)
         key = definition.get("key_env")
         configured = bool(credential(spec.provider)) if key else True
         roles[role] = {
             **asdict(spec),
             "protocol": definition["roles"][role],
+            "deployment": deployment(spec.provider, catalog),
             "credential_required": bool(key),
             "credential_present": configured,
             "verification_state": "synthetic_only" if spec.provider == "mock" else "not_verified",
@@ -168,7 +173,25 @@ def configuration_status(preset=None, overrides=None):
             "openrouter": bool(cfg.openrouter_api_key.get_secret_value()),
             "mineru": bool(cfg.mineru_api_key.get_secret_value()),
         },
-        "available_presets": list(configuration()["PRESETS"]),
+        "available_presets": list(catalog["PRESETS"]),
+        "inference_mode": catalog.get("INFERENCE_MODE", "auto"),
+        "available_models": {
+            name: {
+                **entry,
+                "roles": catalog["MODEL_CAPABILITIES"].get(name, []),
+                "deployment": deployment(entry["provider"], catalog),
+            }
+            for name, entry in catalog["MODELS"].items()
+        },
+        "reload_policy": {
+            "model_config": "new_tasks_without_restart",
+            "running_and_queued_tasks": "pinned_snapshot_drift_rejected",
+            "permission_flags": "checked_before_each_real_request",
+            "environment_and_builtin_credentials": "restart_api_and_workers",
+            "container_file": "requires_visible_file_update_or_redeploy",
+            "production_mode": "cloud_is_legacy_name_for_real_local_cloud_or_mixed_dispatch",
+            "local_parser": "specialized_lifecycle_not_enabled",
+        },
         "roles": roles,
         "snapshot_fingerprint": selected.snapshot()["fingerprint"],
         "cloud_enabled": False,

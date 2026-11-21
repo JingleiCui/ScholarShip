@@ -4,7 +4,6 @@ from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
 import re
-import runpy
 from urllib.parse import urlsplit
 
 from scholarship.config import PROJECT_ROOT, settings
@@ -13,15 +12,17 @@ CONFIG_PATH = PROJECT_ROOT / "model_config.py"
 
 
 @lru_cache(maxsize=8)
-def _read(path, stamp):
-    return runpy.run_path(path)
+def _read(path, source):
+    # Compile the exact bytes used as the cache key: no stat race or stale pyc.
+    namespace = {"__file__": path, "__name__": "<model_configuration>"}
+    exec(compile(source, path, "exec"), namespace)
+    return {k: v for k, v in namespace.items() if k.isupper()}
 
 
 def configuration(path=None):
     file = Path(path or CONFIG_PATH)
-    stat = file.stat()
-    # A copy prevents callers mutating the shared catalog or a stored snapshot.
-    return deepcopy({k: v for k, v in _read(str(file), (stat.st_mtime_ns, stat.st_size)).items() if k.isupper()})
+    # Content keys detect even equal-size edits with a preserved timestamp.
+    return deepcopy(_read(str(file), file.read_bytes()))
 
 
 def provider_definition(provider, config=None):
@@ -39,7 +40,18 @@ def provider_definition(provider, config=None):
     options = entry.get("chat_options", {})
     if not isinstance(options, dict) or set(options) - {"reasoning", "provider"}:
         raise ValueError("unsupported_chat_options")
+    deployment(provider, config)
     return entry
+
+
+def deployment(provider, config=None):
+    """Explicit location, with backwards compatible inference for old catalogs."""
+    c = config if config is not None else configuration()
+    entry = c.get("PROVIDER_DEFINITIONS", {}).get(provider, {})
+    value = entry.get("deployment", "simulated" if provider == "mock" else "cloud" if entry.get("key_env") else "local")
+    if value not in {"simulated", "local", "cloud"} or (value == "simulated") != (provider == "mock"):
+        raise ValueError("invalid_provider_deployment")
+    return value
 
 
 def validate_binding(spec, role, config=None):
@@ -64,7 +76,7 @@ def validate_binding(spec, role, config=None):
         u = urlsplit(spec.base_url)
         if u.username or u.password or u.query or u.fragment:
             raise ValueError()
-        if definition.get("key_env"):
+        if deployment(spec.provider, c) == "cloud":
             if u.scheme != "https" or u.port not in (None, 443):
                 raise ValueError()
         elif u.scheme != "http" or u.hostname != "127.0.0.1" or not u.port:
@@ -89,10 +101,10 @@ def credential(provider):
     return os.environ.get(key) or dotenv_values(PROJECT_ROOT / ".env").get(key) or ""
 
 
-def identity_allowed(spec, reported):
+def identity_allowed(spec, reported, config=None):
     if reported is None:
         return True
-    definition = provider_definition(spec.provider)
+    definition = provider_definition(spec.provider, config)
     aliases = {spec.model}
     if definition.get("free_only") and spec.model.endswith(":free"):
         aliases.add(spec.model.removesuffix(":free"))

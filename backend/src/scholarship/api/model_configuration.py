@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, ConfigDict
 import sqlalchemy as sa
 from scholarship.api.auth import Identity, identity, mutation_identity
 from scholarship.models.configuration import load_selection, configuration_status
+from scholarship.models.catalog import binding_snapshot
 from scholarship.infrastructure.database import tenant_transaction
 from scholarship.infrastructure.schema import tables as T
 
@@ -39,7 +40,13 @@ def existing_indexes_need_rebuild(conn, project, spec):
             return True
         if spec.dimensions is not None and profile["dimensions"] != spec.dimensions:
             return True
-        if spec.provider != "mock" and profile["config_json"].get("simulated"):
+        config = profile["config_json"]
+        if spec.provider != "mock" and (
+            config.get("base_url") != spec.base_url
+            or config.get("adapter_binding") != binding_snapshot(spec, "embedding")
+        ):
+            return True
+        if spec.provider != "mock" and config.get("simulated"):
             return True
     return False
 
@@ -136,7 +143,10 @@ def switch(project: UUID, body: Switch, user: Identity = Depends(mutation_identi
         old = selected(row["preferences"])
         if old.snapshot()["fingerprint"] != body.expected_fingerprint:
             raise HTTPException(409, "model_configuration_changed_refresh_required")
-        embedding_changed = old.roles["embedding"] != new.roles["embedding"]
+        embedding_changed = (
+            old.roles["embedding"] != new.roles["embedding"]
+            or old.bindings["embedding"] != new.bindings["embedding"]
+        )
         parser_changed = old.roles["parser"] != new.roles["parser"]
         preferences = {
             **row["preferences"],
@@ -145,6 +155,7 @@ def switch(project: UUID, body: Switch, user: Identity = Depends(mutation_identi
                 "overrides": body.overrides,
                 "snapshot": new.snapshot(),
                 "requires_reindex": embedding_changed
+                or existing_indexes_need_rebuild(conn, project, new.roles["embedding"])
                 or row["preferences"].get("model_configuration", {}).get("requires_reindex", False),
             },
         }

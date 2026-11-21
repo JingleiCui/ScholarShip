@@ -18,7 +18,7 @@ from scholarship.adapters.providers import (
     validate_answer_response,
 )
 from scholarship.models.configuration import ModelSpec
-from scholarship.models.catalog import provider_definition, identity_allowed, binding_snapshot
+from scholarship.models.catalog import provider_definition, identity_allowed, binding_snapshot, configuration
 from scholarship.models.protocols import resolve_protocol
 
 from scholarship.models.contracts import ModelResult, usage
@@ -28,11 +28,12 @@ from scholarship.models.transports import request_json
 
 class ProviderClient:
     def __init__(self, spec: ModelSpec, role, *, transport=None, timeout=120, max_output=2048):
-        self.spec = spec.validate(role)
+        self.config = configuration()
+        self.spec = spec.validate(role, config=self.config)
         self.role = role
-        self.definition = provider_definition(spec.provider)
+        self.definition = provider_definition(spec.provider, self.config)
         self.protocol = resolve_protocol(self.definition["roles"][role])
-        self.binding = binding_snapshot(spec, role)
+        self.binding = binding_snapshot(spec, role, self.config)
         self.timeout = timeout
         self.max_output = max_output
         self.last_response = None
@@ -65,7 +66,7 @@ class ProviderClient:
         for field in ["model", "id"]:
             if d.get(field) is not None and (not isinstance(d[field], str) or len(d[field]) > 256):
                 raise ContractError("invalid_response_identity")
-        if not identity_allowed(self.spec, d.get("model")):
+        if not identity_allowed(self.spec, d.get("model"), self.config):
             raise ContractError("unexpected_reported_model")
         return ModelResult(
             value,
@@ -217,7 +218,7 @@ class ProviderClient:
             result.append(v)
         if dimensions != (expected_dimensions or self.spec.dimensions or dimensions):
             raise ContractError("embedding_profile_dimension_mismatch")
-        if not identity_allowed(self.spec, d.get("model")):
+        if not identity_allowed(self.spec, d.get("model"), self.config):
             raise ContractError("unexpected_embedding_model")
         return self.result(result, d, elapsed, dimensions)
 
@@ -246,7 +247,7 @@ class ProviderClient:
                     raise ContractError("rerank_index_mismatch")
                 seen.add(i)
                 result.append({"index": i, "score": finite(r["relevance_score"])})
-            if not identity_allowed(self.spec, d.get("model")):
+            if not identity_allowed(self.spec, d.get("model"), self.config):
                 raise ContractError("unexpected_rerank_model")
             return self.result(sorted(result, key=lambda r: r["score"], reverse=True), d, elapsed)
         except (KeyError, TypeError):

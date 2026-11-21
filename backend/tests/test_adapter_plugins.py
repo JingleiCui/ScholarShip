@@ -102,10 +102,7 @@ def test_v1_snapshot_restores_without_rewriting_history():
 def test_configuration_is_cached_but_returned_data_is_not_shared(custom_catalog, monkeypatch):
     _, file = custom_catalog
     catalog._read.cache_clear()
-    original = catalog.runpy.run_path
-    reads = []
-    monkeypatch.setattr(catalog.runpy, "run_path", lambda path: reads.append(path) or original(path))
     first = catalog.configuration(file)
     first["MODELS"].clear()
     second = catalog.configuration(file)
-    assert second["MODELS"] and len(reads) == 1
+    assert second["MODELS"] and catalog._read.cache_info().misses == 1

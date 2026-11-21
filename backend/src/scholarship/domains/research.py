@@ -32,8 +32,8 @@ def enqueue_research(
         raise ContractError("invalid_research_mode_or_kind")
     selection = project_selection(owner, project)
     if mode == "cloud":
-        require_cloud(selection)
         roles = ("embedding",) if kind == "research_build" else ("embedding", "rerank", "chat")
+        require_cloud(selection, roles)
         with tenant_transaction(owner) as conn:
             for role in roles:
                 spec = selection.roles[role]

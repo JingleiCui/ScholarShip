@@ -241,7 +241,7 @@ def test_real_profile_requires_consumed_real_receipt(case, database):
         )
 
 
-def production_case(case, database, monkeypatch, *, limit=3):
+def production_case(case, database, monkeypatch, *, limit=3, preset="free_gemma"):
     from scholarship.models.production import ProductionGateway
     from scholarship.domains.offline_workflow import enqueue
     from scholarship.models.configuration import load_selection
@@ -249,7 +249,7 @@ def production_case(case, database, monkeypatch, *, limit=3):
     from types import SimpleNamespace
 
     owner, project = case
-    selection = replace(load_selection("free_gemma"), allow_cloud=True)
+    selection = replace(load_selection(preset), allow_cloud=True, allow_local=True)
     run = enqueue(owner, project, "research_qa", uuid4().hex, {}, dispatch=False)["id"]
     with tenant_transaction(owner) as conn:
         conn.execute(
@@ -267,10 +267,14 @@ def production_case(case, database, monkeypatch, *, limit=3):
             ),
             {"o": owner, "p": project, "v": spec.provider, "m": spec.model, "n": limit},
         )
+    monkeypatch.setattr("scholarship.models.routing.settings", lambda: SimpleNamespace(external_services_enabled=True))
+    from scholarship.models.catalog import configuration
+
+    test_config = {**configuration(), "ALLOW_REAL_REQUESTS": True, "ALLOW_LOCAL_INFERENCE": True}
+    monkeypatch.setattr("scholarship.models.routing.configuration", lambda: test_config)
     monkeypatch.setattr(
-        "scholarship.models.production.settings", lambda: SimpleNamespace(external_services_enabled=True)
+        "scholarship.models.production.credential", lambda p: "" if p == "ollama" else "isolated-test-key"
     )
-    monkeypatch.setattr("scholarship.models.production.credential", lambda p: "isolated-test-key")
     return owner, project, run, selection, policy, ProductionGateway
 
 
