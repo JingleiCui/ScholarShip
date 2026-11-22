@@ -40,19 +40,51 @@ class OpenAIChat:
 
 
 class OllamaChat:
-    revision = "ollama-chat-v2"
+    revision = "ollama-chat-v5"
     roles = {"chat", "translation"}
     usage_style = "ollama"
 
-    def prepare(self, spec, definition, *, messages, structured, max_output):
+    def prepare(self, spec, definition, *, messages, structured, max_output, schema=None):
+        converted = []
+        for message in messages:
+            row = deepcopy(message)
+            if isinstance(row.get("content"), list):
+                parts = row["content"]
+                row["content"] = "\n".join(p["text"] for p in parts if p.get("type") == "text")
+                row["images"] = [p["image_url"]["url"].split(",", 1)[1] for p in parts if p.get("type") == "image_url"]
+            converted.append(row)
         body = {
             "model": spec.model,
-            "messages": messages,
+            "messages": converted,
             "stream": False,
             "think": False,
             "options": {"num_ctx": spec.context_tokens, "num_predict": max_output, "temperature": 0},
         }
-        if structured and spec.json_mode:
+        if schema is not None:
+            body["format"] = deepcopy(schema)
+            # Ollama's JSON grammar does not enforce numeric min/max. Constrain
+            # the decoder to a declared 0.01 grid rather than clamping replies.
+            coordinate = (
+                body["format"].get("$defs", {}).get("Node", {}).get("properties", {}).get("bbox", {}).get("items")
+            )
+            if coordinate is not None and definition.get("figure_policy") == "nodes_then_edges":
+                body["format"]["properties"]["edges"] = {"type": "array", "const": []}
+                for row in body["messages"]:
+                    if row.get("role") == "system":
+                        row["content"] += (
+                            " This is the node-location stage only. Return edges as an empty list; a separate stage traces connections using your fixed node IDs."
+                        )
+            if coordinate is not None:
+                coordinate["enum"] = [round(i / 100, 2) for i in range(101)]
+                for row in body["messages"]:
+                    if row.get("role") == "system":
+                        row["content"] += (
+                            " Read boxes in observed top-to-bottom order. The origin is the top-left of the image; y increases downward. "
+                            "Use bbox coordinates on the supplied 0.01 grid between 0 and 1. Each box MUST have x1<x2 and y1<y2. "
+                            "Never extrapolate positions by subtracting fixed layer offsets. Omit any node whose positive-area box cannot be located, "
+                            "and omit edges referencing an omitted node; describe that uncertainty. Do not infer arrows from known architecture conventions."
+                        )
+        elif structured and spec.json_mode:
             body["format"] = "json"
         return WireRequest("/api/chat", body)
 
@@ -95,12 +127,12 @@ class OpenAIEmbedding:
 
 
 class OllamaEmbedding:
-    revision = "ollama-embedding-v1"
+    revision = "ollama-embedding-v2"
     roles = {"embedding"}
     usage_style = "ollama"
 
     def prepare(self, spec, definition, *, texts, input_kind):
-        body = {"model": spec.model, "input": texts, "truncate": False}
+        body = {"model": spec.model, "input": texts, "truncate": False, "options": {"num_ctx": spec.context_tokens}}
         if spec.dimensions:
             body["dimensions"] = spec.dimensions
         return WireRequest("/api/embed", body)

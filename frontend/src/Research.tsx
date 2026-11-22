@@ -9,6 +9,7 @@ const SourceReader = lazy(() => import('./SourceReader'));
 type Doc = {
   can_query_offline: boolean;
   can_query_cloud: boolean;
+  can_query_local: boolean;
   native_index_stale?: boolean;
   id: string;
   title: string;
@@ -83,7 +84,7 @@ export default function Research({
     [target, setTarget] = useState<Target | null>(null);
   const [parent, setParent] = useState('');
   useEffect(() => setParent(''), [project, scopeKey]);
-  const [mode, setMode] = useState<'offline_acceptance' | 'cloud'>('cloud');
+  const [mode, setMode] = useState<'offline_acceptance' | 'cloud' | 'local_inference'>('local_inference');
   useEffect(() => {
     if (versionIds) {
       const next = versionIds.filter((id) => docs.some((d) => d.id === id));
@@ -99,9 +100,11 @@ export default function Research({
   }, [focusRunId, runs]);
   const cloudReady = execution.available(['embedding', 'rerank', 'chat']);
   const buildReady =
-    mode === 'cloud'
-      ? execution.available(['embedding'])
-      : !docs.some((d) => selected.includes(d.id) && d.active_index_id && d.model_simulated === false);
+    mode === 'local_inference'
+      ? execution.localAvailable(['embedding'])
+      : mode === 'cloud'
+        ? execution.available(['embedding'])
+        : !docs.some((d) => selected.includes(d.id) && d.active_index_id && d.model_simulated === false);
   async function refresh() {
     const [d, r] = await Promise.all([
       api(`/research/projects/${project}/documents`),
@@ -166,10 +169,18 @@ export default function Research({
   const queryReady =
     selected.length > 0 &&
     selected.length <= 8 &&
-    (mode !== 'cloud' || cloudReady) &&
+    (mode === 'local_inference'
+      ? execution.localAvailable(['embedding', 'rerank', 'chat'])
+      : mode !== 'cloud' || cloudReady) &&
     selected.every((id) =>
       docs.some(
-        (d) => d.id === id && (mode === 'offline_acceptance' ? d.can_query_offline : d.can_query_cloud),
+        (d) =>
+          d.id === id &&
+          (mode === 'offline_acceptance'
+            ? d.can_query_offline
+            : mode === 'local_inference'
+              ? d.can_query_local
+              : d.can_query_cloud),
       ),
     );
   if (!project) return null;
@@ -186,7 +197,14 @@ export default function Research({
       <p>回答只依据当前选择的文献。单篇细节、多轮续问与跨文对比使用相同的来源核对方式。</p>
       <p className="inline-notice">{execution.notice}</p>
       <details className="execution-options">
-        <summary>执行方式：{mode === 'cloud' ? '真实云端 / 历史回看' : '离线流程验收（模拟）'}</summary>
+        <summary>
+          执行方式：
+          {mode === 'local_inference'
+            ? '真实本地模型'
+            : mode === 'cloud'
+              ? '真实云端 / 历史回看'
+              : '离线流程验收（模拟）'}
+        </summary>
         <label>
           执行模式{' '}
           <select
@@ -197,6 +215,7 @@ export default function Research({
             }}
           >
             <option value="offline_acceptance">离线验收 · 不发出外部请求</option>
+            <option value="local_inference">本地模型 · 不调用云端生成 API</option>
             <option value="cloud">云端业务 · 需正式额度准入</option>
           </select>
         </label>

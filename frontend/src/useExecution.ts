@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './researchApi';
-import { cloudAvailable, type ExecutionConfiguration, type ExternalState } from './execution';
+import { cloudAvailable, localAvailable, type ExecutionConfiguration, type ExternalState } from './execution';
 export default function useExecution(project: string) {
   const [configuration, setConfiguration] = useState<ExecutionConfiguration | null>(null);
   const [external, setExternal] = useState<ExternalState | null>(null);
@@ -40,9 +40,10 @@ export default function useExecution(project: string) {
   return {
     checked,
     configuration,
+    localAvailable: (roles: string[]) => localAvailable(configuration, roles),
     available: (roles: string[]) => cloudAvailable(configuration, external, roles),
     notice: checked
-      ? '新的云端生成需有效模型、文献范围与额度准入。未开放时可继续本地阅读和回看历史成果。'
+      ? '本地生成需模型和服务就绪；MinerU 使用已授权云端解析。云端生成仍需独立额度准入。'
       : '正在核对执行条件，可先阅读原文。',
   };
 }

@@ -28,11 +28,13 @@ def chat_response(content="hello", **extra):
 
 
 def test_presets_snapshot_no_secrets_and_compatibility():
-    selection = load_selection()
+    assert load_selection().preset == "local"
+    assert load_selection().roles["parser"].provider == "mineru_cloud"
+    selection = load_selection("free_gemma")
     assert selection.preset == "free_gemma"
     assert selection.roles["embedding"].dimensions is None
     assert restore_snapshot(selection.snapshot()).snapshot() == selection.snapshot()
-    assert configuration_status()["roles"]["embedding"]["dimensions_state"] == "pending_first_valid_receipt"
+    assert configuration_status("free_gemma")["roles"]["embedding"]["dimensions_state"] == "pending_first_valid_receipt"
     changed = load_selection("local")
     assert changed.snapshot()["fingerprint"] != selection.snapshot()["fingerprint"]
     body = selection.snapshot()
@@ -316,7 +318,7 @@ def test_profile_switch_rebuild_failure_preserves_old_index(case):
     with tenant_transaction(owner) as conn:
         old = conn.scalar(sa.select(T["paper_versions"].c.active_index_id).where(T["paper_versions"].c.id == vid))
         pid = conn.scalar(sa.select(T["paper_versions"].c.active_parse_id).where(T["paper_versions"].c.id == vid))
-    selection = load_selection()
+    selection = load_selection("free_gemma")
     run = enqueue(owner, project, "offline_build", uuid4().hex, {})["id"]
 
     def handler(r):
@@ -354,7 +356,13 @@ def test_model_configuration_api_and_scope(signed_client, accounts):
     before = signed_client.get(base)
     assert before.status_code == 200
     key = before.json()["fingerprint"]
-    r = signed_client.put(base, json={"preset": "local", "expected_fingerprint": key})
+    r = signed_client.put(
+        base,
+        json={
+            "preset": "free_gemma" if before.json()["selected_preset"] == "local" else "local",
+            "expected_fingerprint": key,
+        },
+    )
     assert r.status_code == 200, r.text
     assert r.json()["requires_reindex"] and r.json()["active_indexes_unchanged"] and not r.json()["execution_enabled"]
     assert signed_client.put(base, json={"preset": "mock", "expected_fingerprint": key}).status_code == 409

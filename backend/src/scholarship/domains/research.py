@@ -11,6 +11,8 @@ from scholarship.infrastructure.schema import tables as T
 from scholarship.models.configuration import load_selection, restore_snapshot
 from scholarship.models.fixtures import transport_factory
 from scholarship.models.gateway import SimulatedGateway
+from scholarship.models.local import LocalGateway
+from scholarship.models.routing import require_local
 from scholarship.models.production import ProductionGateway, require_cloud
 
 
@@ -28,7 +30,7 @@ def project_selection(owner, project):
 def enqueue_research(
     owner, project, key, kind, versions, *, question=None, mode="offline_acceptance", parent_run_id=None
 ):
-    if mode not in {"offline_acceptance", "cloud"} or kind not in {"research_build", "research_qa"}:
+    if mode not in {"offline_acceptance", "cloud", "local_inference"} or kind not in {"research_build", "research_qa"}:
         raise ContractError("invalid_research_mode_or_kind")
     selection = project_selection(owner, project)
     if mode == "cloud":
@@ -44,6 +46,8 @@ def enqueue_research(
                     {"p": project, "v": spec.provider, "m": spec.model, "r": role},
                 ):
                     raise ExternalDisabled("production_policy_closed")
+    if mode == "local_inference":
+        require_local(selection, ("embedding",) if kind == "research_build" else ("embedding", "rerank", "chat"))
     ids = sorted(set(versions), key=str)
     if not ids or len(ids) > 8:
         raise ContractError("one_to_eight_versions_required")
@@ -57,7 +61,7 @@ def enqueue_research(
                 sa.select(T["document_parses"].c.id)
                 .where(
                     T["document_parses"].c.version_id == vid,
-                    T["document_parses"].c.parser_name.in_(["mineru-native", "pdfplumber-structure"]),
+                    T["document_parses"].c.parser_name.in_(["mineru-native", "mineru-local", "pdfplumber-structure"]),
                     T["document_parses"].c.status == "ready",
                 )
                 .order_by(T["document_parses"].c.revision_no.desc())
@@ -81,7 +85,7 @@ def enqueue_research(
             if needed > selection.max_requests_per_run:
                 raise ContractError("index_scope_exceeds_run_limit_split_documents")
     scope = (
-        snapshot(owner, project, ids, model_selection=selection, simulated=mode != "cloud")
+        snapshot(owner, project, ids, model_selection=selection, simulated=mode == "offline_acceptance")
         if kind == "research_qa"
         else []
     )
@@ -185,6 +189,8 @@ def execute_research(owner, project, run_id, *, interrupt_after=None):
     selection = restore_snapshot(config["models"])
     if config["mode"] == "offline_acceptance":
         gateway = SimulatedGateway(owner, run_id, selection, transport_factory(selection))
+    elif config["mode"] == "local_inference":
+        gateway = LocalGateway(owner, project, run_id, selection)
     elif config["mode"] == "cloud":
         gateway = ProductionGateway(owner, project, run_id, selection)
     else:

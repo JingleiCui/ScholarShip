@@ -304,7 +304,8 @@ def test_readonly_status_and_no_live_route(signed_client):
     assert r.status_code == 200
     data = r.json()
     assert (
-        data["mode"] == "offline_contracts_only"
+        data["mode"] == "local_models"
+        and data["local_transport_configured"]
         and not data["live_transport_available"]
         and not data["research_qa_available"]
     )

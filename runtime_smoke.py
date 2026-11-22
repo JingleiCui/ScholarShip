@@ -3,6 +3,7 @@
 import argparse
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import subprocess
 import socket
@@ -76,7 +77,13 @@ def main():
             wait_http(base, process)
             with httpx.Client(base_url=base, headers={"Origin": origin}, timeout=5) as client:
                 response = client.post(
-                    "/api/v1/auth/login", json={"username": "researcher", "password": values["INITIAL_USER_PASSWORD"]}
+                    "/api/v1/auth/login",
+                    json={
+                        "username": "researcher",
+                        "password": os.environ.get("LOCAL_ACCEPTANCE_PASSWORD")
+                        or values.get("LOCAL_ACCEPTANCE_PASSWORD")
+                        or values["INITIAL_USER_PASSWORD"],
+                    },
                 )
                 response.raise_for_status()
                 client.headers["X-CSRF-Token"] = client.cookies["ss_csrf"]

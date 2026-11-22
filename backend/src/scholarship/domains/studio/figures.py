@@ -68,6 +68,24 @@ def describe(owner, project, run, inputs, gateway):
         "describe_figure",
         {"image_base64": base64.b64encode(raw).decode(), "mime": row["mime_type"], "caption": row["canonical_text"]},
     )
+    node_receipt = None
+    selection = getattr(gateway, "selection", None)
+    strategy = (
+        (selection.bindings or {}).get("chat", {}).get("definition", {}).get("figure_policy") if selection else None
+    )
+    if strategy == "nodes_then_edges" and receipt["value"]["nodes"]:
+        node_receipt = receipt
+        receipt = gateway.invoke(
+            "figure-edges:" + str(row["id"]),
+            "chat",
+            "describe_figure_edges",
+            {
+                "image_base64": base64.b64encode(raw).decode(),
+                "mime": row["mime_type"],
+                "caption": row["canonical_text"],
+                "description": node_receipt["value"],
+            },
+        )
     result = {
         "description": receipt["value"],
         "source": {
@@ -79,6 +97,8 @@ def describe(owner, project, run, inputs, gateway):
             "bbox": row["bbox"],
         },
         "review_state": "unreviewed",
+        "extraction_strategy": strategy or "single_stage",
+        "stages": 2 if node_receipt else 1,
         "model_simulated": receipt["simulated"],
         "provider": receipt["provider"],
         "model": receipt["requested_model"],

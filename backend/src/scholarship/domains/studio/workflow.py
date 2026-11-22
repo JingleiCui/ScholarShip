@@ -15,6 +15,8 @@ from scholarship.infrastructure.database import tenant_transaction
 from scholarship.infrastructure.schema import tables as T
 from scholarship.models.configuration import restore_snapshot
 from scholarship.models.gateway import SimulatedGateway
+from scholarship.models.local import LocalGateway
+from scholarship.models.routing import require_local
 from scholarship.models.production import ProductionGateway, require_cloud
 from scholarship.models.fixtures import transport_factory
 from scholarship.domains.studio.artifacts import publish, write_member
@@ -55,7 +57,7 @@ def source_windows(text, byte_limit=None):
 
 
 def submit(owner, project, key, operation, inputs, mode="offline_acceptance"):
-    if operation not in OPERATIONS or mode not in {"local", "offline_acceptance", "cloud"}:
+    if operation not in OPERATIONS or mode not in {"local", "offline_acceptance", "cloud", "local_inference"}:
         raise ContractError("invalid_studio_operation")
     selection = project_selection(owner, project)
     if operation in {
@@ -75,7 +77,11 @@ def submit(owner, project, key, operation, inputs, mode="offline_acceptance"):
         from scholarship.models.configuration import load_selection
         from dataclasses import replace
 
-        alias = configuration().get("FIGURE_MODEL")
+        alias = (
+            configuration().get("LOCAL_FIGURE_MODEL", "ollama_chat")
+            if mode == "local_inference"
+            else configuration().get("FIGURE_MODEL")
+        )
         if alias:
             visual = load_selection(selection.preset, overrides={"chat": alias})
             selection = replace(
@@ -84,7 +90,9 @@ def submit(owner, project, key, operation, inputs, mode="offline_acceptance"):
                 bindings={**selection.bindings, "chat": visual.bindings["chat"]},
             )
         spec = selection.roles["chat"]
-        if mode != "cloud" or (spec.provider, spec.model) not in configuration().get("VISION_MODEL_BINDINGS", []):
+        if mode not in {"cloud", "local_inference"} or (
+            mode == "cloud" and (spec.provider, spec.model) not in configuration().get("VISION_MODEL_BINDINGS", [])
+        ):
             raise ContractError("cloud_vision_model_required")
         if len(inputs.get("block_ids", [])) != 1:
             raise ContractError("one_figure_required")
@@ -94,6 +102,8 @@ def submit(owner, project, key, operation, inputs, mode="offline_acceptance"):
             row = source(conn, UUID(inputs["block_ids"][0]))
             if row["project_id"] != project:
                 raise ContractError("figure_project_mismatch")
+    if mode == "local_inference":
+        require_local(selection, ("translation",) if operation == "translate" else ("chat",))
     if mode == "cloud":
         require_cloud(selection, ("translation",) if operation == "translate" else ("chat",))
     config = {"revision": "research-studio-v1", "operation": operation, "mode": mode, "models": selection.snapshot()}
@@ -232,7 +242,9 @@ def execute(owner, project, run):
         return review(owner, project, run, inputs)
     selection = restore_snapshot(job["config_json"]["models"])
     gateway = (
-        ProductionGateway(owner, project, run, selection)
+        LocalGateway(owner, project, run, selection)
+        if job["config_json"]["mode"] == "local_inference"
+        else ProductionGateway(owner, project, run, selection)
         if job["config_json"]["mode"] == "cloud"
         else SimulatedGateway(owner, run, selection, transport_factory(selection))
     )

@@ -24,7 +24,7 @@ router = APIRouter(prefix="/research")
 
 class ResearchRequest(BaseModel):
     version_ids: list[UUID] = Field(min_length=1, max_length=8)
-    mode: Literal["offline_acceptance", "cloud"] = "offline_acceptance"
+    mode: Literal["offline_acceptance", "cloud", "local_inference"] = "offline_acceptance"
     question: str | None = Field(default=None, min_length=1, max_length=1000)
     parent_run_id: UUID | None = None
 
@@ -105,7 +105,7 @@ def documents(project_id: UUID, user: Identity = Depends(identity)):
                 .limit(1)
             )
             model_simulated = None
-            readiness = {"can_query_offline": False, "can_query_cloud": False}
+            readiness = {"can_query_offline": False, "can_query_cloud": False, "can_query_local": False}
             if r["active_index_id"]:
                 active_profile = (
                     conn.execute(
@@ -122,6 +122,7 @@ def documents(project_id: UUID, user: Identity = Depends(identity)):
                         readiness = {
                             "can_query_offline": profile_matches(active_profile, selection, simulated=True),
                             "can_query_cloud": profile_matches(active_profile, selection, simulated=False),
+                            "can_query_local": profile_matches(active_profile, selection, simulated=False),
                         }
             result.append(
                 {

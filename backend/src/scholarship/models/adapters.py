@@ -113,8 +113,12 @@ class ProviderClient:
         from scholarship.models.figure_contract import image_data, messages, validate_description, response_schema
 
         # The image route is explicit. Text-only and local protocols cannot silently accept it.
-        if self.role != "chat" or self.binding.get("protocol") != "openai_chat":
+        if self.role != "chat" or self.binding.get("protocol") not in {"openai_chat", "ollama_chat"}:
             raise ContractError("figure_vision_protocol_required")
+        from scholarship.models.catalog import configuration
+
+        if (self.spec.provider, self.spec.model) not in configuration().get("VISION_MODEL_BINDINGS", []):
+            raise ContractError("figure_vision_model_required")
         try:
             if not isinstance(image_base64, str) or len(image_base64) > 5600000:
                 raise ValueError()
@@ -131,6 +135,69 @@ class ProviderClient:
         )
         data, elapsed = self.request(wire.path, wire.body)
         value = validate_description(self.protocol.read(data))
+        return self.result(value, data, elapsed)
+
+    def describe_figure_edges(self, image_base64, mime, description, caption=""):
+        """Trace only edges between previously validated nodes; no node creation."""
+        import base64
+        from scholarship.models.figure_contract import image_data, messages, validate_description
+
+        if self.role != "chat" or self.binding.get("protocol") not in {"openai_chat", "ollama_chat"}:
+            raise ContractError("figure_vision_protocol_required")
+        if self.definition.get("figure_policy") != "nodes_then_edges":
+            raise ContractError("figure_edge_stage_not_configured")
+        base = validate_description(json.dumps(description))
+        ids = [n["id"] for n in base["nodes"]]
+        if not ids:
+            raise ContractError("figure_nodes_required")
+        try:
+            if not isinstance(image_base64, str) or len(image_base64) > 5600000:
+                raise ValueError()
+            raw = base64.b64decode(image_base64, validate=True)
+        except (ValueError, TypeError):
+            raise ContractError("invalid_figure_image") from None
+        schema = {
+            "type": "object",
+            "properties": {
+                "edges": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "source": {"type": "string", "enum": ids},
+                            "target": {"type": "string", "enum": ids},
+                            "label": {"type": "string", "maxLength": 500},
+                            "direction": {"type": "string", "enum": ["directed", "undirected", "uncertain"]},
+                        },
+                        "required": ["source", "target", "label", "direction"],
+                        "additionalProperties": False,
+                    },
+                },
+                "summary": {"type": "string", "maxLength": 4000},
+                "uncertainties": {"type": "array", "maxItems": 100, "items": {"type": "string"}},
+            },
+            "required": ["edges", "summary", "uncertainties"],
+            "additionalProperties": False,
+        }
+        prompt = messages(image_data(raw, mime), caption)
+        prompt[0]["content"] += (
+            " Trace only visible connections between these fixed nodes. Do not create new node IDs. "
+            "If an input label has no node, omit its edge and record uncertainty. Never infer arrows from standard architecture conventions. "
+            "Return only edges, summary and uncertainties, using the provided schema. Fixed nodes: "
+            + json.dumps(base["nodes"], ensure_ascii=False)
+        )
+        wire = self.protocol.prepare(
+            self.spec, self.definition, messages=prompt, schema=schema, structured=True, max_output=self.max_output
+        )
+        data, elapsed = self.request(wire.path, wire.body)
+        try:
+            edges = json.loads(self.protocol.read(data))
+            if not isinstance(edges, dict) or set(edges) != {"edges", "summary", "uncertainties"}:
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise ContractError("invalid_figure_edges") from None
+        value = validate_description(json.dumps({**base, **edges}))
         return self.result(value, data, elapsed)
 
     def answer(self, question, evidence, *, citation_mode="verbatim"):

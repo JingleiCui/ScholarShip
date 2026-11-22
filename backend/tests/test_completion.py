@@ -23,7 +23,9 @@ def test_workspace_and_reversible_library(case, signed_client):
     assert signed_client.post("/api/v1/projects", json={"name": name}).status_code == 409
     with tenant_transaction(owner) as conn:
         prefs = conn.scalar(sa.select(T["projects"].c.preferences).where(T["projects"].c.id == UUID(pid)))
-        assert prefs["model_configuration"]["preset"] == "mock"
+        from scholarship.models.configuration import load_selection
+
+        assert prefs["model_configuration"]["preset"] == load_selection().preset
     vid, _ = imported(case, signed_client)
     papers = signed_client.get(f"/api/v1/projects/{project}/papers").json()
     paper = next(p for p in papers if p["version_id"] == str(vid))

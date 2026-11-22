@@ -97,7 +97,7 @@ export default function Reader({
       <div className="reading-context">
         <label>
           当前阅读文献{' '}
-          <select value={current?.id ?? ''} onChange={(e) => onScope(e.target.value ? [e.target.value] : [])}>
+          <select aria-label="当前阅读文献" value={current?.id ?? ''} onChange={(e) => onScope(e.target.value ? [e.target.value] : [])}>
             <option value="">选择一篇文献</option>
             {docs.map((d) => (
               <option key={d.id} value={d.id}>

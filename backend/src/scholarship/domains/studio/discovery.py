@@ -267,8 +267,8 @@ def run_subscription(owner, project, sid, *, transport=None):
     from uuid import uuid4
 
     token = uuid4()
-    now = datetime.now(timezone.utc)
     with tenant_transaction(owner) as conn:
+        now = conn.scalar(sa.select(sa.func.clock_timestamp()))
         sub = (
             conn.execute(
                 sa.select(T["subscriptions"])

@@ -65,7 +65,7 @@ LangGraph 按 **检索 → 重排 → 回答 → 发布** 四个节点执行。�
 - **模型统一接入。** `model_config.py` 与 Gateway 管理角色、协议、配置快照和调用准入。更换向量模型先创建新索引世代，真实与模拟 profile 分开保存。
 - **隔离落实到数据层。** 租户事务设置 `app.owner_id`，配合 RLS 与归属约束；检索候选回到 PostgreSQL 核对来源后才进入证据。
 
-[架构详解](docs/engineering/architecture-current.md) · [其他架构视图与可编辑源码](docs/engineering/architecture-gallery.md) · [代码导读](docs/engineering/code-walkthrough.md) · [模型接入设计](docs/models/adapter-design.md)
+[架构详解](docs/engineering/architecture-current.md) · [其他架构视图与可编辑源码](docs/engineering/architecture-gallery.md) · [代码导读](docs/engineering/code-walkthrough.md) · [目录与验收入口](docs/engineering/repository-layout.md) · [模型接入设计](docs/models/adapter-design.md)
 
 <a id="quickstart"></a>
 ## 快速开始
@@ -110,7 +110,8 @@ python3.12 bootstrap.py
 |---|---|---|
 | 本地工具 | 导入、预览、文本结构提取、图谱计算与受控绘图 | 无模型 Key |
 | 模拟模式（mock） | 在独立练习空间体验检索、问答与翻译流程 | 输出带模拟标记，不用于研究结论 |
-| 云端模型 | 真实生成、向量化、重排与翻译 | [模型配置与生产准入](docs/guides/models.md) |
+| 本地模型 | 真实问答、向量化、重排、翻译与视觉 | [本地准备与验收](docs/models/local-setup.md) |
+| 云端模型 | MinerU 解析及可选模型 API | [模型配置与生产准入](docs/guides/models.md) |
 
 停止本项目的本地进程，保留基础容器和数据：
 

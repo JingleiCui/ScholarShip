@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 type Status = {
   mode: string;
+  local_call_states?: Record<string, number>;
   production_policies?: {
     role: string;
     enabled: boolean;
@@ -50,10 +51,20 @@ export default function ServiceStatus({ userId }: { userId: string | undefined }
       <div className="section-top">
         <h2>外部服务与统一预算</h2>
         <span className="outline-tag">
-          {status?.mode === 'scoped_cloud_approval' ? '有限云端验收' : '模型调用已关闭'}
+          {status?.mode === 'scoped_cloud_approval'
+            ? '有限云端验收'
+            : status?.mode === 'local_models'
+              ? '本地模型已配置'
+              : '云端模型调用已关闭'}
         </span>
       </div>
       <p>云端请求须按已批准的文献、模型、期限和次数准入。这里显示本地记账，不代表供应商余额或免费额度。</p>
+      {status?.local_call_states && (
+        <p>
+          本地调用：已完成 {status.local_call_states.succeeded ?? 0} · 待核对{' '}
+          {status.local_call_states.unknown ?? 0}。本地推理不消耗云端额度；是否可运行仍需检查模型服务。
+        </p>
+      )}
       {error && <p role="status">{error}</p>}
       {status?.production_policies?.map((p, i) => (
         <p key={i}>

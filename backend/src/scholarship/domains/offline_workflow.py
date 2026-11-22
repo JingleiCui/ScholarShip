@@ -228,7 +228,7 @@ def persist_answer(owner, project, run, question, answer, selected, trace):
                 sa.select(T["paper_versions"].c.id).where(T["paper_versions"].c.id == UUID(vid)).with_for_update()
             )
             version_scope(conn, UUID(vid))
-        model_simulated = row["config_json"]["mode"] != "cloud"
+        model_simulated = row["config_json"]["mode"] not in {"cloud", "local_inference"}
         source_synthetic = any(
             version_scope(conn, UUID(v))["metadata_json"].get("synthetic", False)
             for v in row["input_json"].get("version_ids", [])
@@ -428,7 +428,7 @@ def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
         if role == "embedding":
             actual.update(input_kind="query", expected_dimensions=expected_dimensions)
         receipt = model_gateway.invoke(intent, role, operation, actual)
-        if receipt["simulated"] != (row["config_json"]["mode"] != "cloud"):
+        if receipt["simulated"] != (row["config_json"]["mode"] not in {"cloud", "local_inference"}):
             raise ContractError("workflow_simulation_mode_mismatch")
         return {
             "result": receipt["value"],
@@ -524,6 +524,7 @@ def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
 
     def publish(state):
         from scholarship.domains.cancellation import check_cancelled
+
         check_cancelled(owner, run)
         return {
             "result": persist_answer(

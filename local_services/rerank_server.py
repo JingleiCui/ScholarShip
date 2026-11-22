@@ -13,6 +13,9 @@ from pydantic import BaseModel, Field, ConfigDict
 ROOT = Path(__file__).resolve().parents[1]
 MODEL = "Qwen/Qwen3-Reranker-0.6B"
 PORT = 18083
+DEVICE = "auto"  # Prefer Apple MPS, otherwise CPU; never uses a remote provider.
+BATCH_SIZE = 2
+CPU_THREADS = 4
 LOCK = Lock()
 app = FastAPI(title="ScholarShip local reranker")
 
@@ -21,7 +24,13 @@ app = FastAPI(title="ScholarShip local reranker")
 def model():
     from sentence_transformers import CrossEncoder
 
-    return CrossEncoder(MODEL, device="cpu", local_files_only=True)
+    import torch
+
+    torch.set_num_threads(CPU_THREADS)
+    device = ("mps" if torch.backends.mps.is_available() else "cpu") if DEVICE == "auto" else DEVICE
+    options = {"dtype": torch.float16} if device == "mps" else {}
+    weights = ROOT / ".tools/model-cache/reranker"
+    return CrossEncoder(str(weights), device=device, local_files_only=True, model_kwargs=options)
 
 
 class Rerank(BaseModel):
@@ -34,7 +43,19 @@ class Rerank(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"configured": True, "weights_loaded": model.cache_info().currsize > 0, "inference_verified": False}
+    weights = ROOT / ".tools/model-cache/reranker"
+    present = all(
+        (weights / name).is_file() for name in ("verified.json", "model.safetensors", "config.json", "tokenizer.json")
+    )
+    return {
+        "configured": True,
+        "model": MODEL,
+        "weights_present": present,
+        "weights_loaded": model.cache_info().currsize > 0,
+        "device_policy": DEVICE,
+        "batch_size": BATCH_SIZE,
+        "inference_verified": False,
+    }
 
 
 @app.post("/rerank")
@@ -49,7 +70,21 @@ def rerank(body: Rerank):
         raise HTTPException(422, "invalid_rerank_input")
     with LOCK:
         try:
-            scores = model().predict([(body.query, t) for t in body.documents]).tolist()
+            encoder = model()
+            usage = {"prompt_tokens": 0, "completion_tokens": 0}
+
+            def count_tokens(module, args, kwargs):
+                mask = kwargs.get("attention_mask")
+                if mask is None:
+                    raise ValueError("rerank_token_usage_unavailable")
+                usage["prompt_tokens"] += int(mask.sum().item())
+
+            hook = encoder.model.register_forward_pre_hook(count_tokens, with_kwargs=True)
+            try:
+                scores = encoder.predict([(body.query, t) for t in body.documents], batch_size=BATCH_SIZE).tolist()
+            finally:
+                hook.remove()
+            usage["total_tokens"] = usage["prompt_tokens"]
         except Exception:
             raise HTTPException(503, "local_reranker_unavailable") from None
     rows = sorted(
@@ -57,7 +92,7 @@ def rerank(body: Rerank):
         key=lambda r: r["relevance_score"],
         reverse=True,
     )
-    return {"model": MODEL, "results": rows[: body.top_n]}
+    return {"model": MODEL, "results": rows[: body.top_n], "usage": usage}
 
 
 if __name__ == "__main__":

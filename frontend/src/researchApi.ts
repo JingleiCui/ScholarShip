@@ -1,4 +1,8 @@
 const messages: Record<string, string> = {
+  local_provider_required: '当前角色未选择本地模型，请在模型配置中切换本地预设。',
+  local_admission_closed: '本地任务准入未通过，请核对任务配置和服务状态。',
+  local_binding_changed: '模型配置已变化，请新建任务；原任务和回执保留。',
+
   cloud_vision_model_required: '请先在项目模型配置中选择支持图片输入的云端聊天模型。',
   cloud_vision_admission_required: '图内识别的云端权限尚未启用，请配置对应数据范围与额度。',
   ready_figure_image_required: '需要已完成深解析并保留图片原件的图块。',

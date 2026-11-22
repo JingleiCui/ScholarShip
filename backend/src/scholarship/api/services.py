@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 import sqlalchemy as sa
 from scholarship.api.auth import identity, Identity
 from scholarship.config import settings
+from scholarship.models.configuration import load_selection
 from scholarship.infrastructure.database import tenant_transaction
 
 router = APIRouter()
@@ -13,11 +14,20 @@ router = APIRouter()
 @router.get("/system/external-services")
 def external_status(user: Identity = Depends(identity)):
     cfg = settings()
+    local_enabled = load_selection().allow_local
     with tenant_transaction(user.user_id) as conn:
         pool = conn.execute(sa.text("SELECT * FROM billing.pools WHERE active")).mappings().first()
         counts = {
             r.state: r.n
             for r in conn.execute(sa.text("SELECT state,count(*) AS n FROM billing.allocations GROUP BY state"))
+        }
+        local_counts = {
+            r.state: r.n
+            for r in conn.execute(
+                sa.text(
+                    "SELECT c.state,count(*) AS n FROM model_runtime.calls c JOIN model_runtime.local_admissions a ON a.call_id=c.id GROUP BY c.state"
+                )
+            )
         }
         policies = [
             dict(r)
@@ -40,7 +50,13 @@ def external_status(user: Identity = Depends(identity)):
             "period_end": pool["period_end"],
         }
     return {
-        "mode": "scoped_cloud_approval" if policies and cfg.external_services_enabled else "offline_contracts_only",
+        "mode": "scoped_cloud_approval"
+        if policies and cfg.external_services_enabled
+        else "local_models"
+        if local_enabled
+        else "offline_contracts_only",
+        "local_transport_configured": local_enabled,
+        "local_call_states": local_counts,
         "production_policies": policies,
         "live_transport_available": False,
         "bounded_validation_transport_available": True,

@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 CATALOG_PATH = Path(__file__).with_name("schema_catalog.json")
-REVISION = "0014_figure_scope"
+REVISION = "0015_local_inference"
 
 
 def constraint_name(kind: str, table: str, detail: str) -> str:

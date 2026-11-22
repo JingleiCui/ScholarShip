@@ -10,6 +10,8 @@ export type Policy = {
 export type ExecutionConfiguration = {
   roles: Record<string, { provider: string; model: string }>;
   production_policies?: Policy[];
+  local_ready?: Record<string, boolean>;
+  configured_flags?: { allow_local: boolean };
 };
 export type ExternalState = {
   requested_external_flag: boolean;
@@ -48,4 +50,11 @@ export function cloudAvailable(
       )
     );
   });
+}
+
+export function localAvailable(configuration: ExecutionConfiguration | null, roles: string[]): boolean {
+  return (
+    !!configuration?.configured_flags?.allow_local &&
+    roles.every((role) => configuration?.local_ready?.[role] === true)
+  );
 }

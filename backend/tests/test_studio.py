@@ -477,6 +477,14 @@ def test_partial_translation_stops_but_preserves_valid_parts_for_next_explicit_r
 
     owner, project = case
     _, pid = imported(case, signed_client)
+    # This fault response is OpenAI wire format; do not couple it to the app default.
+    with tenant_transaction(owner) as conn:
+        conn.execute(
+            T["projects"]
+            .update()
+            .where(T["projects"].c.id == project)
+            .values(preferences={"model_configuration": {"preset": "free_api"}})
+        )
     original_factory = workflow.transport_factory
 
     def partial(request):

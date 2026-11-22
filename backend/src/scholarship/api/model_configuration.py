@@ -103,8 +103,11 @@ def project_models(project: UUID, user: Identity = Depends(identity)):
                 if role == "embedding" and receipt["state"] == "succeeded" and type(dimensions) is int:
                     status["roles"][role]["dimensions"] = dimensions
                     status["roles"][role]["dimensions_state"] = "native_receipt_proved"
+        from scholarship.models.availability import local_readiness
+
         return {
             **status,
+            "local_ready": local_readiness(selection),
             "production_policies": [
                 dict(r)
                 for r in conn.execute(
@@ -144,8 +147,7 @@ def switch(project: UUID, body: Switch, user: Identity = Depends(mutation_identi
         if old.snapshot()["fingerprint"] != body.expected_fingerprint:
             raise HTTPException(409, "model_configuration_changed_refresh_required")
         embedding_changed = (
-            old.roles["embedding"] != new.roles["embedding"]
-            or old.bindings["embedding"] != new.bindings["embedding"]
+            old.roles["embedding"] != new.roles["embedding"] or old.bindings["embedding"] != new.bindings["embedding"]
         )
         parser_changed = old.roles["parser"] != new.roles["parser"]
         preferences = {

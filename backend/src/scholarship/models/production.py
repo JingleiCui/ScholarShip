@@ -75,6 +75,9 @@ class ProductionClient(ProviderClient):
 
 class ProductionGateway(AbstractContextManager):
     simulated = False
+    prepare_function = "prepare_production"
+    transport_class = AdmissionTransport
+    local_execution = False
 
     def __init__(self, owner, project, run, selection, *, transport_factory=network_transport):
         self.owner, self.project, self.run, self.selection = owner, project, run, selection
@@ -89,7 +92,7 @@ class ProductionGateway(AbstractContextManager):
         spec = self.selection.roles[role]
         try:
             with tenant_transaction(self.owner) as conn:
-                stmt = sa.text("SELECT model_runtime.prepare_production(:r,:k,:h,:c,:role)").bindparams(
+                stmt = sa.text(f"SELECT model_runtime.{self.prepare_function}(:r,:k,:h,:c,:role)").bindparams(
                     sa.bindparam("c", type_=JSONB)
                 )
                 cid = conn.scalar(
@@ -133,7 +136,7 @@ class ProductionGateway(AbstractContextManager):
             client.close()
             raise ExternalDisabled("production_binding_changed")
         client.client.close()
-        transport = AdmissionTransport(
+        transport = self.transport_class(
             self.owner,
             cid,
             step,
@@ -181,6 +184,41 @@ class ProductionGateway(AbstractContextManager):
             return receipt
         except Exception as exc:
             if transport.used:
+                if self.local_execution:
+                    with tenant_transaction(self.owner) as conn:
+                        state = conn.scalar(sa.text("SELECT state FROM model_runtime.calls WHERE id=:id"), {"id": cid})
+                    if state == "sent":
+                        from scholarship.domains.deep_parse import persist_file
+                        import json
+
+                        raw = client.last_response or {}
+                        content = (
+                            raw.get("message", {}).get("content") if isinstance(raw.get("message"), dict) else None
+                        )
+                        diagnostic = None
+                        if isinstance(content, str):
+                            with tenant_transaction(self.owner) as conn:
+                                diagnostic = persist_file(
+                                    conn,
+                                    self.owner,
+                                    json.dumps(
+                                        {"content": content[:20000], "operation": operation}, ensure_ascii=False
+                                    ).encode(),
+                                    "json",
+                                    "application/json",
+                                )
+                        ModelExecutor(self.owner).finish(
+                            cid,
+                            "rejected" if isinstance(exc, ProviderFailure) and not exc.unknown else "unknown",
+                            {
+                                "simulated": False,
+                                "error_code": exc.code
+                                if isinstance(exc, ProviderFailure)
+                                else "local_response_unknown",
+                                "diagnostic_file_id": str(diagnostic) if diagnostic else None,
+                            },
+                        )
+                    raise
                 with tenant_transaction(self.owner) as conn:
                     conn.execute(sa.text("SELECT model_runtime.suspend_production(:id)"), {"id": cid})
                 with tenant_transaction(self.owner) as conn:

@@ -10,6 +10,7 @@ from scholarship.api.auth import Identity, identity
 from scholarship.api.offline import demo_actor
 from scholarship.infrastructure.database import tenant_transaction
 from scholarship.infrastructure.schema import tables as T
+from scholarship.models.configuration import load_selection
 
 router = APIRouter()
 MAX_COMPARE_CHARS = 120000
@@ -48,7 +49,7 @@ def create_workspace(body: Workspace, user: Identity = Depends(demo_actor)):
                     owner_id=user.user_id,
                     name=body.name.strip(),
                     description=body.description,
-                    preferences={"model_configuration": {"preset": "mock", "overrides": {}}},
+                    preferences={"model_configuration": {"preset": load_selection().preset, "overrides": {}}},
                 )
                 .returning(T["projects"])
             )

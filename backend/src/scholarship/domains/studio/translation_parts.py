@@ -441,7 +441,7 @@ def recover_failed_parts(owner, project, run):
             .all()
         )
     selection = restore_snapshot(job["config_json"]["models"])
-    simulated = job["config_json"]["mode"] != "cloud"
+    simulated = job["config_json"]["mode"] not in {"cloud", "local_inference"}
     plan = prepare(
         owner,
         project,

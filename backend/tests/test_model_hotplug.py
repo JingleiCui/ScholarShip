@@ -7,16 +7,10 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-import sqlalchemy as sa
 
 from scholarship.adapters.providers import ExternalDisabled
-from scholarship.infrastructure.database import tenant_transaction
 from scholarship.models import catalog, routing
 from scholarship.models.configuration import load_selection, configuration_status
-from scholarship.models.runtime import register_embedding_profile
-from scholarship.models.contracts import ModelResult
-from test_live_business import production_case
-from test_offline_business import case as case
 
 
 @pytest.fixture
@@ -98,39 +92,6 @@ def test_explicit_local_openai_protocol_and_endpoint_validation(hot_config):
     save()
     with pytest.raises(ValueError, match="untrusted_model_endpoint"):
         load_selection("local", {"chat": "alternative"})
-
-
-def test_local_production_uses_same_admission_and_real_profile(case, database, monkeypatch):
-    owner, project, run, selection, policy, Gateway = production_case(case, database, monkeypatch, preset="local")
-    sent = []
-
-    def reply(request):
-        assert request.url.path == "/api/embed"
-        assert "Authorization" not in request.headers
-        sent.append(request)
-        return httpx.Response(
-            200,
-            json={
-                "model": selection.roles["embedding"].model,
-                "embeddings": [[1.0] + [0.0] * 1023],
-                "prompt_eval_count": 4,
-            },
-        )
-
-    with Gateway(owner, project, run, selection, transport_factory=lambda p: httpx.MockTransport(reply)) as gateway:
-        result = gateway.invoke("embedding", "embedding", "embed", {"texts": ["synthetic test only"]})
-        assert gateway.invoke("embedding", "embedding", "embed", {"texts": ["synthetic test only"]}) == result
-    assert len(sent) == 1 and result["simulated"] is False
-    assert result["cost_verification"] == "local_no_provider_charge"
-    with tenant_transaction(owner) as conn:
-        cid = conn.scalar(sa.text("SELECT id FROM model_runtime.calls WHERE run_id=:r"), {"r": run})
-        assert (
-            conn.scalar(sa.text("SELECT tokens_used FROM model_runtime.production_policies WHERE id=:p"), {"p": policy})
-            == 4
-        )
-    receipt = ModelResult(**{k: v for k, v in result.items() if k != "cost_verification"})
-    profile = register_embedding_profile(owner, selection.roles["embedding"], receipt, call_id=cid)
-    assert profile is not None
 
 
 def test_permission_revoked_between_prepare_and_wire_never_sends(hot_config):

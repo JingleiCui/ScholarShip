@@ -1,5 +1,4 @@
 # Isolated optional environment; resolve and lock with local_models.py.
-mineru>=4.1,<4.2
 sentence-transformers>=5,<6
 fastapi==0.162.5
 uvicorn==0.54.0

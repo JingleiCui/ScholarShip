@@ -127,6 +127,8 @@ def binding_snapshot(spec, role, config=None):
     relevant["roles"] = {role: name}
     if role in {"chat", "translation"} and "chat_options" in definition:
         relevant["chat_options"] = deepcopy(definition["chat_options"])
+    if role == "chat" and "figure_policy" in definition:
+        relevant["figure_policy"] = definition["figure_policy"]
     if role == "embedding" and "embedding_input_types" in definition:
         relevant["embedding_input_types"] = deepcopy(definition["embedding_input_types"])
     aliases = definition.get("model_aliases", {}).get(spec.model)

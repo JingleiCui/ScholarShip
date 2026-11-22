@@ -4,10 +4,11 @@ Credentials belong only in .env. Selecting a preset never authorizes inference.
 """
 
 # USER CONFIGURATION
+LOCAL_FIGURE_MODEL = "ollama_chat"
 FIGURE_MODEL = "openrouter_vision"  # Independent visual model for new figure tasks; no automatic calls.
 INFERENCE_MODE = "auto"  # auto: mixed roles allowed; local/cloud restrict actual model dispatch.
-ACTIVE_PRESET = "free_gemma"  # mock / local / free_api (ChatAnywhere) / free_gemma
-ALLOW_LOCAL_INFERENCE = False
+ACTIVE_PRESET = "local"  # mock / local / free_api (ChatAnywhere) / free_gemma
+ALLOW_LOCAL_INFERENCE = True
 ALLOW_REAL_REQUESTS = False  # Real dispatch also requires project policy, scope and shared-budget admission.
 TIMEOUT_SECONDS = 120
 CONCURRENCY = 1
@@ -54,11 +55,16 @@ PROVIDER_DEFINITIONS = {
     },
     "ollama": {
         "deployment": "local",
+        "figure_policy": "nodes_then_edges",
         "roles": {"chat": "ollama_chat", "translation": "ollama_chat", "embedding": "ollama_embedding"},
         "base_urls": ["http://127.0.0.1:11434"],
     },
     "local_reranker": {"deployment": "local", "roles": {"rerank": "rerank"}, "base_urls": ["http://127.0.0.1:18083"]},
-    "mineru_local": {"deployment": "local", "roles": {"parser": "mineru_local"}, "base_urls": ["http://127.0.0.1:18082"]},
+    "mineru_local": {
+        "deployment": "local",
+        "roles": {"parser": "mineru_local"},
+        "base_urls": ["http://127.0.0.1:18082"],
+    },
     "mineru_cloud": {
         "deployment": "cloud",
         "roles": {"parser": "mineru_cloud"},
@@ -111,6 +117,7 @@ MODELS = {
     "ollama_embedding": {
         "provider": "ollama",
         "model": "qwen3-embedding:0.6b",
+        "context_tokens": 2048,
         "base_url": "http://127.0.0.1:11434",
         "dimensions": 1024,
     },
@@ -158,7 +165,7 @@ PRESETS = {
         "translation": "ollama_chat",
         "embedding": "ollama_embedding",
         "rerank": "local_rerank",
-        "parser": "mineru_local",
+        "parser": "mineru_cloud",
     },
     "free_api": {
         "chat": "chatanywhere_chat",
@@ -179,4 +186,8 @@ PRESETS = {
 ROLE_OVERRIDES = {}
 
 # Models eligible for image-input contract; account access is verified separately.
-VISION_MODEL_BINDINGS = [("chatanywhere", "gpt-4o-mini"), ("openrouter", "nvidia/nemotron-3.5-super-vl:free")]
+VISION_MODEL_BINDINGS = [
+    ("ollama", "qwen3.5:9b"),
+    ("chatanywhere", "gpt-4o-mini"),
+    ("openrouter", "nvidia/nemotron-3.5-super-vl:free"),
+]

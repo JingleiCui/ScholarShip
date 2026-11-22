@@ -102,7 +102,7 @@ export default function Studio({
     [runs, setRuns] = useState<Run[]>([]);
   const [selected, setSelected] = useState<string[]>([]),
     [graphPapers, setGraphPapers] = useState<string[]>([]),
-    [mode, setMode] = useState('cloud');
+    [mode, setMode] = useState('local_inference');
   const [error, setError] = useState(''),
     [note, setNote] = useState(''),
     [busy, setBusy] = useState(false),
@@ -195,8 +195,14 @@ export default function Studio({
   ];
   const graphParsed = docs.filter((d) => graphVersionIds.includes(d.id) && d.native_parse_id);
   const cloudReady = execution.available([module === 1 ? 'translation' : 'chat']);
-  const canGenerate = mode === 'offline_acceptance' || cloudReady;
-  const canGenerateText = mode === 'offline_acceptance' || execution.available(['chat']);
+  const canGenerate =
+    mode === 'offline_acceptance' ||
+    (mode === 'local_inference'
+      ? execution.localAvailable([module === 1 ? 'translation' : 'chat'])
+      : cloudReady);
+  const canGenerateText =
+    mode === 'offline_acceptance' ||
+    (mode === 'local_inference' ? execution.localAvailable(['chat']) : execution.available(['chat']));
   async function action(fn: () => Promise<void>) {
     setError('');
     setNote('');
@@ -212,10 +218,12 @@ export default function Studio({
   async function task(operation: string, extra: object = {}) {
     if (
       ['translate', 'summary', 'draft', 'direction'].includes(operation) &&
-      mode === 'cloud' &&
-      !execution.available([operation === 'translate' ? 'translation' : 'chat'])
+      (mode === 'cloud' || mode === 'local_inference') &&
+      !(mode === 'local_inference'
+        ? execution.localAvailable([operation === 'translate' ? 'translation' : 'chat'])
+        : execution.available([operation === 'translate' ? 'translation' : 'chat']))
     ) {
-      setError('新的云端生成尚未开放，可回看已有产物或继续本地处理。');
+      setError('当前模型或服务未就绪，请核对执行方式与服务状态。');
       return;
     }
     await action(async () => {
@@ -340,6 +348,7 @@ export default function Studio({
             模型执行方式{' '}
             <select value={mode} onChange={(e) => setMode(e.target.value)}>
               <option value="offline_acceptance">离线契约验收（模拟响应）</option>
+              <option value="local_inference">真实本地模型</option>
               <option value="cloud">真实云端（需正式额度）</option>
             </select>
           </label>

@@ -1,7 +1,7 @@
 """Role-based routing policy shared by all real execution paths.
 
 This validates configuration, not installation or permission to send data. The
-production database admission remains mandatory for both local and cloud calls.
+the selected gateway must still admit the call in PostgreSQL before sending.
 """
 
 from scholarship.adapters.providers import ExternalDisabled
@@ -14,14 +14,13 @@ def require_execution(selection, roles):
     mode = config.get("INFERENCE_MODE", "auto")
     if mode not in {"auto", "local", "cloud"}:
         raise ValueError("invalid_inference_mode")
-    # Retain the existing global production kill switch and shared DB budgets,
-    # including for loopback requests. Changing a preset never opens this gate.
-    if not settings().external_services_enabled:
-        raise ExternalDisabled("production_configuration_closed")
+    # Cloud gates apply only to cloud deployments; LocalGateway has independent DB admission.
     for role in roles:
         spec = selection.roles[role]
         spec.validate(role, config=config)
         target = deployment(spec.provider, config)
+        if target == "cloud" and not settings().external_services_enabled:
+            raise ExternalDisabled("production_configuration_closed")
         if target == "simulated":
             raise ExternalDisabled("production_real_model_required")
         if mode != "auto" and target != mode:
@@ -32,3 +31,10 @@ def require_execution(selection, roles):
         # gate closed after enqueue. In-flight network requests cannot be revoked.
         if not selected_flag or config.get(flag) is not True:
             raise ExternalDisabled("production_configuration_closed")
+
+
+def require_local(selection, roles):
+    config = configuration()
+    if any(deployment(selection.roles[role].provider, config) != "local" for role in roles):
+        raise ExternalDisabled("local_provider_required")
+    require_execution(selection, roles)

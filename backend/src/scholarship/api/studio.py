@@ -108,7 +108,7 @@ class ToolRequest(BaseModel):
         "diagram",
         "local_parse",
     ]
-    mode: Literal["offline_acceptance", "cloud"] = "offline_acceptance"
+    mode: Literal["offline_acceptance", "cloud", "local_inference"] = "offline_acceptance"
     version_id: UUID | None = None
     parse_id: UUID | None = None
     parse_ids: list[UUID] = Field(default_factory=list, max_length=30)
@@ -129,7 +129,7 @@ class ToolRequest(BaseModel):
 
     @model_validator(mode="after")
     def source_required(self):
-        if self.operation == "figure" and (len(self.block_ids) != 1 or self.mode != "cloud"):
+        if self.operation == "figure" and (len(self.block_ids) != 1 or self.mode not in {"cloud", "local_inference"}):
             raise ValueError("one_figure_and_cloud_mode_required")
         if self.operation == "direction_review" and (
             not self.original_evidence
