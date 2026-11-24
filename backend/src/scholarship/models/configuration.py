@@ -168,6 +168,9 @@ def configuration_status(preset=None, overrides=None):
         }
     return {
         "selected_preset": selected.preset,
+        # Project-level role overrides win over the preset; expose them so the UI
+        # can tell a clean preset from a custom per-role selection.
+        "active_overrides": dict(overrides or {}),
         "credentials_present": {
             "chatanywhere": bool(cfg.chatanywhere_api_key.get_secret_value()),
             "openrouter": bool(cfg.openrouter_api_key.get_secret_value()),

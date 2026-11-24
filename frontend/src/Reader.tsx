@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import Research from './Research';
-import DocumentPreparation from './DocumentPreparation';
+import DocumentWorkbench from './DocumentWorkbench';
+import DocumentProgress from './DocumentProgress';
 import { api, errorMessage } from './researchApi';
 import { Icon } from './Brand';
 import type { ReadingTab } from './navigation';
@@ -8,7 +9,7 @@ import type { Target, SourceSelection } from './SourceReader';
 const Library = lazy(() => import('./Library'));
 const Studio = lazy(() => import('./Studio'));
 const SourceReader = lazy(() => import('./SourceReader'));
-type Doc = { id: string; title: string; native_parse_id: string | null };
+type Doc = { id: string; title: string; native_parse_id: string | null; active_index_id: string | null };
 export default function Reader({
   project,
   role,
@@ -19,6 +20,7 @@ export default function Reader({
   onTab,
   onLibrary,
   onResults,
+  onConversationChange,
 }: {
   project: string;
   role?: string;
@@ -29,6 +31,7 @@ export default function Reader({
   onTab: (tab: ReadingTab) => void;
   onLibrary: () => void;
   onResults: () => void;
+  onConversationChange?: (run?: string) => void;
 }) {
   const [docs, setDocs] = useState<Doc[]>([]),
     [error, setError] = useState(''),
@@ -97,7 +100,11 @@ export default function Reader({
       <div className="reading-context">
         <label>
           当前阅读文献{' '}
-          <select aria-label="当前阅读文献" value={current?.id ?? ''} onChange={(e) => onScope(e.target.value ? [e.target.value] : [])}>
+          <select
+            aria-label="当前阅读文献"
+            value={current?.id ?? ''}
+            onChange={(e) => onScope(e.target.value ? [e.target.value] : [])}
+          >
             <option value="">选择一篇文献</option>
             {docs.map((d) => (
               <option key={d.id} value={d.id}>
@@ -112,10 +119,12 @@ export default function Reader({
         <button className="text-link" onClick={onResults}>
           查看已有成果
         </button>
+        {current && tab !== 'qa' && (
+          <button className="primary" onClick={() => onTab('qa')}>
+            与 AI 对话 <Icon name="arrow" size={18} />
+          </button>
+        )}
       </div>
-      {current && !current.native_parse_id && (
-        <DocumentPreparation key={current.id} project={project} version={current.id} role={role} />
-      )}
       <div className="reading-tabs" role="tablist" aria-label="阅读任务">
         {(['document', 'qa', 'translation'] as ReadingTab[]).map((id, i) => (
           <button
@@ -137,10 +146,30 @@ export default function Reader({
               requestAnimationFrame(() => document.getElementById('reading-tab-' + tabs[next])?.focus());
             }}
           >
-            {['阅读原文', '证据问答 / 多文对比', '选词与双语翻译'][i]}
+            {['阅读与解析', '与 AI 对话', '选词与双语翻译'][i]}
           </button>
         ))}
       </div>
+      {current && tab === 'document' && (
+        <DocumentProgress project={project} versions={[current.id]} role={role} />
+      )}
+      {current && tab === 'document' && (
+        <details className="document-preparation-disclosure" open={!current.native_parse_id}>
+          <summary>
+            本地解析与中英对应 ·{' '}
+            {current.native_parse_id ? '已有结构，按需展开核对或更新' : '先完成解析，再建索引对话'}
+          </summary>
+          <DocumentWorkbench
+            key={current.id}
+            project={project}
+            version={current.id}
+            role={role}
+            onSource={setTarget}
+            onTranslation={() => onTab('translation')}
+            onResults={onResults}
+          />
+        </details>
+      )}
       {!current ? (
         <section className="empty-state">
           <Icon name="book" size={36} />
@@ -155,58 +184,66 @@ export default function Reader({
           id="reading-workspace"
           role="tabpanel"
           aria-labelledby={'reading-tab-' + tab}
-          className={tab === 'document' ? 'document-workspace' : 'reading-workspace'}
+          className={
+            tab === 'document'
+              ? 'document-workspace'
+              : tab === 'qa'
+                ? 'reading-workspace qa-workspace'
+                : 'reading-workspace'
+          }
         >
-          <section className="reading-source">
-            <div className="source-mode">
-              <h2>
-                {target
-                  ? `引用原文 · ${docs.find((d) => d.id === target.version_id)?.title ?? '固定文献版本'}`
-                  : '文献原文'}
-              </h2>
-              <div className="action-row">
-                <button onClick={() => setTarget(null)} aria-pressed={!target}>
-                  PDF 原件
-                </button>
-                {current.native_parse_id && (
-                  <button
-                    onClick={() =>
-                      setTarget({ version_id: current.id, parse_id: current.native_parse_id!, page: 1 })
-                    }
-                    aria-pressed={!!target}
-                  >
-                    结构原文 / 图表公式
+          {(tab !== 'qa' || target) && (
+            <section className="reading-source">
+              <div className="source-mode">
+                <h2>
+                  {target
+                    ? `引用原文 · ${docs.find((d) => d.id === target.version_id)?.title ?? '固定文献版本'}`
+                    : '文献原文'}
+                </h2>
+                <div className="action-row">
+                  <button onClick={() => setTarget(null)} aria-pressed={!target}>
+                    PDF 原件
                   </button>
-                )}
+                  {current.native_parse_id && (
+                    <button
+                      onClick={() =>
+                        setTarget({ version_id: current.id, parse_id: current.native_parse_id!, page: 1 })
+                      }
+                      aria-pressed={!!target}
+                    >
+                      结构原文 / 图表公式
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-            <p className="mobile-reading-link">
-              <a href="#reading-assistant">跳至{tab === 'translation' ? '翻译' : '问答'}</a>
-            </p>
-            <Suspense fallback={<p>正在打开原文…</p>}>
-              {target ? (
-                <SourceReader
-                  key={
-                    target.parse_id +
-                    ':' +
-                    target.page +
-                    ':' +
-                    (target.quote ?? '') +
-                    ':' +
-                    target.pdf_bbox?.join(',')
-                  }
-                  target={target}
-                  onSelectText={(value) => {
-                    setSelection(value);
-                    onTab('translation');
-                  }}
-                  close={() => setTarget(null)}
-                />
-              ) : (
-                <Library project={project} role={role} layout="reader" initialVersionId={current.id} />
-              )}
-            </Suspense>
-          </section>
+              <p className="mobile-reading-link">
+                <a href="#reading-assistant">跳至{tab === 'translation' ? '翻译' : '问答'}</a>
+              </p>
+              <Suspense fallback={<p>正在打开原文…</p>}>
+                {target ? (
+                  <SourceReader
+                    key={
+                      target.parse_id +
+                      ':' +
+                      target.page +
+                      ':' +
+                      (target.quote ?? '') +
+                      ':' +
+                      target.pdf_bbox?.join(',')
+                    }
+                    target={target}
+                    onSelectText={(value) => {
+                      setSelection(value);
+                      onTab('translation');
+                    }}
+                    close={() => setTarget(null)}
+                  />
+                ) : (
+                  <Library project={project} role={role} layout="reader" initialVersionId={current.id} />
+                )}
+              </Suspense>
+            </section>
+          )}
           {tab !== 'document' && (
             <section className="reading-assistant" id="reading-assistant">
               <Suspense fallback={<p>正在加载研究工具…</p>}>
@@ -219,6 +256,7 @@ export default function Reader({
                     onEvidence={setTarget}
                     focusRunId={run}
                     onResults={onResults}
+                    onConversationChange={onConversationChange}
                   />
                 ) : (
                   <Studio

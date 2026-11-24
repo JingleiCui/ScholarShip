@@ -4,6 +4,29 @@ Credentials belong only in .env. Selecting a preset never authorizes inference.
 """
 
 # USER CONFIGURATION
+RESEARCH_QA_POLICY = {
+    "revision": "adaptive-evidence-v1",
+    "max_rounds": 2,
+    "max_queries": 5,
+    "context_bytes": 8000,
+}
+AUTO_DOCUMENT_PREPARATION = {
+    "enabled": True,
+    "recognize_figures": True,
+    "translate_document": True,
+    "max_local_index_requests": 128,  # Bounded local embedding batches; never applies to cloud.
+}
+LOCAL_DOCUMENT_POLICY = {
+    "ocr_language": "eng",  # Installed Tesseract language; add traineddata before changing.
+    "ocr_dpi": 220,
+    "ocr_timeout_seconds": 90,
+    "max_pages": 1000,
+    "max_page_pixels": 24000000,
+    "min_native_chars": 40,
+    "min_ocr_confidence": 20,
+    "max_model_tasks": 200,
+    "tesseract_command": "tesseract",
+}
 LOCAL_FIGURE_MODEL = "ollama_chat"
 FIGURE_MODEL = "openrouter_vision"  # Independent visual model for new figure tasks; no automatic calls.
 INFERENCE_MODE = "auto"  # auto: mixed roles allowed; local/cloud restrict actual model dispatch.

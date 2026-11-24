@@ -40,6 +40,7 @@ export const operationNames: Record<string, string> = {
   research_qa: '证据问答',
   research_build: '文献索引',
   local_parse: '文本结构解析',
+  prepare_document: '本地解析、识图与翻译准备',
   translate: '阅读翻译',
   summary: '来源摘要 / 综述',
   draft: '写作框架',
@@ -51,6 +52,7 @@ export const operationNames: Record<string, string> = {
   diagram: '架构拓扑',
 };
 export function resultOrigin(r: SavedRun): string {
+  if (r.operation === 'prepare_document') return '本地解析完成后排队识图 / 翻译；各子任务独立核对';
   return r.result_json?.source_synthetic
     ? '合成来源'
     : r.result_json?.model_simulated
@@ -118,7 +120,7 @@ export default function Results({
     translation: ['translate'],
     figures: ['figure', 'figure_correct'],
     charts: ['chart', 'diagram'],
-    tasks: ['research_build', 'local_parse', 'direction_check'],
+    tasks: ['research_build', 'local_parse', 'prepare_document', 'direction_check'],
   };
   const visible = rows.filter(
     (r) => filter === 'all' || types[filter]?.includes(r.operation ?? r.kind ?? ''),
@@ -126,7 +128,7 @@ export default function Results({
   function open(r: SavedRun) {
     const op = r.operation ?? r.kind ?? '';
     onNavigate(
-      ['research_qa', 'research_build', 'local_parse', 'translate', 'figure', 'figure_correct'].includes(op)
+      ['research_qa', 'research_build', 'local_parse', 'prepare_document', 'translate', 'figure', 'figure_correct'].includes(op)
         ? 'read'
         : ['chart', 'diagram'].includes(op)
           ? 'charts'
@@ -136,7 +138,7 @@ export default function Results({
       r.id,
       op === 'translate'
         ? 'translation'
-        : ['research_build', 'local_parse', 'figure', 'figure_correct'].includes(op)
+        : ['research_build', 'local_parse', 'prepare_document', 'figure', 'figure_correct'].includes(op)
           ? 'document'
           : 'qa',
       r.source_version_ids,

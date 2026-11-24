@@ -610,6 +610,12 @@ def test_followup_preserves_conversation_and_rejects_changed_scope(case, signed_
         assert [m["ordinal"] for m in messages] == [0, 1, 2, 3]
         assert messages[2]["content_text"] == "其中多少块 GPU？"
         assert "NVIDIA P100?" in b["input_json"]["query_context"]
+    history = signed_client.get(f"/api/v1/research/projects/{project}/runs").json()
+    first_saved = next(r for r in history if r["id"] == str(first["id"]))
+    next_saved = next(r for r in history if r["id"] == str(followup["id"]))
+    assert first_saved["conversation_id"] == next_saved["conversation_id"]
+    assert next_saved["parent_run_id"] == str(first["id"])
+    assert next_saved["source_version_ids"] == [str(vid)]
     with pytest.raises(ContractError, match="conversation_advanced"):
         enqueue_research(owner, project, uuid4().hex, "research_qa", [vid], question="again", parent_run_id=first["id"])
     with tenant_transaction(owner) as conn:

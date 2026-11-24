@@ -38,7 +38,7 @@ export default function DocumentPreparation({
     <section className="preparation-notice">
       <div>
         <h2>先读原件，需要时再准备问答。</h2>
-        <p>当前文献尚未提取文本结构。文本型 PDF 可本地处理，不会上传云端；扫描件仍需获准的 OCR。</p>
+        <p>当前文献尚未解析。文本页读取文字，扫描页使用本地 OCR，不上传云端；完成后到阅读页核对结构和中英对应。</p>
       </div>
       <button
         disabled={
@@ -57,7 +57,7 @@ export default function DocumentPreparation({
             .finally(() => setBusy(false));
         }}
       >
-        提取文本结构（本地）
+        本地解析 / OCR
       </button>
       {error && (
         <p className="error" role="alert">

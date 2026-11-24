@@ -34,6 +34,7 @@ OPERATIONS = {
     "chart",
     "diagram",
     "local_parse",
+    "prepare_document",
 }
 WRITING_POLICY = {"revision": "bounded-source-notes-v3", "window_bytes": 2500, "final_bytes": 6000, "note_chars": 180}
 
@@ -56,10 +57,12 @@ def source_windows(text, byte_limit=None):
     return result
 
 
-def submit(owner, project, key, operation, inputs, mode="offline_acceptance"):
+def submit(owner, project, key, operation, inputs, mode="offline_acceptance", *, pinned_selection=None):
     if operation not in OPERATIONS or mode not in {"local", "offline_acceptance", "cloud", "local_inference"}:
         raise ContractError("invalid_studio_operation")
-    selection = project_selection(owner, project)
+    selection = restore_snapshot(pinned_selection) if pinned_selection else project_selection(owner, project)
+    if operation == "prepare_document":
+        mode = "local_inference"
     if operation in {
         "chart",
         "diagram",
@@ -82,7 +85,7 @@ def submit(owner, project, key, operation, inputs, mode="offline_acceptance"):
             if mode == "local_inference"
             else configuration().get("FIGURE_MODEL")
         )
-        if alias:
+        if alias and not pinned_selection:
             visual = load_selection(selection.preset, overrides={"chat": alias})
             selection = replace(
                 selection,
@@ -104,9 +107,16 @@ def submit(owner, project, key, operation, inputs, mode="offline_acceptance"):
                 raise ContractError("figure_project_mismatch")
     if mode == "local_inference":
         require_local(selection, ("translation",) if operation == "translate" else ("chat",))
+        if operation == "prepare_document" and inputs.get("translate_document", True):
+            require_local(selection, ("translation",))
     if mode == "cloud":
         require_cloud(selection, ("translation",) if operation == "translate" else ("chat",))
     config = {"revision": "research-studio-v1", "operation": operation, "mode": mode, "models": selection.snapshot()}
+    if operation in {"local_parse", "prepare_document"}:
+        from scholarship.models.catalog import configuration
+        from scholarship.domains.studio.document_engine import policy_snapshot
+
+        config["local_document_policy"] = policy_snapshot(configuration().get("LOCAL_DOCUMENT_POLICY"))
     if operation == "figure":
         config["figure_policy"] = "vision-graph-schema-v2"
     if operation == "translate":
@@ -155,11 +165,25 @@ def execute(owner, project, run):
             return job["result_json"]
     operation = job["config_json"]["operation"]
     inputs = job["input_json"]["arguments"]
+    if operation == "prepare_chat":
+        from scholarship.domains.chat_preparation import execute_preparation
+
+        return execute_preparation(owner, project, run, job)
+    if operation == "prepare_document":
+        from scholarship.domains.studio.document_pipeline import prepare_document
+
+        return prepare_document(owner, project, run, job)
     if operation == "figure_correct":
         from scholarship.domains.studio.figures import correct
 
         return correct(owner, project, run, inputs)
     if operation == "local_parse":
+        if job["config_json"].get("local_document_policy"):
+            from scholarship.domains.studio.document_pipeline import parse_document
+
+            return parse_document(
+                owner, project, UUID(inputs["version_id"]), job["config_json"]["local_document_policy"], run
+            )
         from scholarship.domains.studio.local_parse import parse_local
 
         return parse_local(owner, project, UUID(inputs["version_id"]), run=run)

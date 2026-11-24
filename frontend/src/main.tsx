@@ -237,6 +237,7 @@ function App() {
           onTab={(tab) => navigate('read', { tab })}
           onLibrary={() => navigate('library')}
           onResults={() => navigate('results')}
+          onConversationChange={(run) => navigate('read', { tab: 'qa', run })}
         />
       );
     if (route.page === 'results')

@@ -403,6 +403,10 @@ def qa_graph(owner, project, run, *, interrupt_after=None, model_gateway=None):
         original_question = row["input_json"]["question"]
         question = row["input_json"].get("query_context", original_question)
         scope = row["input_scope_json"]["generations"]
+    if row["config_json"].get("qa_policy", {}).get("revision") == "adaptive-evidence-v1":
+        from scholarship.domains.adaptive_qa import run_graph
+
+        return run_graph(owner, project, run, row, model_gateway, interrupt_after=interrupt_after)
     embed, rerank, answerer = adapters() if model_gateway is None else (None, None, None)
     executor = OfflineExecutor(owner) if model_gateway is None else None
     expected_dimensions = None

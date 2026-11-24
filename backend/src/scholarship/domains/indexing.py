@@ -8,9 +8,10 @@ from qdrant_client import models as m
 
 from scholarship.adapters.providers import ContractError
 from scholarship.adapters.synthetic import adapters
+from scholarship.domains.retrieval_quality import index_chunks
 from scholarship.domains.billing import OfflineExecutor
 from scholarship.domains.deep_parse import version_scope
-from scholarship.domains.retrieval_profile import PROFILE, PROFILE_KEY, PROFILE_HASH, canonical, digest, chunks, lexical
+from scholarship.domains.retrieval_profile import PROFILE, PROFILE_KEY, PROFILE_HASH, canonical, digest, lexical
 from scholarship.infrastructure.database import tenant_transaction
 from scholarship.infrastructure.health import qdrant_client
 from scholarship.infrastructure.schema import tables as T
@@ -202,7 +203,7 @@ def prepare_generation(owner, vid, pid, profile_id=None, *, simulated=True, gene
         for b in block_rows(conn, pid):
             if b["kind"] == "other":
                 continue
-            for a, z, text, count in chunks(b["canonical_text"], b["kind"]):
+            for a, z, text, count in index_chunks(b):
                 n = len(manifest)
                 point = uuid5(NAMESPACE_URL, f"scholarship:{v['project_id']}:{gid}:{n}")
                 cid = conn.scalar(
@@ -218,7 +219,7 @@ def prepare_generation(owner, vid, pid, profile_id=None, *, simulated=True, gene
                         lexical_text=lexical(text),
                         content_sha256=digest(text),
                         token_count=count,
-                        section_path=[],
+                        section_path=b["structured_json"].get("section_path", []),
                         block_kind=b["kind"],
                         page_start=b["page_no"],
                         page_end=b["page_no"],
@@ -328,6 +329,13 @@ def build_index(
     task_generation=False,
     batch_size=10,
 ):
+    from scholarship.domains.runs import emit
+
+    def progress(stage, message, **counts):
+        with tenant_transaction(owner) as conn:
+            emit(conn, run, "progress", {"stage": stage, "message": message, **counts})
+
+    progress("chunking", "正在按原文结构切片并准备向量索引。")
     profile_id = None
     expected_vectors = {}
     dimensions = 1024
@@ -343,12 +351,7 @@ def build_index(
             raise ContractError("embedding_config_mismatch")
         with tenant_transaction(owner) as conn:
             version_scope(conn, vid)
-            texts = [
-                text
-                for b in block_rows(conn, pid)
-                if b["kind"] != "other"
-                for _, _, text, _ in chunks(b["canonical_text"], b["kind"])
-            ]
+            texts = [text for b in block_rows(conn, pid) if b["kind"] != "other" for _, _, text, _ in index_chunks(b)]
         if not texts:
             raise ContractError("no_indexable_blocks")
         executor_new = ModelExecutor(owner)
@@ -359,6 +362,7 @@ def build_index(
                 return model_gateway.invoke(intent, "embedding", "embed", arguments)
             return executor_new.execute(run, intent, model_selection, "embedding", model_client, arguments, "embed")
 
+        progress("embedding", "正在编码首个片段并核对向量维度。", completed=0, total=len(texts))
         probe = invoke(
             probe_key,
             {"texts": [texts[0]], "input_kind": "document"},
@@ -451,7 +455,10 @@ def build_index(
                 ],
                 wait=True,
             )
+            done = offset + len(batch)
+            progress("embedding", f"向量化与写入已完成 {done}/{len(rows)} 个片段。", completed=done, total=len(rows))
         check_cancelled(owner, run)
+        progress("index_verification", "正在校验片段、向量和原文定位的一致性。", completed=len(rows), total=len(rows))
         if after_upsert:
             after_upsert(g)
         # Verify exact identities and all authoritative payload fields, not just counts.
@@ -510,6 +517,7 @@ def build_index(
             conn.execute(
                 T["run_steps"].update().where(T["run_steps"].c.id == generation_step).values(status="succeeded")
             )
+    progress("index_ready", "索引校验完成，可以基于原文提问。", completed=len(rows), total=len(rows))
     return g["id"]
 
 
@@ -567,7 +575,7 @@ def snapshot(owner, project, versions, *, model_selection=None, simulated=True):
         return result
 
 
-def hybrid(owner, project, scope, question, query_vector):
+def hybrid(owner, project, scope, question, query_vector, *, substantive_only=False):
     if not scope:
         return {"candidates": [], "trace": []}
     from scholarship.adapters.providers import finite
@@ -657,6 +665,17 @@ def hybrid(owner, project, scope, question, query_vector):
                     else []
                 )
                 for c in rows:
+                    if substantive_only:
+                        from scholarship.domains.retrieval_quality import substantive
+
+                        if not substantive(c["canonical_text"], c["block_kind"]):
+                            continue
+                        import re
+
+                        if any(
+                            re.search(r"references|bibliography", section, re.I) for section in c["section_path"]
+                        ) and not re.search(r"参考文献|引用文献|references|bibliography", question, re.I):
+                            continue
                     pt = points.get(str(c["point_id"]))
                     if (
                         not pt

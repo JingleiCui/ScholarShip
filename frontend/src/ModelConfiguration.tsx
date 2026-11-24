@@ -2,12 +2,27 @@ import { useEffect, useState } from 'react';
 type ModelRole = {
   provider: string;
   model: string;
+  deployment?: string;
   credential_required: boolean;
   credential_present: boolean;
   verification_state: string;
   dimensions: number | null;
   dimensions_state: string;
 };
+const MODE_PRESETS = { local: 'local', cloud: 'free_gemma' } as const;
+type Mode = keyof typeof MODE_PRESETS;
+const MODE_LABELS: Record<Mode | 'custom', string> = {
+  local: '本地模型模式',
+  cloud: '云端模型模式',
+  custom: '自定义组合',
+};
+function activeMode(state: Configuration | null): Mode | 'custom' {
+  if (!state) return 'custom';
+  if (Object.keys(state.active_overrides ?? {}).length) return 'custom';
+  if (state.selected_preset === MODE_PRESETS.local) return 'local';
+  if (['free_gemma', 'free_api'].includes(state.selected_preset)) return 'cloud';
+  return 'custom';
+}
 type Configuration = {
   production_policies?: {
     role: string;
@@ -18,6 +33,7 @@ type Configuration = {
     ends_at: string;
   }[];
   selected_preset: string;
+  active_overrides?: Record<string, string>;
   available_presets: string[];
   roles: Record<string, ModelRole>;
   fingerprint: string;
@@ -60,33 +76,51 @@ export default function ModelConfiguration({ project, role }: { project: string;
       stop = true;
     };
   }, [project]);
-  async function save() {
-    if (!state) return;
-    setBusy(true);
-    setError('');
-    setNote('');
-    const csrf =
+  function csrfToken() {
+    return (
       document.cookie
         .split('; ')
         .find((x) => x.startsWith('ss_csrf='))
-        ?.split('=')[1] ?? '';
+        ?.split('=')[1] ?? ''
+    );
+  }
+  async function applySwitch(target: string, overrides: Record<string, string>, notePrefix: string) {
+    setBusy(true);
+    setError('');
+    setNote('');
     try {
+      // Read the current fingerprint immediately before writing so a concurrent
+      // edit cannot be silently overwritten.
+      const fresh: Configuration = await read(`/projects/${project}/model-configuration`);
       const result = await read(`/projects/${project}/model-configuration`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-        body: JSON.stringify({ preset, expected_fingerprint: state.fingerprint }),
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken() },
+        body: JSON.stringify({ preset: target, overrides, expected_fingerprint: fresh.fingerprint }),
       });
-      setState(await read(`/projects/${project}/model-configuration`));
+      const next: Configuration = await read(`/projects/${project}/model-configuration`);
+      setState(next);
+      setPreset(next.selected_preset);
+      const parseNote = result.requires_new_parse ? '解析模型变化只影响新解析任务，旧解析修订保留。' : '';
       setNote(
-        result.requires_reindex
-          ? '配置已保存。向量索引需重建，当前活动索引保留；未启用推理。'
-          : '配置已保存，仅影响后续任务；未启用推理。',
+        (result.requires_reindex
+          ? `${notePrefix}向量索引需重建，当前活动索引保留；`
+          : `${notePrefix}仅影响后续任务；`) + `${parseNote}未启用推理。`,
       );
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
     }
+  }
+  async function switchMode(mode: Mode) {
+    if (!state) return;
+    // A clean mode switch clears role overrides, otherwise an override could
+    // keep one role on the other deployment after the preset changes.
+    await applySwitch(MODE_PRESETS[mode], {}, `已切换到${MODE_LABELS[mode]}，`);
+  }
+  async function save() {
+    if (!state) return;
+    await applySwitch(preset, state.active_overrides ?? {}, '配置已保存，');
   }
   const names: Record<string, string> = {
     chat: '聊天 / 证据问答 / 摘要',
@@ -111,6 +145,50 @@ export default function ModelConfiguration({ project, role }: { project: string;
         <p>登录并选择项目后查看。</p>
       ) : state ? (
         <>
+          <div
+            className="mode-switch"
+            role="group"
+            aria-label="模型运行模式快速切换"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '4px 10px',
+              margin: '6px 0 12px',
+            }}
+          >
+            <span
+              className="mode-switch-label"
+              style={{ fontSize: 13, fontWeight: 600, color: '#19345c', marginRight: 6 }}
+            >
+              运行模式
+            </span>
+            <button
+              type="button"
+              className={activeMode(state) === 'local' ? 'primary' : ''}
+              aria-pressed={activeMode(state) === 'local'}
+              title="本地模型组：Ollama 文本/向量/重排，解析仍走 MinerU 云端"
+              disabled={busy || role !== 'researcher'}
+              onClick={() => void switchMode('local')}
+            >
+              本地模型
+            </button>
+            <button
+              type="button"
+              className={activeMode(state) === 'cloud' ? 'primary' : ''}
+              aria-pressed={activeMode(state) === 'cloud'}
+              title="云端模型组：OpenRouter Gemma 与 Nemotron 向量/重排，MinerU 云解析"
+              disabled={busy || role !== 'researcher'}
+              onClick={() => void switchMode('cloud')}
+            >
+              云端模型
+            </button>
+            <span className="outline-tag">{MODE_LABELS[activeMode(state)]}</span>
+          </div>
+          <p style={{ margin: '0 0 16px', fontSize: 12 }}>
+            一键切换即时生效于新建任务，无需重启服务；运行中/排队中的任务保留原配置快照。切换仅保存配置，不启用推理或额度。
+            {activeMode(state) === 'custom' ? ' 当前为自定义组合；点击任一模式将清除角色级覆盖。' : ''}
+          </p>
           <div className="probe-controls">
             <select
               aria-label="模型配置组"
@@ -124,8 +202,8 @@ export default function ModelConfiguration({ project, role }: { project: string;
                 </option>
               ))}
             </select>
-            <button className="primary" disabled={busy || role !== 'researcher'} onClick={() => void save()}>
-              {busy ? '保存中…' : '保存配置组'}
+            <button disabled={busy || role !== 'researcher'} onClick={() => void save()}>
+              {busy ? '保存中…' : '应用配置组（高级）'}
             </button>
           </div>
           {Object.entries(state.roles).map(([role, m]) => (
@@ -133,7 +211,14 @@ export default function ModelConfiguration({ project, role }: { project: string;
               <div>
                 <strong>{names[role] ?? role}</strong>
                 <small>
-                  {m.provider} · {m.model}
+                  {m.deployment === 'local'
+                    ? '本地'
+                    : m.deployment === 'cloud'
+                      ? '云端'
+                      : m.deployment === 'simulated'
+                        ? '模拟'
+                        : m.provider}{' '}
+                  · {m.provider} · {m.model}
                 </small>
                 <small>
                   {m.credential_required

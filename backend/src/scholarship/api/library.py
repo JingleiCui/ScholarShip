@@ -29,6 +29,15 @@ FILE_ROOT = DATA_DIR / "files"
 router = APIRouter()
 
 
+def automatic_preparation(conn, scope, version, enabled=True):
+    from scholarship.models.catalog import configuration
+    from scholarship.domains.chat_preparation import schedule as prepare
+
+    if enabled and configuration().get("AUTO_DOCUMENT_PREPARATION", {}).get("enabled", True):
+        return {"preparation_run_id": prepare(conn, scope, version)["id"]}
+    return {}
+
+
 def version_row(conn, vid):
     v = conn.execute(sa.select(T["paper_versions"]).where(T["paper_versions"].c.id == vid)).mappings().first()
     if not v:
@@ -114,13 +123,14 @@ async def upload(
     project_id: UUID,
     file: UploadFile,
     paper_id: UUID | None = Form(None),
+    auto_prepare: bool = Form(True),
     user: Identity = Depends(demo_actor),
     idempotency_key: str = Header(min_length=1, max_length=128),
 ):
-    return await store_upload(project_id, file, paper_id, user, idempotency_key)
+    return await store_upload(project_id, file, paper_id, user, idempotency_key, auto_prepare=auto_prepare)
 
 
-async def store_upload(project_id, file, paper_id, user, idempotency_key, *, source_record=None):
+async def store_upload(project_id, file, paper_id, user, idempotency_key, *, source_record=None, auto_prepare=True):
     FILE_ROOT.mkdir(parents=True, exist_ok=True)
     with tenant_transaction(user.user_id) as conn:
         if not conn.scalar(sa.select(T["projects"].c.id).where(T["projects"].c.id == project_id)):
@@ -211,6 +221,15 @@ async def store_upload(project_id, file, paper_id, user, idempotency_key, *, sou
                     selected_version = version_row(conn, result["version_id"])
                     if selected_version["paper_id"] != paper_id:
                         raise HTTPException(409, "idempotency_target_conflict")
+                if result.get("version_id"):
+                    result.update(
+                        automatic_preparation(
+                            conn,
+                            {"owner_id": user.user_id, "project_id": project_id},
+                            result["version_id"],
+                            auto_prepare,
+                        )
+                    )
                 return result
             conn.execute(
                 sa.text("SELECT pg_advisory_xact_lock(hashtextextended(:k,0))"), {"k": str(user.user_id) + sha}
@@ -260,7 +279,14 @@ async def store_upload(project_id, file, paper_id, user, idempotency_key, *, sou
                 .first()
             )
             if previous:
-                return {"upload_id": uid, "version_id": previous["id"], "reused": True}
+                return {
+                    "upload_id": uid,
+                    "version_id": previous["id"],
+                    "reused": True,
+                    **automatic_preparation(
+                        conn, {"owner_id": user.user_id, "project_id": project_id}, previous["id"], auto_prepare
+                    ),
+                }
             title = title or Path(file.filename or "未命名文献").stem
             normalized = " ".join(title.casefold().split())
             candidates = (
@@ -375,7 +401,14 @@ async def store_upload(project_id, file, paper_id, user, idempotency_key, *, sou
                 )
                 conn.execute(T["uploads"].update().where(T["uploads"].c.id == uid).values(status="waiting_user"))
             job = schedule(conn, scope, vid)
-            return {"upload_id": uid, "version_id": vid, "review_id": review, "reused": False, **job}
+            return {
+                "upload_id": uid,
+                "version_id": vid,
+                "review_id": review,
+                "reused": False,
+                **job,
+                **automatic_preparation(conn, scope, vid, auto_prepare),
+            }
     finally:
         Path(tmp).unlink(missing_ok=True)
         await file.close()

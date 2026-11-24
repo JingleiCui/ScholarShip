@@ -23,6 +23,12 @@ from scholarship.domains.runs import public_run
 router = APIRouter(prefix="/studio")
 
 
+@router.get("/versions/{version_id}/alignment")
+def document_alignment(version_id: UUID, page: int = Query(1, ge=1, le=2000), user: Identity = Depends(identity)):
+    from scholarship.domains.studio.document_pipeline import alignment
+    return alignment(user.user_id, version_id, page)
+
+
 def history_source_versions(conn, rows, project):
     """Expose only version IDs visible in the same project; never return full task inputs."""
     parse_ids = set()
@@ -107,9 +113,12 @@ class ToolRequest(BaseModel):
         "review_artifact",
         "diagram",
         "local_parse",
+        "prepare_document",
     ]
     mode: Literal["offline_acceptance", "cloud", "local_inference"] = "offline_acceptance"
     version_id: UUID | None = None
+    recognize_figures: bool = True
+    translate_document: bool = True
     parse_id: UUID | None = None
     parse_ids: list[UUID] = Field(default_factory=list, max_length=30)
     block_ids: list[UUID] = Field(default_factory=list, max_length=200)
@@ -140,7 +149,7 @@ class ToolRequest(BaseModel):
             raise ValueError("two_fulltext_spans_and_review_required")
         if self.operation == "review_artifact" and self.artifact_version_id is None:
             raise ValueError("source_artifact_version_required")
-        if self.operation == "local_parse" and self.version_id is None:
+        if self.operation in {"local_parse", "prepare_document"} and self.version_id is None:
             raise ValueError("version_id_required")
         if self.operation == "translate" and self.parse_id is None:
             raise ValueError("parse_id_required")

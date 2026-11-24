@@ -76,11 +76,26 @@ export function runStatus(status: string): string {
 export function runErrorMessage(error: { code?: string; contract_code?: string }): string {
   const code = error.contract_code ?? error.code ?? '';
   const reasons: Record<string, string> = {
+    invalid_quote_menu_citation:
+      '模型返回了本次证据清单之外的引用编号，回答未保存。请新建对话重新提问；原任务和诊断已保留。',
+    no_indexable_blocks:
+      '未提取到可用于检索的连续正文。解析结果已保留，请核对段落、文本层及公式碎片；不会把空索引标为就绪。',
+    local_preparation_configuration_required:
+      '原文已解析，但当前空间未启用可用的本地向量模型。请在设置中选择本地预设，再继续自动准备。',
+    local_ocr_not_installed:
+      '未找到本地 Tesseract。请安装英文 OCR 与语言包，或在 model_config.py 配置程序路径。',
+    local_ocr_failed_check_language: '本地 OCR 执行失败，请检查语言包和文档；未自动上传云端。',
+    local_ocr_timeout: '该页本地 OCR 超时。请核对页面或调整本地解析超时配置。',
+    local_document_image_budget_exceeded: '本次图片资产超过内存预算，请缩小文档范围或调整本地解析配置。',
+    document_model_task_limit_reduce_scope:
+      '解析已保留，但后续任务数超过文档上限；请分批翻译/识图或调整配置后重新提交。',
     chart_font_unavailable: '缺少所需绘图字体，请安装 Noto Sans CJK SC 或选择已安装字体后重试。',
     incomplete_plaintext_translation_response: '接口遗漏翻译片段，合格部分已保存，本批已暂停。',
     invalid_plaintext_translation_response: '翻译结果格式或内容不合要求，本批已暂停。',
     translation_placeholder_integrity_failed: '翻译未保留原文标记，本批已暂停；已有合格片段保留。',
-    production_admission_closed: '云端批次已关闭、到期或额度不足，请查看模型与额度状态。',
+    production_admission_closed: '模型执行条件未满足或准入已关闭，请核对当前模型配置、服务和额度状态。',
+    index_scope_exceeds_run_limit_split_documents:
+      '文献片段数超过单任务处理上限，解析结果已保留，请调整本地单任务配置后重新准备。',
     rate_limited: '免费接口限流，已暂停；未自动重试。',
     invalid_csv_chart_input: 'CSV 的数据列、缺失值或图形参数有误，请检查输入。',
     followup_conversation_advanced: '会话已有新回答，请选择最新回答继续追问。',

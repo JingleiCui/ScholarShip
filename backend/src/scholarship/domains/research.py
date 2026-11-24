@@ -28,11 +28,21 @@ def project_selection(owner, project):
 
 
 def enqueue_research(
-    owner, project, key, kind, versions, *, question=None, mode="offline_acceptance", parent_run_id=None
+    owner,
+    project,
+    key,
+    kind,
+    versions,
+    *,
+    question=None,
+    mode="offline_acceptance",
+    parent_run_id=None,
+    pinned_selection=None,
+    dispatch=True,
 ):
     if mode not in {"offline_acceptance", "cloud", "local_inference"} or kind not in {"research_build", "research_qa"}:
         raise ContractError("invalid_research_mode_or_kind")
-    selection = project_selection(owner, project)
+    selection = restore_snapshot(pinned_selection) if pinned_selection else project_selection(owner, project)
     if mode == "cloud":
         roles = ("embedding",) if kind == "research_build" else ("embedding", "rerank", "chat")
         require_cloud(selection, roles)
@@ -61,7 +71,9 @@ def enqueue_research(
                 sa.select(T["document_parses"].c.id)
                 .where(
                     T["document_parses"].c.version_id == vid,
-                    T["document_parses"].c.parser_name.in_(["mineru-native", "mineru-local", "pdfplumber-structure"]),
+                    T["document_parses"].c.parser_name.in_(
+                        ["mineru-native", "mineru-local", "pdfplumber-structure", "local-document"]
+                    ),
                     T["document_parses"].c.status == "ready",
                 )
                 .order_by(T["document_parses"].c.revision_no.desc())
@@ -71,7 +83,8 @@ def enqueue_research(
                 raise ContractError("ready_native_parse_required")
             parses.append({"version_id": str(vid), "parse_id": str(p)})
         if kind == "research_build":
-            from scholarship.domains.indexing import block_rows, chunks
+            from scholarship.domains.indexing import block_rows
+            from scholarship.domains.retrieval_quality import index_chunks
 
             needed = 0
             for source in parses:
@@ -79,7 +92,7 @@ def enqueue_research(
                     1
                     for b in block_rows(conn, UUID(source["parse_id"]))
                     if b["kind"] != "other"
-                    for _ in chunks(b["canonical_text"], b["kind"])
+                    for _ in index_chunks(b)
                 )
                 needed += 1 + (count + 31) // 32
             if needed > selection.max_requests_per_run:
@@ -99,6 +112,11 @@ def enqueue_research(
         "structural_evidence": "native-table-decimal-v2",
         "embedding_batch_size": 32,
     }
+    if kind == "research_qa" and mode == "local_inference":
+        from scholarship.models.catalog import configuration
+
+        config["qa_policy"] = dict(configuration().get("RESEARCH_QA_POLICY", {}))
+        config["answer_contract"] = "quote-menu-v2"
     inputs = {
         "version_ids": [str(v) for v in ids],
         "parses": parses,
@@ -161,20 +179,21 @@ def enqueue_research(
             .where(T["runs"].c.id == run["id"])
             .values(config_json=config, input_scope_json={"generations": scope})
         )
-        conn.execute(
-            T["task_outbox"]
-            .insert()
-            .values(
-                owner_id=owner,
-                project_id=project,
-                run_id=run["id"],
-                event_key=f"{kind}:{run['id']}",
-                command=kind,
-                payload_json={},
-                available_at=sa.func.now(),
-                delivery_attempts=0,
+        if dispatch:
+            conn.execute(
+                T["task_outbox"]
+                .insert()
+                .values(
+                    owner_id=owner,
+                    project_id=project,
+                    run_id=run["id"],
+                    event_key=f"{kind}:{run['id']}",
+                    command=kind,
+                    payload_json={},
+                    available_at=sa.func.now(),
+                    delivery_attempts=0,
+                )
             )
-        )
     return run
 
 

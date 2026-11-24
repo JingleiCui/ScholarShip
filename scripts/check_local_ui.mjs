@@ -26,7 +26,7 @@ try {
   await page.getByLabel('当前阅读文献', { exact: true }).selectOption({ index: 1 });
   await expect(page.locator('select:has(option[value="local_inference"])')).toHaveValue('local_inference');
   await page.locator('details.execution-options > summary').click();
-  await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('region', { name: '论文 AI 对话' })).toBeVisible({ timeout: 30000 });
   await page.screenshot({ path: path.join(root, 'var/reports/local-ui-read.png'), fullPage: true });
   result.checks.push('qa_local_mode_default');
   await page.goto(base + '/#page=write');

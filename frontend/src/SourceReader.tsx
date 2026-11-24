@@ -222,7 +222,7 @@ export default function SourceReader({
     <section ref={reader} className="task-panel" aria-label="原文证据阅读器">
       <button onClick={close}>关闭原文</button>
       <h3>原文与证据 · 固定修订 {target.parse_id.slice(0, 8)}</h3>
-      <p>页码是原始 PDF 文件页序。黄色框定位 OCR 原文块；逐字引文核对不等于事实核验。</p>
+      <p>页码是原始 PDF 文件页序。黄色框定位解析原文块；逐字引文核对不等于事实核验。</p>
       {error && <p role="alert">{error}</p>}
       {target.quote && (
         <blockquote>

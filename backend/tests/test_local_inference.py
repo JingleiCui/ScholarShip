@@ -19,6 +19,63 @@ from scholarship.models.contracts import ModelResult
 from test_offline_business import case as case
 
 
+@pytest.mark.parametrize("invalid", [None, "missing_prefix", "wrong_quote_pair"])
+def test_quote_v2_constrains_short_ids_and_maps_only_exact_source_pairs(invalid):
+    from scholarship.models.adapters import ProviderClient
+    from scholarship.adapters.providers import Evidence, ContractError
+
+    selection = load_selection("local")
+    sources = [
+        Evidence("parent:original-source-uuid:0", "Layer normalization normalizes one training case. 中文 $x^2$.", 1),
+        Evidence("section:another-source-uuid", "A longer original evidence paragraph. " * 20, 2),
+    ]
+    seen = []
+
+    def reply(request):
+        wire = json.loads(request.content)
+        seen.append(wire)
+        payload = json.loads(wire["messages"][-1]["content"])
+        assert [e["id"] for e in payload["evidence"]] == ["e0", "e1"]
+        assert all(e.id not in json.dumps(wire) for e in sources)
+        pairs = wire["format"]["properties"]["claims"]["items"]["properties"]["citations"]["items"]["anyOf"]
+        assert pairs[0]["properties"]["evidence_id"]["const"] == "e0"
+        assert pairs[0]["properties"]["quote_id"]["enum"] == ["q0"]
+        assert "q1" in pairs[1]["properties"]["quote_id"]["enum"]
+        citation = {"evidence_id": "e0", "quote_id": "q0"}
+        if invalid == "missing_prefix":
+            citation["evidence_id"] = "original-source-uuid:0"
+        elif invalid == "wrong_quote_pair":
+            citation["quote_id"] = "q1"
+        value = {
+            "answer": "Layer normalization uses per-case statistics.",
+            "insufficient_evidence": False,
+            "claims": [{"text": "per-case statistics", "citations": [citation]}],
+        }
+        return httpx.Response(
+            200,
+            json={
+                "model": selection.roles["chat"].model,
+                "done": True,
+                "message": {"content": json.dumps(value)},
+                "prompt_eval_count": 20,
+                "eval_count": 20,
+            },
+        )
+
+    client = ProviderClient(selection.roles["chat"], "chat", transport=httpx.MockTransport(reply))
+    try:
+        if invalid:
+            with pytest.raises(ContractError, match="invalid_quote_menu_citation"):
+                client.answer("有什么创新？", sources, citation_mode="quote_id_v2")
+        else:
+            result = client.answer("有什么创新？", sources, citation_mode="quote_id_v2")
+            cite = result.value["claims"][0]["citations"][0]
+            assert cite["evidence_id"] == sources[0].id and cite["quote"] == sources[0].text
+        assert len(seen) == 1  # A bad response never triggers an implicit repair request.
+    finally:
+        client.close()
+
+
 def pinned(case):
     owner, project = case
     selection = load_selection("local")

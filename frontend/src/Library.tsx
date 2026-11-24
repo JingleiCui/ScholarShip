@@ -1,5 +1,6 @@
 import LibraryActions from './LibraryActions';
 import CancelTask from './CancelTask';
+import DocumentProgress from './DocumentProgress';
 import { api as request, errorMessage } from './researchApi';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import * as pdfjs from 'pdfjs-dist';
@@ -59,7 +60,9 @@ export default function Library({
   const currentParse =
     parses.find((p) => p.id === parseChoice) ??
     parses.find(
-      (p) => ['mineru-native', 'pdfplumber-structure'].includes(p.parser_name) && p.status === 'ready',
+      (p) =>
+        ['mineru-native', 'pdfplumber-structure', 'local-document'].includes(p.parser_name) &&
+        p.status === 'ready',
     ) ??
     parses[0];
   const rendering = useRef<pdfjs.RenderTask | null>(null);
@@ -206,7 +209,7 @@ export default function Library({
       setNotice(
         result.reused
           ? '检测到内容完全相同的 PDF，已复用原版本；没有创建重复文献。'
-          : 'PDF 已导入本地，正在逐页生成预览。新文件尚未深解析或建立问答索引。',
+          : 'PDF 已保存，正在自动解析、切片并建立问答索引；下方会持续显示进度。识图与中文翻译随后在本地处理。',
       );
       const importedPapers: Paper[] = await request(`/projects/${project}/papers`);
       const imported = importedPapers.find((p) => p.version_id === result.version_id);
@@ -232,7 +235,7 @@ export default function Library({
       setQueue([...items]);
       try {
         await upload(items[i].file, items[i].key);
-        items[i] = { ...items[i], state: '已导入' };
+        items[i] = { ...items[i], state: '已导入 · 后台自动准备中' };
       } catch (e) {
         items[i] = { ...items[i], state: errorMessage(e) };
       }
@@ -407,6 +410,9 @@ export default function Library({
               </button>
             )}
           </div>
+          {layout === 'manage' && (
+            <DocumentProgress project={project} versions={[selected.version_id]} role={role} />
+          )}
           {parses.length > 0 && (
             <label>
               解析修订{' '}
@@ -422,7 +428,9 @@ export default function Library({
                       ? 'OCR 深解析'
                       : p.parser_name === 'pdfplumber-structure'
                         ? '本地文本结构'
-                        : '本地预览'}{' '}
+                        : p.parser_name === 'local-document'
+                          ? '本地版面 / OCR'
+                          : '本地预览'}{' '}
                     · {p.completed_pages}/{p.expected_pages} 页
                   </option>
                 ))}

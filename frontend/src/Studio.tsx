@@ -394,7 +394,7 @@ export default function Studio({
       {module === 1 && (
         <div>
           <h3>本地结构解析</h3>
-          <p>文本型 PDF 可本地解析；纯扫描件仍需已授权的 OCR。此步骤不发送文件到云端。</p>
+          <p>文本页本地提取，扫描页使用本地 OCR；在阅读页可逐块核对原文与译文。此步骤不发送文件到云端。</p>
           {docs
             .filter((d) => !d.native_parse_id)
             .map((d) => (

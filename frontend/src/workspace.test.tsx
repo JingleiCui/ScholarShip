@@ -5,8 +5,57 @@ import { cloudAvailable } from './execution';
 import { selectedSpan } from './readingSelection';
 import { Tools } from './Home';
 import { resultOrigin } from './Results';
+import Research from './Research';
+import { conversationGroups } from './researchConversation';
 const first = '00000000-0000-4000-8000-000000000001',
   second = '00000000-0000-4000-8000-000000000002';
+describe('paper conversation boundaries', () => {
+  const root = {
+    id: first,
+    kind: 'research_qa',
+    status: 'succeeded',
+    conversation_id: 'thread',
+    source_version_ids: [first, second],
+    mode: 'local_inference',
+    created_at: '2026-11-23T01:00:00Z',
+    question: 'First',
+  };
+  const pending = {
+    id: second,
+    kind: 'research_qa',
+    status: 'running',
+    parent_run_id: first,
+    source_version_ids: [second, first],
+    mode: 'local_inference',
+    created_at: '2026-11-23T01:01:00Z',
+    question: 'Follow up',
+  };
+  it('keeps accepted pending follow-ups with their published parent and orders user turns', () => {
+    const groups = conversationGroups([pending, root], [first, second], 'local_inference');
+    expect(groups).toHaveLength(1);
+    expect(groups[0].turns.map((r) => r.id)).toEqual([first, second]);
+  });
+  it('does not mix sources, execution modes or separate new conversations', () => {
+    expect(conversationGroups([root, pending], [first], 'local_inference')).toEqual([]);
+    expect(conversationGroups([root, pending], [first, second], 'cloud')).toEqual([]);
+    const separate = { ...pending, conversation_id: 'another', parent_run_id: null };
+    expect(conversationGroups([root, separate], [first, second], 'local_inference')).toHaveLength(2);
+  });
+  it('does not turn index tasks into chat messages', () => {
+    expect(
+      conversationGroups([{ ...root, kind: 'research_build' }], [first, second], 'local_inference'),
+    ).toEqual([]);
+  });
+  it('always exposes the message composer and clear setup without invented answers', () => {
+    const html = renderToStaticMarkup(<Research project={first} role="researcher" versionIds={[second]} />);
+    expect(html).toContain('论文 AI 对话');
+    expect(html).toContain('发送论文问题');
+    expect(html).toContain('发送问题');
+    expect(html).toContain('论文自动处理进度');
+    expect(html).toContain('正在读取实际处理进度');
+    expect(html).not.toContain('chat-message assistant');
+  });
+});
 describe('research workspace continuity', () => {
   it('restores source scope, reading task and selected historical result', () => {
     const route = {

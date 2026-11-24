@@ -35,6 +35,8 @@ def test_presets_snapshot_no_secrets_and_compatibility():
     assert selection.roles["embedding"].dimensions is None
     assert restore_snapshot(selection.snapshot()).snapshot() == selection.snapshot()
     assert configuration_status("free_gemma")["roles"]["embedding"]["dimensions_state"] == "pending_first_valid_receipt"
+    assert configuration_status("free_gemma")["active_overrides"] == {}
+    assert configuration_status("local", {"parser": "mineru_cloud"})["active_overrides"] == {"parser": "mineru_cloud"}
     changed = load_selection("local")
     assert changed.snapshot()["fingerprint"] != selection.snapshot()["fingerprint"]
     body = selection.snapshot()
@@ -381,6 +383,18 @@ def test_model_configuration_api_and_scope(signed_client, accounts):
         ).status_code
         == 422
     )
+    clean = signed_client.get(base).json()
+    assert clean["active_overrides"] == {}
+    valid = signed_client.put(
+        base,
+        json={
+            "preset": "free_api",
+            "overrides": {"chat": "openrouter_gemma"},
+            "expected_fingerprint": clean["fingerprint"],
+        },
+    )
+    assert valid.status_code == 200, valid.text
+    assert signed_client.get(base).json()["active_overrides"] == {"chat": "openrouter_gemma"}
     assert signed_client.get("/api/v1/system/models").json()["live_validation_authorized"] is False
 
 

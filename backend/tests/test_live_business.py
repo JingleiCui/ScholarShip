@@ -59,6 +59,8 @@ def imported(case, client):
     response = client.post(
         f"/api/v1/projects/{project}/uploads",
         files={"file": ("live-business.pdf", raw, "application/pdf")},
+        # This fixture publishes a curated native bundle itself; it owns parsing/index execution.
+        data={"auto_prepare": "false"},
         headers={"Idempotency-Key": uuid4().hex},
     )
     assert response.status_code == 202, response.text
@@ -147,16 +149,21 @@ def test_native_publication_lineage_and_source_hash(case, signed_client):
 def test_real_source_qa_checkpoint_worker_and_evidence(case, signed_client):
     owner, project = case
     vid, pid = imported(case, signed_client)
-    run = enqueue_research(owner, project, uuid4().hex, "research_build", [vid])
+    # This checkpoint fault test owns execution; a session worker must not race its assertions.
+    run = enqueue_research(owner, project, uuid4().hex, "research_build", [vid], dispatch=False)
     execute_offline(str(owner), str(project), str(run["id"]))
     with tenant_transaction(owner) as conn:
         r = conn.execute(sa.select(T["runs"]).where(T["runs"].c.id == run["id"])).mappings().one()
         assert r["status"] == "succeeded", r["error_json"]
         assert r["result_json"]["source_synthetic"] is False and r["result_json"]["model_simulated"] is True
     key = uuid4().hex
-    qa = enqueue_research(owner, project, key, "research_qa", [vid], question="How many NVIDIA P100 GPUs?")
+    qa = enqueue_research(
+        owner, project, key, "research_qa", [vid], question="How many NVIDIA P100 GPUs?", dispatch=False
+    )
     assert (
-        enqueue_research(owner, project, key, "research_qa", [vid], question="How many NVIDIA P100 GPUs?")["id"]
+        enqueue_research(
+            owner, project, key, "research_qa", [vid], question="How many NVIDIA P100 GPUs?", dispatch=False
+        )["id"]
         == qa["id"]
     )
     assert execute_research(owner, project, qa["id"], interrupt_after=["retrieve"]) is None

@@ -3,7 +3,7 @@ name = "scholarship"
 version = "0.1.0"
 description = "Evidence-first scientific workspace"
 requires-python = ">=3.12,<3.13"
-dependencies = ["fastapi==0.162.5", "uvicorn==0.54.0", "pydantic==2.14.3", "pydantic-settings==2.16.2", "SQLAlchemy==2.1.8", "alembic==1.20.1", "psycopg[binary,pool]==3.3.9", "psycopg-pool==3.3.3", "langgraph==1.2.21", "langgraph-checkpoint-postgres==3.2.0", "qdrant-client==1.20.0", "celery[redis]==5.7.0", "redis==8.1.0", "openai==3.50.0", "httpx==0.28.1", "pypdf==7.0.1", "pdfplumber==0.11.10", "pandas==3.1.1", "matplotlib==3.11.2", "networkx==3.7", "numpy==2.5.4", "tiktoken==0.14.0", "python-multipart==0.0.33", "argon2-cffi==25.1.0"]
+dependencies = ["fastapi==0.162.5", "uvicorn==0.54.0", "pydantic==2.14.3", "pydantic-settings==2.16.2", "SQLAlchemy==2.1.8", "alembic==1.20.1", "psycopg[binary,pool]==3.3.9", "psycopg-pool==3.3.3", "langgraph==1.2.21", "langgraph-checkpoint-postgres==3.2.0", "qdrant-client==1.20.0", "celery[redis]==5.7.0", "redis==8.1.0", "openai==3.50.0", "httpx==0.28.1", "pypdf==7.0.1", "pdfplumber==0.11.10", "pypdfium2==5.15.2", "Pillow==13.0.0", "pandas==3.1.1", "matplotlib==3.11.2", "networkx==3.7", "numpy==2.5.4", "tiktoken==0.14.0", "python-multipart==0.0.33", "argon2-cffi==25.1.0"]
 
 [dependency-groups]
 dev = ["pytest==9.2.0", "pytest-asyncio==1.5.0", "ruff==0.17.5"]

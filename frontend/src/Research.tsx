@@ -1,11 +1,19 @@
 import TaskEvents from './TaskEvents';
 import CancelTask from './CancelTask';
+import DocumentProgress from './DocumentProgress';
 import { lazy, Suspense, useEffect, useState, useRef } from 'react';
 import { api, errorMessage, runErrorMessage, runStatus } from './researchApi';
 import useExecution from './useExecution';
+import { BrandMark, Icon } from './Brand';
+import { conversationGroups, sourceKey, type ConversationRun } from './researchConversation';
 import type { Target } from './SourceReader';
 const SourceReader = lazy(() => import('./SourceReader'));
-
+const PROMPTS = [
+  '请概括研究目标、方法与主要结论，并给出原文依据。',
+  '实验设置和评价指标是什么？',
+  '作者提到了哪些局限或适用条件？',
+];
+type Mode = 'offline_acceptance' | 'cloud' | 'local_inference';
 type Doc = {
   can_query_offline: boolean;
   can_query_cloud: boolean;
@@ -19,6 +27,7 @@ type Doc = {
 };
 type Citation = { id: string; quote: string; page: number; version_id: string; parse_id: string };
 type Result = {
+  scope?: { generations?: { id: string; version_id: string }[] };
   answer_method?: string;
   answer?: string;
   model_simulated: boolean;
@@ -26,17 +35,12 @@ type Result = {
   citations?: Citation[];
   limitations?: string;
 };
-type Run = {
+type Run = ConversationRun & {
   scientific_review?: { verdict: string; reason: string } | null;
-  question?: string;
   model_preset?: string;
-  id: string;
-  kind: string;
-  status: string;
   result_json?: Result;
   error_json?: { code: string; contract_code?: string };
 };
-
 export default function Research({
   project,
   role,
@@ -45,6 +49,7 @@ export default function Research({
   onEvidence,
   focusRunId,
   onResults,
+  onConversationChange,
 }: {
   project: string;
   role?: string;
@@ -53,129 +58,120 @@ export default function Research({
   onEvidence?: (target: Target) => void;
   focusRunId?: string;
   onResults?: () => void;
+  onConversationChange?: (run?: string) => void;
 }) {
   const execution = useExecution(project);
-  const scopeKey = versionIds?.join(',');
-  function selectSources(ids: string[]) {
-    if (ids.length > 8 && ids.length >= selected.length) {
-      setError('一次问答最多选择 8 个版本，请缩小范围。');
-      return;
-    }
-    setSelected(ids);
-    setParent('');
-    onScopeChange?.(ids);
-  }
-  function showEvidence(value: Target) {
-    if (onEvidence) {
-      onEvidence(value);
-      requestAnimationFrame(() =>
-        document.querySelector('.reading-source')?.scrollIntoView({ block: 'start' }),
-      );
-    } else setTarget(value);
-  }
-  const focused = useRef('');
   const [docs, setDocs] = useState<Doc[]>([]),
-    [selected, setSelected] = useState<string[]>([]);
+    [selected, setSelected] = useState<string[]>(versionIds ?? []);
   const [runs, setRuns] = useState<Run[]>([]),
-    [question, setQuestion] = useState(''),
-    [error, setError] = useState('');
-  const [pollError, setPollError] = useState('');
+    [question, setQuestion] = useState('');
+  const [error, setError] = useState(''),
+    [pollError, setPollError] = useState('');
   const [busy, setBusy] = useState(false),
-    [target, setTarget] = useState<Target | null>(null);
-  const [parent, setParent] = useState('');
-  useEffect(() => setParent(''), [project, scopeKey]);
-  const [mode, setMode] = useState<'offline_acceptance' | 'cloud' | 'local_inference'>('local_inference');
+    [mode, setMode] = useState<Mode>('local_inference');
+  const [activeRun, setActiveRun] = useState<string | null>(focusRunId ?? null);
+  const [target, setTarget] = useState<Target | null>(null),
+    [awaitingIndex, setAwaitingIndex] = useState(false);
+  const composer = useRef<HTMLTextAreaElement>(null),
+    end = useRef<HTMLDivElement>(null);
+  const transcript = useRef<HTMLDivElement>(null),
+    followTail = useRef(true);
+  const locked = useRef(false),
+    focused = useRef('');
+  const mounted = useRef(true),
+    view = useRef('');
+  view.current = project + ':' + mode + ':' + sourceKey(selected);
   useEffect(() => {
-    if (versionIds) {
-      const next = versionIds.filter((id) => docs.some((d) => d.id === id));
-      setSelected((old) => (old.join(',') === next.join(',') ? old : next));
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const scopeKey = versionIds?.join(',');
+  useEffect(() => {
+    if (versionIds) setSelected((old) => (sourceKey(old) === sourceKey(versionIds) ? old : versionIds));
+  }, [scopeKey]);
+  useEffect(() => {
+    setActiveRun(focusRunId ?? null);
+    setQuestion('');
+    setError('');
+  }, [project, scopeKey]);
+  useEffect(() => {
+    if (!focusRunId || focused.current === focusRunId) return;
+    const row = runs.find((r) => r.id === focusRunId && r.kind === 'research_qa');
+    if (row) {
+      focused.current = focusRunId;
+      setActiveRun(row.id);
+      if (row.mode) setMode(row.mode as Mode);
     }
-  }, [scopeKey, docs]);
-  useEffect(() => {
-    if (!focusRunId || !runs.some((r) => r.id === focusRunId) || focused.current === focusRunId) return;
-    focused.current = focusRunId;
-    requestAnimationFrame(() =>
-      document.getElementById('research-run-' + focusRunId)?.scrollIntoView({ block: 'start' }),
-    );
   }, [focusRunId, runs]);
-  const cloudReady = execution.available(['embedding', 'rerank', 'chat']);
-  const buildReady =
-    mode === 'local_inference'
-      ? execution.localAvailable(['embedding'])
-      : mode === 'cloud'
-        ? execution.available(['embedding'])
-        : !docs.some((d) => selected.includes(d.id) && d.active_index_id && d.model_simulated === false);
   async function refresh() {
     const [d, r] = await Promise.all([
-      api(`/research/projects/${project}/documents`),
-      api(`/research/projects/${project}/runs`),
+      api('/research/projects/' + project + '/documents'),
+      api('/research/projects/' + project + '/runs'),
     ]);
     setDocs(d);
     setRuns(r);
   }
   useEffect(() => {
-    let cancelled = false;
-    if (!project) return;
+    let stopped = false;
+    setDocs([]);
+    setRuns([]);
+    setPollError('');
     async function poll() {
       try {
         const [d, r] = await Promise.all([
-          api(`/research/projects/${project}/documents`),
-          api(`/research/projects/${project}/runs`),
+          api('/research/projects/' + project + '/documents'),
+          api('/research/projects/' + project + '/runs'),
         ]);
-        if (!cancelled) {
+        if (!stopped) {
           setDocs(d);
           setRuns(r);
           setPollError('');
         }
       } catch (e) {
-        if (!cancelled) setPollError(errorMessage(e));
+        if (!stopped) setPollError(errorMessage(e));
       }
     }
     void poll();
     const timer = setInterval(() => void poll(), 2500);
     return () => {
-      cancelled = true;
+      stopped = true;
       clearInterval(timer);
     };
   }, [project]);
-  async function submit(kind: 'indexes' | 'questions') {
-    if ((kind === 'indexes' && !buildReady) || (kind === 'questions' && !queryReady)) {
-      setError('当前来源与执行条件尚未就绪，请核对提示。');
-      return;
-    }
-    setBusy(true);
-    setError('');
-    try {
-      // Each document has its own durable index task; QA still freezes the full selected scope.
-      const groups = kind === 'indexes' ? selected.map((id) => [id]) : [selected];
-      for (const version_ids of groups) {
-        await api(`/research/projects/${project}/${kind}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
-          body: JSON.stringify({
-            version_ids,
-            mode,
-            ...(kind === 'questions' ? { question, parent_run_id: parent || null } : {}),
-          }),
-        });
-      }
-      await refresh();
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const groups = conversationGroups(runs, selected, mode);
+  const conversation = groups.find((g) => g.turns.some((r) => r.id === activeRun));
+  const turns = conversation?.turns ?? [];
+  const last = turns.at(-1);
+  const outdatedConversation = turns.some((r) =>
+    r.result_json?.scope?.generations?.some((g) =>
+      docs.some((d) => d.id === g.version_id && d.active_index_id && d.active_index_id !== g.id),
+    ),
+  );
+  const pendingTurn = turns.some((r) => ['queued', 'running', 'waiting_user'].includes(r.status));
+  const parent =
+    last?.status === 'succeeded' ? last.id : [...turns].reverse().find((r) => r.status === 'succeeded')?.id;
+  const buildReady =
+    selected.length > 0 &&
+    selected.length <= 8 &&
+    selected.every((id) => docs.some((d) => d.id === id && d.native_parse_id)) &&
+    (mode === 'local_inference'
+      ? execution.localAvailable(['embedding'])
+      : mode === 'cloud'
+        ? execution.available(['embedding'])
+        : !docs.some((d) => selected.includes(d.id) && d.active_index_id && d.model_simulated === false));
   const queryReady =
     selected.length > 0 &&
     selected.length <= 8 &&
     (mode === 'local_inference'
       ? execution.localAvailable(['embedding', 'rerank', 'chat'])
-      : mode !== 'cloud' || cloudReady) &&
+      : mode !== 'cloud' || execution.available(['embedding', 'rerank', 'chat'])) &&
     selected.every((id) =>
       docs.some(
         (d) =>
           d.id === id &&
+          !d.native_index_stale &&
           (mode === 'offline_acceptance'
             ? d.can_query_offline
             : mode === 'local_inference'
@@ -183,210 +179,462 @@ export default function Research({
               : d.can_query_cloud),
       ),
     );
+  const indexTasks = runs.filter(
+    (r) => r.kind === 'research_build' && r.source_version_ids?.some((id) => selected.includes(id)),
+  );
+  const indexing = indexTasks.some((r) => ['queued', 'running'].includes(r.status));
+  useEffect(() => {
+    if (awaitingIndex && queryReady && !indexing) {
+      setAwaitingIndex(false);
+      composer.current?.focus();
+    }
+  }, [awaitingIndex, queryReady, indexing]);
+  useEffect(() => {
+    if (activeRun && followTail.current && transcript.current) {
+      transcript.current.scrollTo({ top: transcript.current.scrollHeight, behavior: 'smooth' });
+    }
+  }, [turns.length, last?.status, activeRun]);
+  function newConversation() {
+    setActiveRun(null);
+    setQuestion('');
+    setError('');
+    followTail.current = true;
+    onConversationChange?.();
+    composer.current?.focus();
+  }
+  function selectSources(ids: string[]) {
+    if (ids.length > 8) {
+      setError('一次对话最多选择 8 篇文献。');
+      return;
+    }
+    setSelected(ids);
+    setActiveRun(null);
+    setError('');
+    onScopeChange?.(ids);
+  }
+  function showEvidence(value: Target) {
+    if (onEvidence) onEvidence(value);
+    else setTarget(value);
+    requestAnimationFrame(() =>
+      document.querySelector('.reading-source')?.scrollIntoView({ block: 'start', behavior: 'smooth' }),
+    );
+  }
+  async function submit(kind: 'indexes' | 'questions') {
+    if (locked.current) return;
+    if (
+      (kind === 'indexes' && (!buildReady || indexing)) ||
+      (kind === 'questions' && (!queryReady || pendingTurn || outdatedConversation || !question.trim()))
+    ) {
+      setError('请先核对来源、索引与模型状态，等待当前步骤完成。');
+      return;
+    }
+    locked.current = true;
+    setBusy(true);
+    setError('');
+    const requestView = view.current;
+    try {
+      const batches = kind === 'indexes' ? selected.map((id) => [id]) : [selected];
+      for (const version_ids of batches) {
+        const row = await api('/research/projects/' + project + '/' + kind, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify({
+            version_ids,
+            mode,
+            ...(kind === 'questions' ? { question: question.trim(), parent_run_id: parent ?? null } : {}),
+          }),
+        });
+        if (!mounted.current || requestView !== view.current) return;
+        if (kind === 'questions') {
+          followTail.current = true;
+          setRuns((old) => [
+            {
+              ...row,
+              question: question.trim(),
+              mode,
+              source_version_ids: [...selected],
+              parent_run_id: parent ?? null,
+              conversation_id: last?.conversation_id ?? null,
+            },
+            ...old.filter((r) => r.id !== row.id),
+          ]);
+          setActiveRun(row.id);
+          setQuestion('');
+          onConversationChange?.(row.id);
+        } else setAwaitingIndex(true);
+      }
+      try {
+        await refresh();
+      } catch {
+        setPollError('任务已提交，正在重新获取进度；请勿重复提交。');
+      }
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      locked.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  }
+  const hasUnparsed = selected.some((id) => !docs.find((d) => d.id === id)?.native_parse_id);
+  const statusText = !selected.length
+    ? '先选择论文'
+    : hasUnparsed
+      ? mode === 'local_inference'
+        ? '正在自动解析论文'
+        : '先完成论文解析'
+      : indexing
+        ? '正在建立索引'
+        : queryReady
+          ? '可以开始对话'
+          : '正在准备论文 · 查看下方进度';
   if (!project) return null;
   return (
-    <section className="task-panel" style={{ marginBottom: 24 }}>
-      <div className="section-top">
-        <h2>向所选文献提问</h2>
-        {onResults && (
-          <button className="text-link" onClick={onResults}>
-            历史成果
+    <section className="research-chat" aria-label="论文 AI 对话">
+      <div className="chat-heading">
+        <div>
+          <h2>与 AI 讨论论文</h2>
+          <p>围绕所选原文提问，点击回答中的引用核对出处。</p>
+        </div>
+        <div className="action-row">
+          <span className={'chat-readiness ' + (queryReady ? 'ready' : '')} role="status">
+            {statusText}
+          </span>
+          <button type="button" onClick={newConversation}>
+            新建对话
           </button>
-        )}
+          {onResults && (
+            <button type="button" className="text-link" onClick={onResults}>
+              全部成果
+            </button>
+          )}
+        </div>
       </div>
-      <p>回答只依据当前选择的文献。单篇细节、多轮续问与跨文对比使用相同的来源核对方式。</p>
-      <p className="inline-notice">{execution.notice}</p>
-      <details className="execution-options">
-        <summary>
-          执行方式：
-          {mode === 'local_inference'
-            ? '真实本地模型'
-            : mode === 'cloud'
-              ? '真实云端 / 历史回看'
-              : '离线流程验收（模拟）'}
-        </summary>
-        <label>
-          执行模式{' '}
-          <select
-            value={mode}
-            onChange={(e) => {
-              setMode(e.target.value as typeof mode);
-              setError('');
-            }}
-          >
-            <option value="offline_acceptance">离线验收 · 不发出外部请求</option>
-            <option value="local_inference">本地模型 · 不调用云端生成 API</option>
-            <option value="cloud">云端业务 · 需正式额度准入</option>
-          </select>
-        </label>
-      </details>
+      <div className="chat-source-strip">
+        <Icon name="file" size={18} />
+        <span>
+          {selected.length
+            ? selected.map((id) => docs.find((d) => d.id === id)?.title ?? '正在读取文献').join(' / ')
+            : '尚未选择文献'}
+        </span>
+        <small>{selected.length} 篇来源</small>
+      </div>
+      {mode === 'local_inference' && (
+        <DocumentProgress
+          project={project}
+          versions={selected}
+          role={role}
+          compatible={selected.every((id) =>
+            docs.some((d) => d.id === id && d.can_query_local && !d.native_index_stale),
+          )}
+        />
+      )}
       {(error || pollError) && (
         <p role="alert" className="error">
           {error || pollError}
         </p>
       )}
-      {docs.length === 0 && <p>请先在文献库导入 PDF；已授权的 MinerU 本地产物通过项目导入脚本发布。</p>}
-      <details className="source-scope" open={!selected.length}>
-        <summary>问答来源 · 已选 {selected.length} 篇（最多 8 篇，可多文对比）</summary>
-        <div className="action-row">
-          <button disabled={!selected.length} onClick={() => selectSources(selected.slice(0, 1))}>
-            只问当前这篇
+      {outdatedConversation && (
+        <p className="inline-notice" role="status">
+          当前是基于旧索引的历史对话，原回答与引用保留。论文索引已更新，请开启新对话使用最新正文。
+          <button type="button" onClick={newConversation}>
+            使用最新资料开始对话
           </button>
-          <button onClick={() => selectSources([])}>清空来源</button>
-        </div>
-        {selected.length > 8 && (
-          <p className="inline-notice">
-            当前从其他工具带入 {selected.length} 篇。一次问答最多 8
-            篇，请缩小来源范围；也可点击“只问当前这篇”。
+        </p>
+      )}
+      {!queryReady && mode !== 'local_inference' && (
+        <div className="chat-setup" aria-label="对话准备">
+          <p>
+            {hasUnparsed
+              ? '论文尚未解析。切换“阅读与解析”完成本地解析，再回来建立索引。'
+              : indexing
+                ? '索引在后台建立，完成后输入框会准备就绪。你可以先写下问题。'
+                : mode === 'cloud'
+                  ? '云端对话需要有效准入和相匹配索引；历史回答仍可查看。'
+                  : '模拟模式仅演示流程，回答不用于研究。'}{' '}
           </p>
+          <button
+            type="button"
+            className="primary"
+            disabled={busy || indexing || !buildReady || role !== 'researcher'}
+            onClick={() => void submit('indexes')}
+          >
+            {indexing ? '索引建立中…' : '建立所选文献索引'}
+          </button>
+          {indexTasks
+            .filter((r) => ['queued', 'running', 'failed', 'waiting_user'].includes(r.status))
+            .slice(0, 3)
+            .map((r) => (
+              <div key={r.id}>
+                <p>
+                  索引 · {runStatus(r.status)}
+                  {r.error_json ? ' · ' + runErrorMessage(r.error_json) : ''}
+                </p>
+                <details>
+                  <summary>查看索引步骤</summary>
+                  <TaskEvents run={r.id} />
+                </details>
+              </div>
+            ))}
+        </div>
+      )}
+      <div
+        ref={transcript}
+        className="chat-transcript"
+        role="log"
+        aria-label="当前对话记录"
+        aria-relevant="additions"
+        onScroll={(e) => {
+          const log = e.currentTarget;
+          followTail.current = log.scrollHeight - log.scrollTop - log.clientHeight < 100;
+        }}
+      >
+        {!turns.length && (
+          <div className="chat-welcome">
+            <BrandMark size={38} />
+            <h3>从一个具体问题开始</h3>
+            <p>可以询问研究方法、实验设置和局限。回答附原文引用；缺少依据时会说明。</p>
+            <div className="chat-suggestions">
+              {PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => {
+                    setQuestion(prompt);
+                    composer.current?.focus();
+                  }}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
-        {docs.map((d) => (
-          <div key={d.id} style={{ margin: '12px 0' }}>
-            <label>
+        {turns.map((r) => (
+          <div className="chat-turn" id={'research-run-' + r.id} key={r.id}>
+            <article className="chat-message user">
+              <span className="chat-speaker">你</span>
+              <p>{r.question}</p>
+            </article>
+            <article className="chat-message assistant">
+              <div className="chat-speaker">
+                <BrandMark size={24} /> ScholarShip
+              </div>
+              {r.scientific_review && (
+                <p className={r.scientific_review.verdict === 'incorrect' ? 'error' : 'inline-notice'}>
+                  {r.scientific_review.verdict === 'incorrect'
+                    ? '此历史回答已核对为错误，请勿采用。'
+                    : '固定样例已有源文审阅，不代表一般准确率。'}
+                  {r.scientific_review.reason}
+                </p>
+              )}
+              {['queued', 'running'].includes(r.status) && (
+                <>
+                  <p className="chat-progress" role="status">
+                    {r.status === 'queued' ? '问题已收到，等待处理…' : '正在检索原文、重排证据并生成回答…'}
+                  </p>
+                  <TaskEvents run={r.id} initiallyOpen />
+                </>
+              )}
+              {r.error_json && (
+                <p role="alert" className="error">
+                  {runErrorMessage(r.error_json)}
+                </p>
+              )}
+              {r.status === 'cancelled' && <p>本次问答已取消，已有记录保留。</p>}
+              {r.result_json?.answer && (
+                <>
+                  <p className="chat-answer">{r.result_json.answer}</p>
+                  <div className="chat-citations" aria-label="回答引用">
+                    {r.result_json.citations?.map((c, i) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        title={c.quote}
+                        onClick={() =>
+                          void api('/research/evidence/' + c.id)
+                            .then(showEvidence)
+                            .catch((e) => setError(errorMessage(e)))
+                        }
+                      >
+                        <Icon name="source" size={16} /> 引用 {i + 1} · 原件第 {c.page} 页
+                      </button>
+                    ))}
+                  </div>
+                  <p className="chat-origin">
+                    {r.result_json.answer_method?.startsWith('deterministic_')
+                      ? '原文结构提取 / 本地计算'
+                      : r.result_json.model_simulated
+                        ? '模拟回答，不用于科研'
+                        : r.mode === 'local_inference'
+                          ? '本地模型回答，需核对原文'
+                          : '历史云端模型回答，需核对原文'}
+                    {r.result_json.source_synthetic ? ' · 合成测试资料' : ''}
+                  </p>
+                </>
+              )}
+              <details className="chat-turn-details">
+                <summary>处理状态与核查说明 · {runStatus(r.status)}</summary>
+                {role === 'researcher' && <CancelTask id={r.id} status={r.status} />}
+                <TaskEvents run={r.id} />
+                {r.result_json?.limitations && <p>{r.result_json.limitations}</p>}
+                <p>模型组合：{r.model_preset ?? mode}</p>
+              </details>
+            </article>
+          </div>
+        ))}
+        <div ref={end} />
+      </div>
+      <form
+        className="chat-composer"
+        aria-label="发送论文问题"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit('questions');
+        }}
+      >
+        <label htmlFor="research-question">{parent ? '继续追问' : '研究问题'}</label>
+        <textarea
+          id="research-question"
+          ref={composer}
+          value={question}
+          maxLength={1000}
+          rows={3}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder={
+            parent ? '继续围绕这组文献提问…' : '输入你的问题，例如：作者用了什么方法，原文依据在哪里？'
+          }
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              void submit('questions');
+            }
+          }}
+        />
+        <div className="chat-composer-footer">
+          <small>
+            {pendingTurn
+              ? last?.status === 'waiting_user'
+                ? '当前任务需处理，请先核查；不会自动重复请求。'
+                : '本轮回答完成后可以继续追问。'
+              : parent
+                ? '续问保持相同来源与索引。换文献请新建对话。'
+                : !queryReady
+                  ? '可先写下问题；论文和模型准备完成后即可发送。'
+                  : 'Enter 发送，Shift + Enter 换行。'}{' '}
+            {question.length}/1000
+          </small>
+          <button
+            className="primary"
+            type="submit"
+            disabled={
+              busy ||
+              pendingTurn ||
+              outdatedConversation ||
+              !queryReady ||
+              !question.trim() ||
+              role !== 'researcher'
+            }
+          >
+            <Icon name="arrow" size={18} />
+            {busy ? '正在提交…' : '发送问题'}
+          </button>
+        </div>
+      </form>
+      <div className="chat-secondary">
+        <details className="source-scope">
+          <summary>问答来源与索引 · 已选 {selected.length} 篇</summary>
+          <p>最多 8 篇；切换来源会开始新的对话上下文。</p>
+          <div className="action-row">
+            <button type="button" onClick={() => selectSources(selected.slice(0, 1))}>
+              只问当前这篇
+            </button>
+            <button type="button" onClick={() => selectSources([])}>
+              清空来源
+            </button>
+          </div>
+          {docs.map((d) => (
+            <label className="chat-source-option" key={d.id}>
               <input
                 type="checkbox"
                 disabled={!d.native_parse_id}
                 checked={selected.includes(d.id)}
                 onChange={(e) =>
-                  selectSources(e.target.checked ? [...selected, d.id] : selected.filter((v) => v !== d.id))
+                  selectSources(e.target.checked ? [...selected, d.id] : selected.filter((id) => id !== d.id))
                 }
               />
-              {d.title} ·{' '}
-              {d.native_index_stale
-                ? '新结构修订待重建索引，历史问答保留原修订'
-                : d.native_parse_id
-                  ? '原文已入库'
-                  : '尚未提取文本结构'}{' '}
-              · {d.active_index_id ? (d.model_simulated ? '模拟索引' : '真实索引') : '未建索引'}
-            </label>{' '}
-            {d.native_parse_id && (
-              <button
-                onClick={() => showEvidence({ version_id: d.id, parse_id: d.native_parse_id!, page: 1 })}
-              >
-                阅读结构化原文
-              </button>
-            )}
-          </div>
-        ))}
-      </details>
-      <details className="index-preparation">
-        <summary>问答准备与索引状态</summary>
-        <p className="helper">仅在需要时建立索引。模拟索引不会覆盖所选文献已有的真实活动索引。</p>
-        <button
-          disabled={busy || !buildReady || !selected.length || role !== 'researcher'}
-          onClick={() => void submit('indexes')}
-        >
-          建立所选文献索引
-        </button>
-        {!buildReady && (
-          <p className="helper">
-            {mode === 'cloud'
-              ? '新的真实向量化未开放；可回看现有索引与历史回答。'
-              : '所选文献已有真实活动索引，请在独立练习空间执行模拟建索引。'}
-          </p>
-        )}
-      </details>
-      <label>
-        会话上下文{' '}
-        <select value={parent} onChange={(e) => setParent(e.target.value)}>
-          <option value="">新问题（不继承上文）</option>
-          {runs
-            .filter((r) => r.kind === 'research_qa' && r.status === 'succeeded')
-            .map((r) => (
-              <option key={r.id} value={r.id}>
-                接着问：{r.question?.slice(0, 70)}
-              </option>
-            ))}
-        </select>
-      </label>
-      <label style={{ display: 'block', marginTop: 16 }}>
-        研究问题{' '}
-        <textarea
-          value={question}
-          maxLength={1000}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="问题仅从所选文献证据回答"
-        />
-      </label>
-      {selected.length > 0 && !queryReady && (
-        <p role="status">
-          {mode === 'cloud'
-            ? '云端问答需要相匹配的真实索引和有效限额；请先核对配置与准入状态。'
-            : '所选文献的向量配置与当前模型不一致，或索引尚未就绪。请先建立或重建索引。'}
-        </p>
-      )}
-      <button
-        disabled={busy || !question.trim() || !queryReady || role !== 'researcher'}
-        onClick={() => void submit('questions')}
-      >
-        提交证据问答
-      </button>
-      <h3 className="history-heading">空间历史回答与任务</h3>
-      {runs.map((r, index) => (
-        <details
-          open={focusRunId ? r.id === focusRunId : index === 0}
-          id={'research-run-' + r.id}
-          key={r.id}
-          style={{ marginTop: 20, borderTop: '1px solid #ddd', paddingTop: 12 }}
-        >
-          <summary>
-            <strong>
-              {r.question ?? '文献索引'} ·{' '}
-              {(
-                {
-                  queued: '排队中',
-                  running: '执行中',
-                  succeeded: '流程完成',
-                  failed: '失败',
-                  waiting_user: '需处理',
-                } as Record<string, string>
-              )[r.status] ?? r.status}
-            </strong>
-          </summary>
-          {role === 'researcher' && <CancelTask id={r.id} status={r.status} />}
-          <TaskEvents run={r.id} />
-          <p>任务模型组合：{r.model_preset}</p>
-          {r.error_json && <p role="alert">{runErrorMessage(r.error_json)}</p>}
-          {r.result_json && (
-            <>
-              {r.scientific_review && (
-                <p role={r.scientific_review.verdict === 'incorrect' ? 'alert' : 'status'}>
-                  {r.scientific_review.verdict === 'incorrect'
-                    ? '此历史回答已核对为错误，请勿采用。'
-                    : '官方单篇样例已核对；不代表一般问答准确率。'}
-                  {r.scientific_review.reason}
-                </p>
-              )}
-              <p>
-                {r.result_json.answer_method?.startsWith('deterministic_')
-                  ? '原文结构提取／本地计算（非模型生成）'
-                  : r.result_json.model_simulated
-                    ? '模型响应：模拟'
-                    : '模型响应：真实'}{' '}
-                · {r.result_json.source_synthetic ? '来源：合成' : '来源：正式文献'}
-              </p>
-              <p style={{ whiteSpace: 'pre-wrap' }}>{r.result_json.answer}</p>
-              <p>{r.result_json.limitations}</p>
-              {r.result_json.citations?.map((c, i) => (
-                <button
-                  key={c.id}
-                  onClick={() =>
-                    void api(`/research/evidence/${c.id}`)
-                      .then(showEvidence)
-                      .catch((e) => setError(errorMessage(e)))
-                  }
-                >
-                  引用 {i + 1} · 原件第 {c.page} 页
-                </button>
-              ))}
-            </>
-          )}
+              {d.title}
+              <small>
+                {!d.native_parse_id
+                  ? '待解析'
+                  : d.native_index_stale
+                    ? '新解析待重建索引，历史索引保留'
+                    : !d.active_index_id
+                      ? '待建索引'
+                      : d.model_simulated
+                        ? '模拟索引'
+                        : '真实索引'}
+              </small>
+            </label>
+          ))}
+          <button
+            type="button"
+            disabled={busy || indexing || !buildReady || role !== 'researcher'}
+            onClick={() => void submit('indexes')}
+          >
+            建立 / 重建所选索引
+          </button>
         </details>
-      ))}
+        <details className="execution-options">
+          <summary>
+            执行方式 ·{' '}
+            {mode === 'local_inference' ? '本地模型' : mode === 'cloud' ? '云端 / 历史回看' : '模拟流程'}
+          </summary>
+          <label>
+            执行模式{' '}
+            <select
+              value={mode}
+              onChange={(e) => {
+                setMode(e.target.value as Mode);
+                setActiveRun(null);
+                setError('');
+                onConversationChange?.();
+              }}
+            >
+              <option value="local_inference">本地模型</option>
+              <option value="cloud">云端业务 · 需准入</option>
+              <option value="offline_acceptance">离线验收 · 模拟</option>
+            </select>
+          </label>
+          <p>{execution.notice}</p>
+        </details>
+        <details className="chat-history">
+          <summary>当前来源的会话历史 · {groups.length} 个</summary>
+          {!groups.length && <p>还没有这组文献在当前模式下的历史对话。</p>}
+          {groups.map((g) => (
+            <button
+              type="button"
+              key={g.id}
+              className="chat-history-item"
+              onClick={() => {
+                const id = g.turns.at(-1)!.id;
+                setActiveRun(id);
+                setQuestion('');
+                onConversationChange?.(id);
+              }}
+            >
+              <span>{g.turns[0].question}</span>
+              <small>
+                {g.turns.length} 轮 · {runStatus(g.turns.at(-1)!.status)}
+              </small>
+            </button>
+          ))}
+          <p>展示最近 100 项问答与索引记录中的会话；历史成果也可从成果页打开。</p>
+        </details>
+      </div>
       {target && (
-        <Suspense fallback={<p>正在加载原文阅读器…</p>}>
+        <Suspense fallback={<p>正在打开原文…</p>}>
           <SourceReader
-            key={`${target.version_id}:${target.parse_id}:${target.page}:${target.quote ?? ''}`}
+            key={target.parse_id + ':' + target.page}
             target={target}
             close={() => setTarget(null)}
           />

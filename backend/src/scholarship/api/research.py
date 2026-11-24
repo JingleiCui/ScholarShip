@@ -22,6 +22,31 @@ from scholarship.domains.retrieval_profile import digest
 router = APIRouter(prefix="/research")
 
 
+@router.get("/versions/{version_id}/preparation")
+def preparation_progress(version_id: UUID, user: Identity = Depends(identity)):
+    from scholarship.domains.chat_preparation import progress
+
+    return progress(user.user_id, version_id)
+
+
+@router.post("/versions/{version_id}/prepare", status_code=202)
+def prepare_for_chat(
+    version_id: UUID, user: Identity = Depends(demo_actor), idempotency_key: str = Header(min_length=1, max_length=128)
+):
+    from scholarship.domains.chat_preparation import schedule
+
+    with tenant_transaction(user.user_id) as conn:
+        v = version_scope(conn, version_id)
+        # Recovery prepares chat only; it never silently repeats failed translations.
+        return schedule(
+            conn,
+            {"owner_id": user.user_id, "project_id": v["project_id"]},
+            version_id,
+            request_key=idempotency_key,
+            extras=False,
+        )
+
+
 class ResearchRequest(BaseModel):
     version_ids: list[UUID] = Field(min_length=1, max_length=8)
     mode: Literal["offline_acceptance", "cloud", "local_inference"] = "offline_acceptance"
@@ -98,7 +123,7 @@ def documents(project_id: UUID, user: Identity = Depends(identity)):
                 sa.select(T["document_parses"].c.id)
                 .where(
                     T["document_parses"].c.version_id == r["id"],
-                    T["document_parses"].c.parser_name.in_(["mineru-native", "pdfplumber-structure"]),
+                    T["document_parses"].c.parser_name.in_(["mineru-native", "pdfplumber-structure", "local-document"]),
                     T["document_parses"].c.status == "ready",
                 )
                 .order_by(T["document_parses"].c.revision_no.desc())
@@ -144,7 +169,7 @@ def history(project_id: UUID, user: Identity = Depends(identity)):
                 sa.select(T["runs"])
                 .where(T["runs"].c.project_id == project_id, T["runs"].c.kind.in_(["research_build", "research_qa"]))
                 .order_by(T["runs"].c.created_at.desc())
-                .limit(20)
+                .limit(100)
             )
             .mappings()
             .all()
@@ -168,6 +193,8 @@ def history(project_id: UUID, user: Identity = Depends(identity)):
                 "mode": r["config_json"].get("mode"),
                 "model_preset": r["config_json"].get("models", {}).get("preset"),
                 "source_version_ids": r["input_json"].get("version_ids", []),
+                "conversation_id": str(r["conversation_id"]) if r["conversation_id"] else None,
+                "parent_run_id": r["input_json"].get("parent_run_id"),
                 "scientific_review": reviews.get(str(r["id"])),
             }
             for r in rows

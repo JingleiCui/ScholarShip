@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-export default function TaskEvents({ run }: { run: string }) {
-  const [open, setOpen] = useState(false),
+export default function TaskEvents({ run, initiallyOpen = false }: { run: string; initiallyOpen?: boolean }) {
+  const [open, setOpen] = useState(initiallyOpen),
     [lines, setLines] = useState<{ id: string; text: string }[]>([]),
     [state, setState] = useState('');
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function TaskEvents({ run }: { run: string }) {
     return () => source.close();
   }, [open, run]);
   return (
-    <details onToggle={(e) => setOpen(e.currentTarget.open)}>
+    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>实时任务步骤</summary>
       <p role="status">{state}</p>
       <ol>

@@ -43,7 +43,7 @@ export default function useExecution(project: string) {
     localAvailable: (roles: string[]) => localAvailable(configuration, roles),
     available: (roles: string[]) => cloudAvailable(configuration, external, roles),
     notice: checked
-      ? '本地生成需模型和服务就绪；MinerU 使用已授权云端解析。云端生成仍需独立额度准入。'
+      ? '本地对话需向量、重排和回答服务就绪；PDF 可在阅读页本地解析 / OCR。云端调用仍需独立准入。'
       : '正在核对执行条件，可先阅读原文。',
   };
 }
